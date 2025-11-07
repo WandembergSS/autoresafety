@@ -1,0 +1,58 @@
+<section class="page">
+  <header class="page__header">
+    <p class="step">Step 4</p>
+    <h2>Identify Unsafe Control Actions (UCAs)</h2>
+    <p>
+      Use the control structure context to reason about how actions can become unsafe. Keep each entry concise and
+      traceable back to the originating controller and hazard.
+    </p>
+  </header>
+
+  <section class="card">
+    <h3>Record a new UCA</h3>
+    <form class="grid" [formGroup]="ucaForm" (ngSubmit)="addUca()">
+      <label class="field">
+        <span>Controller</span>
+        <input type="text" formControlName="controller" placeholder="Which controller issues the action?" />
+      </label>
+      <label class="field">
+        <span>Control action</span>
+        <input type="text" formControlName="controlAction" placeholder="Describe the control action" />
+      </label>
+      <label class="field field--full">
+        <span>Hazard or loss</span>
+        <textarea rows="2" formControlName="hazard" placeholder="What loss scenario might occur?"></textarea>
+      </label>
+      <label class="field">
+        <span>Category</span>
+        <select formControlName="category">
+          <option value="Not provided">Not provided</option>
+          <option value="Provided incorrectly">Provided incorrectly</option>
+          <option value="Incorrect timing">Incorrect timing</option>
+          <option value="Stopped too soon / applied too long">Stopped too soon / applied too long</option>
+        </select>
+      </label>
+      <div class="actions field--full">
+        <button type="submit">Add unsafe action</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Unsafe control actions list</h3>
+    <div class="uca-list">
+      @for (uca of ucas(); track uca.id) {
+        <article class="uca">
+          <header>
+            <div>
+              <h4>{{ uca.controlAction }}</h4>
+              <p>Controller: {{ uca.controller }}</p>
+            </div>
+            <span class="badge badge--{{ categoryClass(uca.category) }}">{{ uca.category }}</span>
+          </header>
+          <p class="uca__hazard">Hazard: {{ uca.hazard }}</p>
+        </article>
+      }
+    </div>
+  </section>
+</section>

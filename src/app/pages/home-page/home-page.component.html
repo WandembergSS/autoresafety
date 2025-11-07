@@ -1,0 +1,121 @@
+<section class="page">
+  <header class="page__header">
+    <h2>Project Portfolio</h2>
+    <p>Spin up a new RESafety study or jump back into an existing safety analysis.</p>
+  </header>
+
+  <div class="page__grid">
+    <form class="card" [formGroup]="projectForm" (ngSubmit)="createProject()">
+      <h3>Create new project</h3>
+      <div class="field">
+        <label for="project-name">Project name</label>
+        <input
+          id="project-name"
+          type="text"
+          formControlName="name"
+          placeholder="e.g. Autonomous shuttle rollout"
+        />
+        @if (projectForm.controls.name.invalid && projectForm.controls.name.touched) {
+          <small class="hint">Provide a descriptive name (min. 4 characters).</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="project-domain">Application domain</label>
+        <input id="project-domain" type="text" formControlName="domain" placeholder="e.g. Urban mobility" />
+      </div>
+
+      <div class="field">
+        <label for="project-owner">Lead analyst</label>
+        <input id="project-owner" type="text" formControlName="owner" placeholder="Assign a primary analyst" />
+      </div>
+
+      <div class="field">
+        <label for="project-description">Overview</label>
+        <textarea
+          id="project-description"
+          rows="3"
+          formControlName="description"
+          placeholder="Summarise system intent, risk posture, and major stakeholders."
+        ></textarea>
+      </div>
+
+      <button type="submit" class="primary">Create project draft</button>
+    </form>
+
+    <section class="card card--summary">
+      <h3>RESafety workflow</h3>
+      <ol>
+        <li>Define the scope and safety intent of the system.</li>
+        <li>Model stakeholders with iStar4Safety.</li>
+        <li>Map the STPA control structure.</li>
+        <li>Capture unsafe control actions.</li>
+        <li>Formulate controller constraints.</li>
+        <li>Analyse loss scenarios and derive safety requirements.</li>
+        <li>Synchronise updates back into iStar4Safety models.</li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="list">
+    <header class="list__header">
+      <h3>In-flight analyses</h3>
+      <p>{{ pendingProjects().length }} active projects</p>
+    </header>
+
+    @if (pendingProjects().length === 0) {
+      <p class="empty">No pending analyses. Draft a project to get started.</p>
+    } @else {
+      <div class="list__grid">
+        @for (project of pendingProjects(); track project.id) {
+          <article class="tile">
+            <div class="tile__heading">
+              <h4>{{ project.name }}</h4>
+              <span class="status status--{{ project.status }}">{{ project.status }}</span>
+            </div>
+            <p class="tile__meta">
+              <strong>Domain:</strong> {{ project.domain }} · <strong>Lead:</strong> {{ project.owner ?? 'Unassigned' }}
+            </p>
+            <p class="tile__description">{{ project.description }}</p>
+            <p class="tile__next">Next step: {{ project.nextStep }}</p>
+            <div class="tile__actions">
+              <button type="button" (click)="updateStatus(project.id, 'in-progress')">Mark in-progress</button>
+              <button type="button" (click)="updateStatus(project.id, 'complete')">Mark complete</button>
+              <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="list">
+    <header class="list__header">
+      <h3>Concluded analyses</h3>
+      <p>{{ completedProjects().length }} archived projects</p>
+    </header>
+
+    @if (completedProjects().length === 0) {
+      <p class="empty">No completed projects yet. Finish a workflow to see history here.</p>
+    } @else {
+      <div class="list__grid list__grid--compact">
+        @for (project of completedProjects(); track project.id) {
+          <article class="tile tile--compact">
+            <div class="tile__heading">
+              <h4>{{ project.name }}</h4>
+              <span class="status status--complete">Complete</span>
+            </div>
+            <p class="tile__meta">
+              <strong>Domain:</strong> {{ project.domain }} · <strong>Lead:</strong> {{ project.owner ?? 'Unassigned' }}
+            </p>
+            <p class="tile__description">{{ project.description }}</p>
+            <div class="tile__actions">
+              <button type="button" (click)="updateStatus(project.id, 'pending')">Reopen</button>
+              <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </section>
+</section>

@@ -1,0 +1,129 @@
+<section class="page">
+  <header class="page__header">
+    <p class="step">Step 1</p>
+    <h2>Define the Scope of the Safety-Critical System</h2>
+    <p>
+      Capture the mission context, stakeholders, hazards, and baseline constraints that shape the RESafety activity.
+      All data shown below is mock content for prototyping the experience.
+    </p>
+  </header>
+
+  <div class="page__grid">
+    <section class="card">
+      <h3>System mission overview</h3>
+      <form [formGroup]="scopeSummaryForm" class="stack">
+        <label class="field">
+          <span>System name</span>
+          <input type="text" formControlName="systemName" />
+        </label>
+        <label class="field">
+          <span>Mission intent</span>
+          <textarea rows="2" formControlName="mission"></textarea>
+        </label>
+        <label class="field">
+          <span>Operational boundary</span>
+          <textarea rows="3" formControlName="boundary"></textarea>
+        </label>
+        <label class="field">
+          <span>Assumptions</span>
+          <textarea rows="3" formControlName="assumptions"></textarea>
+        </label>
+      </form>
+    </section>
+
+    <section class="card">
+      <h3>Stakeholder objectives ({{ objectiveCount() }})</h3>
+      <form class="inline-form" [formGroup]="objectiveForm" (ngSubmit)="addObjective()">
+        <input type="text" formControlName="description" placeholder="Objective statement" />
+        <input type="text" formControlName="stakeholder" placeholder="Stakeholder" />
+        <select formControlName="priority">
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+        <button type="submit">Add</button>
+      </form>
+      <ul class="list">
+        @for (objective of objectives(); track objective.id) {
+          <li>
+            <div>
+              <h4>{{ objective.description }}</h4>
+              <p>Stakeholder: {{ objective.stakeholder }}</p>
+            </div>
+            <span class="tag tag--priority-{{ objective.priority | lowercase }}">{{ objective.priority }}</span>
+          </li>
+        }
+      </ul>
+    </section>
+  </div>
+
+  <div class="page__grid">
+    <section class="card">
+      <h3>System-level hazards ({{ hazardCount() }})</h3>
+      <form class="stack" [formGroup]="hazardForm" (ngSubmit)="addHazard()">
+        <label class="field">
+          <span>Hazard title</span>
+          <input type="text" formControlName="title" placeholder="e.g. Over-infusion due to sensor fault" />
+        </label>
+        <label class="field">
+          <span>Potential loss</span>
+          <textarea rows="2" formControlName="potentialLoss"></textarea>
+        </label>
+        <label class="field field--split">
+          <span>Severity</span>
+          <select formControlName="severity">
+            <option value="Catastrophic">Catastrophic</option>
+            <option value="Major">Major</option>
+            <option value="Minor">Minor</option>
+          </select>
+          <button type="submit">Add hazard</button>
+        </label>
+      </form>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Hazard</th>
+            <th>Potential loss</th>
+            <th>Severity</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (hazard of hazards(); track hazard.id) {
+            <tr>
+              <td>{{ hazard.title }}</td>
+              <td>{{ hazard.potentialLoss }}</td>
+              <td><span class="tag tag--severity">{{ hazard.severity }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h3>Initial safety constraints</h3>
+      <form class="stack" [formGroup]="constraintForm" (ngSubmit)="addConstraint()">
+        <label class="field">
+          <span>Constraint statement</span>
+          <textarea rows="2" formControlName="statement"></textarea>
+        </label>
+        <label class="field">
+          <span>Rationale</span>
+          <textarea rows="2" formControlName="rationale"></textarea>
+        </label>
+        <button type="submit">Record constraint</button>
+      </form>
+
+      <ul class="list list--dense">
+        @for (constraint of constraints(); track constraint.id) {
+          <li>
+            <div>
+              <h4>{{ constraint.statement }}</h4>
+              <p>{{ constraint.rationale }}</p>
+            </div>
+          </li>
+        }
+      </ul>
+    </section>
+  </div>
+</section>

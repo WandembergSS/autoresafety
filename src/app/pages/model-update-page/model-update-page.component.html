@@ -1,0 +1,161 @@
+<section class="page-header">
+  <h2>Update iStar4Safety Models</h2>
+  <p>Synchronise model changes with validation artefacts and keep stakeholders aligned on delivery.</p>
+</section>
+
+<section class="dashboard">
+  <div class="stat-grid">
+    @for (card of changeBreakdown(); track card.label) {
+      <article class="stat-card stat-card--{{ card.tone }}">
+        <h3>{{ card.label }}</h3>
+        <p class="stat-card__value">{{ card.value }}</p>
+      </article>
+    }
+  </div>
+  <article class="gauge">
+    <h3>Validation readiness</h3>
+    <p>{{ readinessScore() }}% tasks completed</p>
+    <div class="gauge__bar">
+      <div class="gauge__fill" [style.width.%]="readinessScore()"></div>
+    </div>
+    <span class="gauge__hint">Close tasks to unlock the next release gate.</span>
+  </article>
+</section>
+
+<section class="change-form">
+  <h3>Log a model update</h3>
+  <form [formGroup]="changeForm" (ngSubmit)="addChange()">
+    <div class="form-grid">
+      <label>
+        Model area
+        <input type="text" formControlName="area" placeholder="Subsystem or diagram" />
+      </label>
+      <label>
+        Driver
+        <input type="text" formControlName="driver" placeholder="Link to UCA, scenario or requirement" />
+      </label>
+      <label class="full">
+        Description
+        <textarea formControlName="change" rows="2" placeholder="Summarise the change"></textarea>
+      </label>
+      <label class="full">
+        Impact analysis
+        <textarea formControlName="impact" rows="2" placeholder="How does this affect stakeholders?"></textarea>
+      </label>
+      <label class="full">
+        Evidence references
+        <input type="text" formControlName="evidence" placeholder="Comma-separated artefacts" />
+      </label>
+    </div>
+    <button type="submit" class="primary">Add update</button>
+  </form>
+</section>
+
+<section>
+  <div class="section-heading">
+    <h3>Model change log</h3>
+    <p>Keep an auditable record of model revisions linked back to safety insights.</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Area</th>
+        <th>Change</th>
+        <th>Driver</th>
+        <th>Impact</th>
+        <th>Evidence</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (change of modelChanges(); track change.id) {
+        <tr>
+          <td>{{ change.id }}</td>
+          <td>{{ change.area }}</td>
+          <td>{{ change.change }}</td>
+          <td>{{ change.driver }}</td>
+          <td>{{ change.impact }}</td>
+          <td>
+            @if (change.evidence.length) {
+              <ul class="inline-list">
+                @for (item of change.evidence; track item) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            } @else {
+              <span class="muted">Pending upload</span>
+            }
+          </td>
+          <td class="status-cell">
+            <span class="badge badge--{{ statusClass(change.status) }}">{{ change.status }}</span>
+            <select (change)="updateChangeStatus(change.id, $event)" [value]="change.status">
+              <option value="planned">Planned</option>
+              <option value="in-progress">In progress</option>
+              <option value="deployed">Deployed</option>
+            </select>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</section>
+
+<section class="tasks-layout">
+  <div>
+    <div class="section-heading">
+      <h3>Validation &amp; release tasks</h3>
+      <p>Ensure evidence lands in the safety case before release.</p>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Task</th>
+          <th>Owner</th>
+          <th>Channel</th>
+          <th>Due</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (task of validationTasks(); track task.id) {
+          <tr>
+            <td>{{ task.id }}</td>
+            <td>{{ task.name }}</td>
+            <td>{{ task.owner }}</td>
+            <td>{{ task.channel }}</td>
+            <td>{{ task.dueDate }}</td>
+            <td class="status-cell">
+              <span class="badge badge--{{ statusClass(task.status) }}">{{ task.status }}</span>
+              <select (change)="updateTaskStatus(task.id, $event)" [value]="task.status">
+                <option value="todo">To do</option>
+                <option value="doing">In progress</option>
+                <option value="done">Done</option>
+              </select>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <aside class="notes">
+    <h3>Integration notes</h3>
+    <ul>
+      @for (note of integrationNotes(); track note.id) {
+        <li>
+          <div class="note-meta">
+            <span class="note-date">{{ note.createdOn }}</span>
+            <span class="note-author">{{ note.author }}</span>
+          </div>
+          <p>{{ note.summary }}</p>
+          <ul class="action-list">
+            @for (item of note.actionItems; track item) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </li>
+      }
+    </ul>
+  </aside>
+</section>

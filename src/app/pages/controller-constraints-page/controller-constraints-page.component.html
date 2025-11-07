@@ -1,0 +1,63 @@
+<section class="page">
+  <header class="page__header">
+    <p class="step">Step 5</p>
+    <h2>Identify Controller Constraints</h2>
+    <p>
+      Translate each unsafe control action into a constraint that the controller must enforce. The mock table below mimics the
+      review board used to approve constraints.
+    </p>
+  </header>
+
+  <section class="card">
+    <h3>Draft a constraint</h3>
+    <form class="grid" [formGroup]="constraintForm" (ngSubmit)="addConstraint()">
+      <label class="field">
+        <span>UCA reference</span>
+        <input type="text" formControlName="ucaRef" placeholder="e.g. UCA-04" />
+      </label>
+      <label class="field field--full">
+        <span>Constraint statement</span>
+        <textarea rows="3" formControlName="constraint" placeholder="Describe the required controller behaviour"></textarea>
+      </label>
+      <label class="field field--full">
+        <span>Enforcement mechanism</span>
+        <textarea rows="2" formControlName="enforcementMechanism" placeholder="How will the controller ensure this constraint?"></textarea>
+      </label>
+      <label class="field">
+        <span>Status</span>
+        <select formControlName="status">
+          <option value="Draft">Draft</option>
+          <option value="Pending Review">Pending Review</option>
+          <option value="Approved">Approved</option>
+        </select>
+      </label>
+      <div class="actions field--full">
+        <button type="submit">Record constraint</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h3>Constraint review board</h3>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>UCA</th>
+          <th>Constraint</th>
+          <th>Enforcement</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of constraints(); track item.id) {
+          <tr>
+            <td>{{ item.ucaRef }}</td>
+            <td>{{ item.constraint }}</td>
+            <td>{{ item.enforcementMechanism }}</td>
+            <td><span class="badge badge--{{ statusClass(item.status) }}">{{ item.status }}</span></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+</section>

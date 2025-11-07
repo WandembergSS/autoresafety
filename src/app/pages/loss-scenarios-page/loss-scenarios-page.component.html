@@ -1,0 +1,167 @@
+<section class="page-header">
+  <h2>Loss Scenarios &amp; Safety Requirements</h2>
+  <p>Trace mitigations from unsafe control actions into actionable safety requirements and monitor closure progress.</p>
+</section>
+
+<section class="stats">
+  <div class="stat-grid">
+    @for (card of scenarioSummary().totals; track card.label) {
+      <article class="stat-card stat-card--{{ card.tone }}">
+        <h3>{{ card.label }}</h3>
+        <p class="stat-card__value">{{ card.value }}</p>
+      </article>
+    }
+  </div>
+  <div class="stat-grid stat-grid--compact">
+    @for (card of scenarioSummary().severity; track card.label) {
+      <article class="stat-pill stat-pill--{{ card.tone }}">
+        <span>{{ card.label }}</span>
+        <strong>{{ card.value }}</strong>
+      </article>
+    }
+  </div>
+</section>
+
+<section class="scenario-form">
+  <h3>Capture a new loss scenario</h3>
+  <form [formGroup]="scenarioForm" (ngSubmit)="addScenario()">
+    <div class="form-grid">
+      <label>
+        Unsafe Control Action
+        <input type="text" formControlName="uca" placeholder="Summarise the triggering UCA" />
+      </label>
+      <label>
+        Hazard
+        <input type="text" formControlName="hazard" placeholder="Hazard linked to the scenario" />
+      </label>
+      <label class="full">
+        Loss Scenario Outcome
+        <textarea formControlName="outcome" rows="3" placeholder="Describe the accident sequence"></textarea>
+      </label>
+      <label>
+        Severity
+        <select formControlName="severity">
+          <option value="catastrophic">Catastrophic</option>
+          <option value="major">Major</option>
+          <option value="moderate">Moderate</option>
+          <option value="minor">Minor</option>
+        </select>
+      </label>
+      <label class="full">
+        Candidate Mitigations
+        <input type="text" formControlName="mitigations" placeholder="Comma-separated mitigations" />
+      </label>
+    </div>
+    <button type="submit" class="primary">Add Scenario</button>
+  </form>
+</section>
+
+<section>
+  <div class="section-heading">
+    <h3>Loss scenario register</h3>
+    <p>Review severity coverage and track mitigation status across the programme.</p>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Unsafe Control Action</th>
+        <th>Hazard</th>
+        <th>Outcome</th>
+        <th>Severity</th>
+        <th>Mitigations</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (scenario of lossScenarios(); track scenario.id) {
+        <tr>
+          <td>{{ scenario.id }}</td>
+          <td>{{ scenario.uca }}</td>
+          <td>{{ scenario.hazard }}</td>
+          <td>{{ scenario.outcome }}</td>
+          <td>
+            <span class="badge {{ severityClass(scenario.severity) }}">{{ scenario.severity }}</span>
+          </td>
+          <td>
+            @if (scenario.mitigations.length) {
+              <ul class="mitigation-list">
+                @for (mitigation of scenario.mitigations; track mitigation) {
+                  <li>{{ mitigation }}</li>
+                }
+              </ul>
+            } @else {
+              <span class="muted">No mitigations proposed yet</span>
+            }
+          </td>
+          <td class="status-cell">
+            <span class="badge badge--{{ statusClass(scenario.status) }}">{{ scenario.status }}</span>
+            <select (change)="changeScenarioStatus(scenario.id, $event)" [value]="scenario.status">
+              <option value="open">Open</option>
+              <option value="mitigated">Mitigated</option>
+              <option value="accepted">Accepted</option>
+            </select>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <div class="section-heading">
+    <h3>Safety requirements backlog</h3>
+    <p>Maintain traceability between loss scenarios and mitigations delivered to engineering teams.</p>
+  </div>
+  <div class="backlog-layout">
+    <div class="backlog-table">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Requirement</th>
+            <th>Scenario</th>
+            <th>Category</th>
+            <th>Owner</th>
+            <th>Due</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (requirement of safetyRequirements(); track requirement.id) {
+            <tr>
+              <td>{{ requirement.id }}</td>
+              <td>{{ requirement.title }}</td>
+              <td>LS-{{ requirement.linkedScenario }}</td>
+              <td>{{ requirement.category }}</td>
+              <td>{{ requirement.owner }}</td>
+              <td>{{ requirement.dueDate }}</td>
+              <td class="status-cell">
+                <span class="badge badge--{{ statusClass(requirement.status) }}">{{ requirement.status }}</span>
+                <select (change)="changeRequirementStatus(requirement.id, $event)" [value]="requirement.status">
+                  <option value="draft">Draft</option>
+                  <option value="in-review">In review</option>
+                  <option value="implemented">Implemented</option>
+                </select>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <aside class="review-panel">
+      <h4>Upcoming reviews</h4>
+      <p>Coordinate cross-discipline reviews before sign-off.</p>
+      <ul>
+        @for (item of upcomingReviews(); track item.id) {
+          <li>
+            <strong>{{ item.title }}</strong>
+            <span>Owner: {{ item.owner }}</span>
+            <span>Target date: {{ item.dueDate }}</span>
+            <span class="badge badge--{{ statusClass(item.status) }}">{{ item.status }}</span>
+          </li>
+        }
+      </ul>
+    </aside>
+  </div>
+</section>

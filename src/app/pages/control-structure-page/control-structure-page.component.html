@@ -1,0 +1,80 @@
+<section class="page">
+  <header class="page__header">
+    <p class="step">Step 3</p>
+    <h2>Define the STPA Control Structure</h2>
+    <p>
+      Map controllers, controlled processes, and feedback channels. The diagrams below use mocked data to visualise the evolving
+      control structure for the infusion pump system.
+    </p>
+  </header>
+
+  <section class="card">
+    <h3>Control loop catalogue</h3>
+    <form class="inline-form" [formGroup]="controlActionForm" (ngSubmit)="addControlAction()">
+      <input type="text" placeholder="Controller" formControlName="controller" />
+      <input type="text" placeholder="Control action" formControlName="action" />
+      <input type="text" placeholder="Controlled process" formControlName="controlledProcess" />
+      <input type="text" placeholder="Feedback signal" formControlName="feedback" />
+      <button type="submit">Add loop</button>
+    </form>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Controller</th>
+          <th>Action</th>
+          <th>Process</th>
+          <th>Feedback</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (item of controlActions(); track item.id) {
+          <tr>
+            <td>{{ item.controller }}</td>
+            <td>{{ item.action }}</td>
+            <td>{{ item.controlledProcess }}</td>
+            <td>{{ item.feedback }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h3>Feedback channels</h3>
+    <div class="feedback-grid">
+      @for (loop of feedbackLoops(); track loop.id) {
+        <article class="feedback-card">
+          <header>
+            <h4>{{ loop.source }} → {{ loop.destination }}</h4>
+            <span class="badge">{{ loop.latency }}</span>
+          </header>
+          <p>{{ loop.signal }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="card card--diagram">
+    <h3>Control structure mock diagram</h3>
+    <div class="diagram">
+      <div class="diagram__controller">
+        <h4>Infusion Controller</h4>
+        <p> Executes closed-loop dosing logic based on sensor telemetry. </p>
+      </div>
+      <div class="diagram__process">
+        <h4>Controlled Process</h4>
+        <p> Insulin Pump Mechanism </p>
+      </div>
+      <div class="diagram__feedback">
+        <p>Sensor feedback: flow rate, pressure, occlusion status</p>
+      </div>
+      <div class="diagram__actuation">
+        <p>Control action: adjust basal rate</p>
+      </div>
+    </div>
+    <p class="note">
+      Replace this placeholder with an interactive canvas or imported diagram in future iterations.
+    </p>
+  </section>
+</section>
