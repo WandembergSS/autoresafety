@@ -35,23 +35,23 @@ export class UcasPageComponent {
   readonly ucas = signal<UnsafeControlAction[]>([
     {
       id: 1,
-      controller: 'Infusion Controller',
-      controlAction: 'Increase basal rate',
-      hazard: 'Over-infusion leading to hypoglycemia',
+      controller: 'Control Application',
+      controlAction: 'Release insulin delivery',
+      hazard: 'H-2 · Control application releases insulin when glucose level is high',
       category: 'Provided incorrectly'
     },
     {
       id: 2,
-      controller: 'Caregiver Portal',
-      controlAction: 'Approve configuration change',
-      hazard: 'Unsafe regimen activated without dual sign-off',
+      controller: 'Continuous Glucose Monitor',
+      controlAction: 'Provide glucose reading',
+      hazard: 'H-5 · CGM does not provide a measure when glucose level is high',
       category: 'Not provided'
     },
     {
       id: 3,
-      controller: 'Cloud Update Service',
-      controlAction: 'Deploy firmware patch',
-      hazard: 'Pump enters failsafe due to incompatible firmware',
+      controller: 'Insulin Pump',
+      controlAction: 'Deliver insulin bolus',
+      hazard: 'H-3 · Pump delivers insulin with a delayed response',
       category: 'Incorrect timing'
     }
   ]);

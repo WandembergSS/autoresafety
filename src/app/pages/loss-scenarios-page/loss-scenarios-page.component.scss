@@ -18,6 +18,21 @@ section {
   color: #475569;
 }
 
+.page-header .step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  background: #e0f2fe;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .stats {
   display: grid;
   gap: 1.5rem;
@@ -334,6 +349,124 @@ tbody td {
   gap: 0.25rem;
   font-size: 0.85rem;
   color: #475569;
+}
+
+.trace-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 0.65rem;
+  border: 1px solid #cbd5f5;
+  background: #f8fafc;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.trace-button:hover {
+  background: #e0f2fe;
+  color: #1e3a8a;
+}
+
+.trace-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  z-index: 50;
+}
+
+.trace-modal__dialog {
+  width: min(720px, 100%);
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 1.1rem;
+  box-shadow: 0 30px 60px -25px rgba(15, 23, 42, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.trace-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+  color: #ffffff;
+}
+
+.trace-modal__header h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.15rem;
+}
+
+.trace-modal__header p {
+  margin: 0;
+  font-size: 0.85rem;
+  max-width: 40ch;
+}
+
+.trace-modal__close {
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+}
+
+.trace-modal__body {
+  padding: 1.5rem 1.8rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  overflow-y: auto;
+}
+
+.trace-modal__body section {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.85rem;
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.trace-modal__body h4 {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: #1f3c88;
+}
+
+.trace-modal__body ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.trace-modal__body p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #334155;
+}
+
+.trace-modal__footer {
+  padding: 1rem 1.5rem 1.4rem;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #e2e8f0;
+  background: #ffffff;
 }
 
 @media (max-width: 960px) {

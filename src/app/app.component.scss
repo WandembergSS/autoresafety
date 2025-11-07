@@ -67,13 +67,17 @@
 	gap: 0.75rem;
 }
 
+
 .shell__nav a {
 	text-decoration: none;
 	color: #1f2933;
 	font-weight: 500;
-	padding: 0.5rem 0.75rem;
-	border-radius: 0.65rem;
+	padding: 0.6rem 0.75rem;
+	border-radius: 0.75rem;
 	transition: background-color 0.2s ease, color 0.2s ease;
+	display: flex;
+	flex-direction: column;
+	gap: 0.2rem;
 }
 
 .shell__nav a:hover {
@@ -84,6 +88,17 @@
 .shell__nav a.active {
 	background: rgba(58, 125, 255, 0.15);
 	color: #1f4ddb;
+}
+
+.nav__label {
+	font-size: 0.88rem;
+	line-height: 1.15rem;
+}
+
+.nav__description {
+	font-size: 0.73rem;
+	font-weight: 500;
+	color: #64748b;
 }
 
 .shell__nav-label {

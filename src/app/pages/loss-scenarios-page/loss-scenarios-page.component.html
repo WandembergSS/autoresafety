@@ -1,4 +1,5 @@
 <section class="page-header">
+  <p class="step">Step 6</p>
   <h2>Loss Scenarios &amp; Safety Requirements</h2>
   <p>Trace mitigations from unsafe control actions into actionable safety requirements and monitor closure progress.</p>
 </section>
@@ -125,6 +126,7 @@
             <th>Owner</th>
             <th>Due</th>
             <th>Status</th>
+            <th>Traceability</th>
           </tr>
         </thead>
         <tbody>
@@ -143,6 +145,11 @@
                   <option value="in-review">In review</option>
                   <option value="implemented">Implemented</option>
                 </select>
+              </td>
+              <td>
+                <button type="button" class="trace-button" (click)="openTraceability(requirement.id)">
+                  Requirement traceability
+                </button>
               </td>
             </tr>
           }
@@ -165,3 +172,60 @@
     </aside>
   </div>
 </section>
+
+@if (traceability(); as detail) {
+  <div class="trace-modal" (click)="closeTraceability()">
+    <div class="trace-modal__dialog" (click)="$event.stopPropagation()">
+      <header class="trace-modal__header">
+        <div>
+          <h3>{{ detail.code }} Traceability</h3>
+          <p>{{ detail.statement }}</p>
+        </div>
+        <button type="button" class="trace-modal__close" (click)="closeTraceability()">×</button>
+      </header>
+
+      <div class="trace-modal__body">
+        <section>
+          <h4>Unsafe Control Action</h4>
+          <p><strong>{{ detail.uca.id }}</strong> · {{ detail.uca.description }}</p>
+        </section>
+        <section>
+          <h4>Related Hazards</h4>
+          <ul>
+            @for (hazard of detail.hazards; track hazard) {
+              <li>{{ hazard }}</li>
+            }
+          </ul>
+        </section>
+        <section>
+          <h4>Related Losses</h4>
+          <ul>
+            @for (loss of detail.losses; track loss) {
+              <li>{{ loss }}</li>
+            }
+          </ul>
+        </section>
+        <section>
+          <h4>Supporting Constraints</h4>
+          <ul>
+            @for (constraint of detail.constraints; track constraint) {
+              <li>{{ constraint }}</li>
+            }
+          </ul>
+        </section>
+        <section>
+          <h4>Control Actions</h4>
+          <ul>
+            @for (action of detail.controlActions; track action) {
+              <li>{{ action }}</li>
+            }
+          </ul>
+        </section>
+      </div>
+
+      <footer class="trace-modal__footer">
+        <button type="button" class="primary" (click)="closeTraceability()">Close</button>
+      </footer>
+    </div>
+  </div>
+}

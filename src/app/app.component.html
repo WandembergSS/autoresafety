@@ -5,17 +5,26 @@
     </button>
     <div>
       <h1>{{ appTitle }}</h1>
-      <p class="shell__subtitle">Guided workflow for AI-enhanced RESafety analysis</p>
+      <p class="shell__subtitle">{{ appSubtitle }}</p>
     </div>
   </header>
 
   <div class="shell__body">
     <aside class="shell__nav" [class.shell__nav--open]="navOpen()">
       <nav>
-        <a routerLink="/" (click)="closeNav()" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
-        <p class="shell__nav-label">RESafety Steps</p>
-        @for (step of steps; track step.path) {
-          <a [routerLink]="step.path" (click)="closeNav()" routerLinkActive="active">{{ step.label }}</a>
+        @for (section of navSections; track section.heading) {
+          <p class="shell__nav-label">{{ section.heading }}</p>
+          @for (link of section.links; track link.path) {
+            <a
+              [routerLink]="link.path"
+              (click)="closeNav()"
+              routerLinkActive="active"
+              [routerLinkActiveOptions]="{ exact: link.path === '/' }"
+            >
+              <span class="nav__label">{{ link.label }}</span>
+              <span class="nav__description">{{ link.description }}</span>
+            </a>
+          }
         }
       </nav>
     </aside>

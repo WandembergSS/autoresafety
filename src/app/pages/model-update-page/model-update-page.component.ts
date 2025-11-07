@@ -54,37 +54,37 @@ export class ModelUpdatePageComponent {
   readonly modelChanges = signal<ModelChange[]>([
     {
       id: 1,
-      area: 'Goal refinement',
-      change: 'Split "Maintain safe separation" into speed and lateral control sub-goals.',
-      driver: 'UCA-12 mitigation',
-      impact: 'Clarifies feedback loops for perception latency analysis.',
+      area: 'Safety goals',
+      change: 'Refine <<SafetyGoal>> Maintain safe insulin delivery into authentication and timing sub-goals.',
+      driver: 'R-Saf-1 traceability review',
+      impact: 'Exposes explicit link between authentication guard and insulin release control action.',
       status: 'in-progress',
-      evidence: ['Updated goal diagram', 'Meeting notes 2024-10-12']
+      evidence: ['Updated iStar SR diagram', 'Workshop notes 2024-10-12']
     },
     {
       id: 2,
       area: 'Actor responsibilities',
-      change: 'Add maintenance supervisor actor to reflect depot override authority.',
-      driver: 'Scenario LS-33',
-      impact: 'Ensures maintenance mode interlocks are explicitly modelled.',
+      change: 'Assign CGM firmware team responsibility for latency monitoring and watchdog alerts.',
+      driver: 'R-Saf-6 implementation plan',
+      impact: 'Maintains traceability from CGM watchdog constraint back to sensing responsibilities.',
       status: 'planned',
-      evidence: ['Action from review board']
+      evidence: ['Traceability review action item']
     },
     {
       id: 3,
-      area: 'Resource links',
-      change: 'Model redundant sensor voting channel between lidar and radar.',
-      driver: 'Requirement SR-501',
-      impact: 'Supports traceability to fusion logic constraints.',
+      area: 'Control structure',
+      change: 'Add explicit feedback link from pump actuation sensor to control application.',
+      driver: 'R-Saf-8 readiness review',
+      impact: 'Documents telemetry channel needed to confirm dosage completion.',
       status: 'deployed',
-      evidence: ['Git commit #f92a4c', 'Simulation run 2219']
+      evidence: ['Git commit #f92a4c', 'Bench test log 2219']
     }
   ]);
 
   readonly validationTasks = signal<ValidationTask[]>([
     {
       id: 21,
-      name: 'Review goal hierarchy with safety board',
+      name: 'Review authentication guard update with safety board',
       owner: 'Priya Banerjee',
       dueDate: '2024-12-05',
       channel: 'Safety board',
@@ -92,7 +92,7 @@ export class ModelUpdatePageComponent {
     },
     {
       id: 22,
-      name: 'Update change log in safety case',
+      name: 'Update RESafety change log with CGM latency constraint',
       owner: 'Miguel Santos',
       dueDate: '2024-11-28',
       channel: 'Safety case',
@@ -100,7 +100,7 @@ export class ModelUpdatePageComponent {
     },
     {
       id: 23,
-      name: 'Run regression of fusion logic scenario set',
+      name: 'Run regression of pump actuation validation scenarios',
       owner: 'Dana Ortiz',
       dueDate: '2024-12-18',
       channel: 'V&V',
@@ -111,17 +111,17 @@ export class ModelUpdatePageComponent {
   readonly integrationNotes = signal<IntegrationNote[]>([
     {
       id: 81,
-      summary: 'System engineers aligned on new maintenance supervisor actor responsibilities.',
+      summary: 'System engineers aligned on CGM watchdog responsibilities and telemetry format.',
       createdOn: '2024-11-01',
       author: 'Keira Osei',
-      actionItems: ['Draft revised SOP for depot handover', 'Sync with training lead on new role']
+      actionItems: ['Draft revised SOP for latency alerts', 'Sync training lead on new escalation flow']
     },
     {
       id: 82,
-      summary: 'Fusion logic change validated against urban shuttle night route scenarios.',
+      summary: 'Pump actuation telemetry validated against simulated infusion cycles.',
       createdOn: '2024-10-22',
       author: 'Dana Ortiz',
-      actionItems: ['Upload waveform captures', 'Schedule dry-run with ops team']
+      actionItems: ['Upload infusion trend captures', 'Schedule dry-run with clinical ops team']
     }
   ]);
 

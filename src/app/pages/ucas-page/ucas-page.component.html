@@ -3,8 +3,9 @@
     <p class="step">Step 4</p>
     <h2>Identify Unsafe Control Actions (UCAs)</h2>
     <p>
-      Use the control structure context to reason about how actions can become unsafe. Keep each entry concise and
-      traceable back to the originating controller and hazard.
+      Evaluate each control action from the STPA control structure across the four STPA contexts—Not Provided, Provided,
+      Incorrect Timing, and Stopped Too Soon/Applied Too Long. Each UCA should remain traceable back to the source
+      controller and the hazard identifiers from Step 1.
     </p>
   </header>
 
@@ -21,7 +22,7 @@
       </label>
       <label class="field field--full">
         <span>Hazard or loss</span>
-        <textarea rows="2" formControlName="hazard" placeholder="What loss scenario might occur?"></textarea>
+        <textarea rows="2" formControlName="hazard" placeholder="Reference the hazard or loss (e.g. H-2, L-1)"></textarea>
       </label>
       <label class="field">
         <span>Category</span>

@@ -33,23 +33,26 @@ export class ControllerConstraintsPageComponent {
   readonly constraints = signal<ControllerConstraint[]>([
     {
       id: 1,
-      ucaRef: 'UCA-01',
-      constraint: 'The controller shall verify current glucose value < 80 mg/dL before commanding an increase in basal rate.',
-      enforcementMechanism: 'Runtime guard inside dosing loop',
+      ucaRef: 'UCA-Saf-1',
+      constraint:
+        'The control application shall not release insulin when the CGM reports glucose above the high threshold.',
+      enforcementMechanism: 'Runtime guard within dosing supervisor',
       status: 'Approved'
     },
     {
       id: 2,
-      ucaRef: 'UCA-02',
-      constraint: 'Configuration updates shall require dual caregiver approval before activation on the device.',
-      enforcementMechanism: 'Workflow enforced inside caregiver portal',
+      ucaRef: 'UCA-Saf-5',
+      constraint:
+        'The CGM shall provide a validated glucose sample to the control application within 5 seconds of each reading.',
+      enforcementMechanism: 'Sensor firmware timing watchdog',
       status: 'Pending Review'
     },
     {
       id: 3,
-      ucaRef: 'UCA-03',
-      constraint: 'Firmware deployment shall be deferred if the device reports active infusion session.',
-      enforcementMechanism: 'Cloud deployment pipeline gate',
+      ucaRef: 'UCA-Saf-9',
+      constraint:
+        'The insulin pump shall complete a commanded infusion before accepting a stop signal from the control application.',
+      enforcementMechanism: 'Pump firmware state machine guard',
       status: 'Draft'
     }
   ]);

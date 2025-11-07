@@ -7,6 +7,7 @@ interface HomeProject extends Project {
   domain?: string;
   owner?: string;
   nextStep?: string;
+  currentStep?: number;
 }
 
 @Component({
@@ -30,21 +31,25 @@ export class HomePageComponent {
   readonly projects = signal<HomeProject[]>([
     {
       id: 1,
-      name: 'Autonomous Shuttle Pilot',
-      domain: 'Urban Mobility',
-      description: 'Pilot deployment for level-4 autonomous shuttles in a university campus.',
-      status: 'pending',
+      name: 'Automated Insulin Delivery (AID) System',
+      domain: 'Medical IoT',
+      description:
+        'Co-create the RESafety stack for the SafeSecIoT reference case: AID system with CGM, control app, and insulin pump.',
+      status: 'in-progress',
       owner: 'Priya Banerjee',
-      nextStep: 'Define Scope'
+      currentStep: 4,
+      nextStep: 'Resume Step 4 · Identify Unsafe Control Actions'
     },
     {
       id: 2,
-      name: 'Infusion Pump Safety Refresh',
-      domain: 'Healthcare Devices',
-      description: 'Retrofit safety case for smart insulin infusion pumps with wireless updates.',
-      status: 'in-progress',
+      name: 'Smart Grid Balancing Agent',
+      domain: 'Critical Energy',
+      description:
+        'Assess distributed balancing agents for constraint violations and cascading loss scenarios in the grid.',
+      status: 'pending',
       owner: 'Miguel Santos',
-      nextStep: 'Identify UCAs'
+      currentStep: 1,
+      nextStep: 'Kick-off Step 1 · Define SCS Scope'
     },
     {
       id: 3,
@@ -53,7 +58,8 @@ export class HomePageComponent {
       description: 'Evaluate fail-operational constraints for runway lighting automation.',
       status: 'complete',
       owner: 'Laura Chen',
-      nextStep: 'Review Safety Requirements'
+      currentStep: 7,
+      nextStep: 'Archive evidence & publish traceability report'
     }
   ]);
 
@@ -80,7 +86,8 @@ export class HomePageComponent {
       description: raw.description ?? '',
       status: 'pending',
       owner: raw.owner ?? 'Unassigned',
-      nextStep: 'Define Scope'
+      currentStep: 1,
+      nextStep: 'Kick-off Step 1 · Define SCS Scope'
     };
 
     this.projects.update((current) => [newProject, ...current]);
@@ -95,7 +102,12 @@ export class HomePageComponent {
     this.projects.update((current) =>
       current.map((project) =>
         project.id === projectId
-          ? { ...project, status, nextStep: this.deriveNextStep(status) }
+          ? {
+              ...project,
+              status,
+              nextStep: this.deriveNextStep(status, project.currentStep),
+              currentStep: this.deriveStep(status, project.currentStep)
+            }
           : project
       )
     );
@@ -109,16 +121,51 @@ export class HomePageComponent {
     this.projects.update((current) => current.filter((project) => project.id !== projectId));
   }
 
-  private deriveNextStep(status: 'pending' | 'in-progress' | 'complete'): string {
-    switch (status) {
-      case 'pending':
-        return 'Define Scope';
-      case 'in-progress':
-        return 'Continue RESafety workflow';
-      case 'complete':
-        return 'Archive & report';
-      default:
-        return 'Unassigned';
+  private deriveNextStep(
+    status: 'pending' | 'in-progress' | 'complete',
+    currentStep: number | undefined
+  ): string {
+    if (status === 'pending') {
+      return 'Kick-off Step 1 · Define SCS Scope';
     }
+
+    if (status === 'in-progress') {
+      const step = currentStep && currentStep < 7 ? currentStep : 2;
+      const labels: Record<number, string> = {
+        1: 'Scope Definition',
+        2: 'iStar4Safety Models',
+        3: 'Control Structure',
+        4: 'Unsafe Control Actions',
+        5: 'Controller Constraints',
+        6: 'Loss Scenarios & Safety Requirements',
+        7: 'Update iStar4Safety Models'
+      };
+      return `Resume Step ${step} · ${labels[step]}`;
+    }
+
+    if (status === 'complete') {
+      return 'Archive evidence & publish traceability report';
+    }
+
+    return 'Next activity to be defined';
+  }
+
+  private deriveStep(
+    status: 'pending' | 'in-progress' | 'complete',
+    currentStep: number | undefined
+  ): number | undefined {
+    if (status === 'pending') {
+      return 1;
+    }
+
+    if (status === 'in-progress') {
+      return currentStep && currentStep < 7 ? currentStep + 1 : 2;
+    }
+
+    if (status === 'complete') {
+      return 7;
+    }
+
+    return currentStep;
   }
 }

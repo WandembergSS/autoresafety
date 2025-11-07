@@ -26,6 +26,17 @@ interface SafetyRequirement {
   status: RequirementStatus;
 }
 
+interface TraceabilityDetail {
+  requirementId: number;
+  code: string;
+  statement: string;
+  uca: { id: string; description: string };
+  hazards: string[];
+  losses: string[];
+  constraints: string[];
+  controlActions: string[];
+}
+
 @Component({
   selector: 'app-loss-scenarios-page',
   standalone: true,
@@ -47,59 +58,62 @@ export class LossScenariosPageComponent {
 
   readonly lossScenarios = signal<LossScenario[]>([
     {
-      id: 31,
-      uca: 'UCA-12: Increase throttle while obstacle detected',
-      hazard: 'H-3: Collision with pedestrian at mid-block crossing',
-      outcome: 'Vehicle acceleration overrides braking request when lidar misclassifies stroller.',
+      id: 101,
+      uca: 'UCA-Saf-1: Control app releases insulin without satisfying authentication',
+      hazard: 'H-2: Unauthorized insulin delivery during high glucose',
+      outcome:
+        'Control application issues a bolus command before the CGM confirms glucose is within the safe range.',
       severity: 'catastrophic',
-      mitigations: ['Dual-sensor voting', 'Predictive braking override'],
+      mitigations: ['R-Saf-1 · Enforce authentication before insulin release'],
       status: 'open'
     },
     {
-      id: 32,
-      uca: 'UCA-22: Defer pilot alert beyond 8 seconds',
-      hazard: 'H-8: Flight crew loses situational awareness of automation state',
-      outcome: 'Late alert prevents timely handover on approach in low visibility.',
+      id: 102,
+      uca: 'UCA-Saf-6: CGM provides delayed glucose sample',
+      hazard: 'H-5: Control application acts on stale glucose data',
+      outcome:
+        'Sensor latency hides a sudden glucose drop, delaying the controller response and triggering hypoglycemia.',
       severity: 'major',
-      mitigations: ['Cockpit callouts', 'Alert escalation ladder'],
+      mitigations: ['R-Saf-6 · Guard against delayed samples', 'R-Saf-7 · Require pump behaviour check'],
       status: 'mitigated'
     },
     {
-      id: 33,
-      uca: 'UCA-05: Disable cooling loop during maintenance mode',
-      hazard: 'H-14: Battery thermal runaway in charging depot',
-      outcome: 'Manual override disables coolant circulation for more than 4 minutes.',
+      id: 103,
+      uca: 'UCA-Saf-9: Pump stops infusion before delivering prescribed dose',
+      hazard: 'H-3: Patient receives insufficient insulin',
+      outcome:
+        'Pump firmware aborts infusion early after a communications glitch, leaving the patient under-dosed.',
       severity: 'moderate',
-      mitigations: ['Maintenance checklist update'],
+      mitigations: ['R-Saf-8 · Monitor pump actuation timing'],
       status: 'accepted'
     }
   ]);
 
   readonly safetyRequirements = signal<SafetyRequirement[]>([
     {
-      id: 501,
-      title: 'Implement redundant obstacle detection fusion controller',
-      linkedScenario: 31,
+      id: 601,
+      title: 'R-Saf-1 · Require authentication before insulin release commands',
+      linkedScenario: 101,
       category: 'Control Logic',
-      owner: 'Dana Ortiz',
+      owner: 'Nia Marques',
       dueDate: '2025-01-15',
       status: 'in-review'
     },
     {
-      id: 502,
-      title: 'Add progressive pilot alert ladder with tactile cue',
-      linkedScenario: 32,
-      category: 'Human Factors',
-      owner: 'Milan Petrov',
+      id: 602,
+      title: 'R-Saf-6 · Reject CGM samples that exceed age threshold',
+      linkedScenario: 102,
+      category: 'Sensing',
+      owner: 'Miguel Santos',
       dueDate: '2024-12-12',
       status: 'draft'
     },
     {
-      id: 503,
-      title: 'Mandate coolant bypass interlock in maintenance tooling',
-      linkedScenario: 33,
-      category: 'Procedural',
-      owner: 'Keira Osei',
+      id: 603,
+      title: 'R-Saf-8 · Monitor pump actuation completion feedback',
+      linkedScenario: 103,
+      category: 'Device Firmware',
+      owner: 'Laura Chen',
       dueDate: '2025-02-05',
       status: 'implemented'
     }
@@ -139,6 +153,53 @@ export class LossScenariosPageComponent {
       .filter((item) => item.status !== 'implemented')
       .slice(0, 3)
   );
+
+  private readonly traceabilityCatalog: Record<number, TraceabilityDetail> = {
+    601: {
+      requirementId: 601,
+      code: 'R-Saf-1',
+      statement:
+        'The system must not provide the control application with the ability to release insulin without first satisfying proper authentication.',
+      uca: {
+        id: 'UCA-Saf-1',
+        description: 'Control application releases insulin without performing authentication.'
+      },
+      hazards: ['H-2 · Release insulin when glucose is high', 'H-4 · Control app bypasses security constraint'],
+      losses: ['L-1 · Patient experiences severe hypoglycemia or hyperglycemia', 'L-4 · Loss of trust in the AID system'],
+      constraints: ['SC-Sec-4 · Implement robust authentication and access control mechanisms'],
+      controlActions: ['CA-1 · Release insulin delivery']
+    },
+    602: {
+      requirementId: 602,
+      code: 'R-Saf-6',
+      statement:
+        'The system must provide the CGM with the ability to deliver timely glucose readings after each sensor capture.',
+      uca: {
+        id: 'UCA-Saf-6',
+        description: 'CGM provides a measure of glucose level too late after performing the sensor reading.'
+      },
+      hazards: ['H-5 · Use of stale glucose data', 'H-6 · Delayed therapy adjustments'],
+      losses: ['L-2 · Patient suffers harm due to delayed insulin delivery'],
+      constraints: ['SC-Saf-6 · CGM must publish samples within defined latency bounds'],
+      controlActions: ['CA-2 · Measure glucose level']
+    },
+    603: {
+      requirementId: 603,
+      code: 'R-Saf-8',
+      statement:
+        'The system must ensure the insulin pump delivers insulin promptly upon release by the control application.',
+      uca: {
+        id: 'UCA-Saf-8',
+        description: 'Insulin pump provides insulin delivery too late after release by the control application.'
+      },
+      hazards: ['H-1 · Patient receives incorrect insulin dosage', 'H-3 · Pump stops delivering before dosage is complete'],
+      losses: ['L-1 · Patient experiences severe hypo/hyperglycemia'],
+      constraints: ['SC-Saf-5 · Pump must confirm actuation timings'],
+      controlActions: ['CA-5 · Deliver insulin']
+    }
+  };
+
+  readonly traceability = signal<TraceabilityDetail | null>(null);
 
   addScenario(): void {
     if (this.scenarioForm.invalid) {
@@ -195,5 +256,14 @@ export class LossScenariosPageComponent {
 
   severityClass(value: string): string {
     return `severity-${value.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  }
+
+  openTraceability(requirementId: number): void {
+    const detail = this.traceabilityCatalog[requirementId] ?? null;
+    this.traceability.set(detail);
+  }
+
+  closeTraceability(): void {
+    this.traceability.set(null);
   }
 }

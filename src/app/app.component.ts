@@ -10,17 +10,61 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  readonly appTitle = 'AutoRESafety Workbench';
+  readonly appTitle = 'SafeSecRETS Studio';
+  readonly appSubtitle = 'SafeSecIoT Canvas + 7-Step RESafety Workflow';
   readonly navOpen = signal(false);
 
-  readonly steps = [
-    { path: '/scope', label: '1. Scope Definition' },
-    { path: '/istar-models', label: '2. iStar4Safety Models' },
-    { path: '/control-structure', label: '3. Control Structure' },
-    { path: '/ucas', label: '4. Unsafe Control Actions' },
-    { path: '/controller-constraints', label: '5. Controller Constraints' },
-    { path: '/loss-scenarios', label: '6. Loss Scenarios & Safety Requirements' },
-    { path: '/model-update', label: '7. Update iStar4Safety' }
+  readonly navSections = [
+    {
+      heading: 'Workspace',
+      links: [
+        {
+          path: '/',
+          label: 'Home Dashboard',
+          description: 'Portfolio of safety analyses and SafeSecIoT canvas setup'
+        }
+      ]
+    },
+    {
+      heading: 'RESafety Workflow',
+      links: [
+        {
+          path: '/scope',
+          label: 'Step 1 · Define SCS Scope',
+          description: 'SafeSecIoT Canvas · Mission, hazards, and baseline constraints'
+        },
+        {
+          path: '/istar-models',
+          label: 'Step 2 · iStar4Safety Models',
+          description: 'Map actors, responsibilities, and safety goals'
+        },
+        {
+          path: '/control-structure',
+          label: 'Step 3 · Control Structure',
+          description: 'Translate goals into STPA control loops'
+        },
+        {
+          path: '/ucas',
+          label: 'Step 4 · Unsafe Control Actions',
+          description: 'Evaluate STPA contexts for each control action'
+        },
+        {
+          path: '/controller-constraints',
+          label: 'Step 5 · Controller Constraints',
+          description: 'Invert UCAs into enforceable controller behaviour'
+        },
+        {
+          path: '/loss-scenarios',
+          label: 'Step 6 · Loss Scenarios & Safety Requirements',
+          description: 'Assess causal scenarios and derive mitigations'
+        },
+        {
+          path: '/model-update',
+          label: 'Step 7 · Update iStar4Safety Models',
+          description: 'Close the loop by syncing models and evidence'
+        }
+      ]
+    }
   ];
 
   toggleNav(): void {
