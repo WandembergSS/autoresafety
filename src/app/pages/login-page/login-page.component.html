@@ -1,0 +1,63 @@
+<section class="login">
+  <div class="login__panel login__panel--brand">
+    <div class="brand">
+      <h1>{{ appTitle }}</h1>
+      <p>
+        Unified portal for driving the ReSafety workflow. Organize analyses, maintain traceability,
+        and generate safety artefacts with collaborative support.
+      </p>
+      <ul>
+        <li>Guided ReSafety flow with contextual assistance.</li>
+        <li>iStar4Safety models linked across STPA steps.</li>
+        <li>Safety requirements generation with full history.</li>
+      </ul>
+    </div>
+  </div>
+
+  <form class="login__panel login__panel--form" [formGroup]="loginForm" (ngSubmit)="signIn()">
+    <header>
+      <h2>Sign in to AutoReSafety</h2>
+      <p>Use your corporate credentials to access the studio.</p>
+      <p class="hint">Demo credentials: analyst&#64;resafety.ai / resafety123.</p>
+    </header>
+
+    <label class="field">
+      <span>Email</span>
+      <input type="email" formControlName="email" placeholder="analyst@company.com" />
+      @if (loginForm.controls.email.invalid && loginForm.controls.email.touched) {
+        <small class="hint">Enter a valid email address.</small>
+      }
+    </label>
+
+    <label class="field">
+      <span>Password</span>
+      <input type="password" formControlName="password" placeholder="Your password" />
+      @if (loginForm.controls.password.invalid && loginForm.controls.password.touched) {
+        <small class="hint">Password must contain at least 6 characters.</small>
+      }
+    </label>
+
+    <label class="checkbox">
+      <input type="checkbox" formControlName="remember" />
+      <span>Keep me signed in</span>
+    </label>
+
+    <button type="submit" class="primary" [disabled]="status() === 'submitting'">
+      @if (status() === 'submitting') {
+        <span>Validating...</span>
+      } @else {
+        <span>Sign in</span>
+      }
+    </button>
+
+    @if (errorMessage()) {
+      <p class="error">{{ errorMessage() }}</p>
+    }
+
+    @if (status() === 'success') {
+      <p class="success">Login successful. Redirecting to the dashboard...</p>
+    }
+
+    <p class="support">Need access? Contact the AutoReSafety Studio administrator.</p>
+  </form>
+</section>

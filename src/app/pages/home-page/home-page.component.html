@@ -1,8 +1,8 @@
 <section class="page">
   <header class="page__header">
-    <h2>SafeSecIoT Project Workspace</h2>
+    <h2>ReSafety Project Workspace</h2>
     <p>
-      Coordinate SafeSecIoT Canvas capture and the 7-step RESafety workflow for every safety-critical system under analysis.
+      Coordinate ReSafety project capture and the 7-step workflow for every safety-critical system under analysis.
     </p>
   </header>
 
@@ -56,9 +56,9 @@
     </form>
 
     <section class="card card--summary">
-      <h3>7-step RESafety timeline</h3>
+      <h3>7-step ReSafety timeline</h3>
       <ol>
-        <li>Define SCS scope via the SafeSecIoT Canvas (mission, hazards, constraints).</li>
+        <li>Define SCS scope via the ReSafety scope canvas (mission, hazards, constraints).</li>
         <li>Refine iStar4Safety models to map actors, goals, and responsibilities.</li>
         <li>Derive the STPA control structure and feedback architecture.</li>
         <li>Evaluate control actions across STPA contexts to expose UCAs.</li>
@@ -72,11 +72,11 @@
   <section class="list">
     <header class="list__header">
       <h3>In-flight analyses</h3>
-      <p>{{ pendingProjects().length }} active SafeSecIoT projects</p>
+  <p>{{ pendingProjects().length }} active projects</p>
     </header>
 
     @if (pendingProjects().length === 0) {
-        <p class="empty">No pending analyses. Create a charter to start the SafeSecIoT Canvas.</p>
+  <p class="empty">No pending analyses. Create a charter to start Step 1 (Scope).</p>
     } @else {
       <div class="list__grid">
         @for (project of pendingProjects(); track project.id) {

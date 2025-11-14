@@ -1,33 +1,40 @@
 <div class="shell">
   <header class="shell__header">
-    <button type="button" class="shell__menu" (click)="toggleNav()" aria-label="Toggle navigation">
-      ☰
-    </button>
-    <div>
+    @if (isAuthenticated()) {
+      <button type="button" class="shell__menu" (click)="toggleNav()" aria-label="Toggle navigation">
+        ☰
+      </button>
+    }
+    <div class="shell__title">
       <h1>{{ appTitle }}</h1>
       <p class="shell__subtitle">{{ appSubtitle }}</p>
     </div>
+    @if (isAuthenticated()) {
+      <button type="button" class="shell__logout" (click)="logout()">Sair</button>
+    }
   </header>
 
-  <div class="shell__body">
-    <aside class="shell__nav" [class.shell__nav--open]="navOpen()">
-      <nav>
-        @for (section of navSections; track section.heading) {
-          <p class="shell__nav-label">{{ section.heading }}</p>
-          @for (link of section.links; track link.path) {
-            <a
-              [routerLink]="link.path"
-              (click)="closeNav()"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: link.path === '/' }"
-            >
-              <span class="nav__label">{{ link.label }}</span>
-              <span class="nav__description">{{ link.description }}</span>
-            </a>
+  <div class="shell__body" [class.shell__body--no-nav]="!isAuthenticated()">
+    @if (isAuthenticated()) {
+      <aside class="shell__nav" [class.shell__nav--open]="navOpen()">
+        <nav>
+          @for (section of navSections; track section.heading) {
+            <p class="shell__nav-label">{{ section.heading }}</p>
+            @for (link of section.links; track link.path) {
+              <a
+                [routerLink]="link.path"
+                (click)="closeNav()"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: link.path === '/' }"
+              >
+                <span class="nav__label">{{ link.label }}</span>
+                <span class="nav__description">{{ link.description }}</span>
+              </a>
+            }
           }
-        }
-      </nav>
-    </aside>
+        </nav>
+      </aside>
+    }
 
     <main class="shell__content" (click)="closeNav()">
       <router-outlet />

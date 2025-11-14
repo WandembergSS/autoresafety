@@ -34,7 +34,7 @@ export class HomePageComponent {
       name: 'Automated Insulin Delivery (AID) System',
       domain: 'Medical IoT',
       description:
-        'Co-create the RESafety stack for the SafeSecIoT reference case: AID system with CGM, control app, and insulin pump.',
+  'Co-create the ReSafety stack for an AID system with CGM, control app, and insulin pump.',
       status: 'in-progress',
       owner: 'Priya Banerjee',
       currentStep: 4,

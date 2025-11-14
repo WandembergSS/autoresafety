@@ -1,6 +1,8 @@
-import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, inject, signal } from '@angular/core';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
+import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -11,8 +13,13 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 })
 export class AppComponent {
   readonly appTitle = 'SafeSecRETS Studio';
-  readonly appSubtitle = 'SafeSecIoT Canvas + 7-Step RESafety Workflow';
+  readonly appSubtitle = '7-Step ReSafety Workflow';
   readonly navOpen = signal(false);
+
+  private readonly router = inject(Router);
+  private readonly authService = inject(AuthService);
+
+  readonly isAuthenticated = this.authService.authState;
 
   readonly navSections = [
     {
@@ -21,7 +28,7 @@ export class AppComponent {
         {
           path: '/',
           label: 'Home Dashboard',
-          description: 'Portfolio of safety analyses and SafeSecIoT canvas setup'
+          description: 'Portfolio of safety analyses and setup'
         }
       ]
     },
@@ -31,7 +38,7 @@ export class AppComponent {
         {
           path: '/scope',
           label: 'Step 1 · Define SCS Scope',
-          description: 'SafeSecIoT Canvas · Mission, hazards, and baseline constraints'
+          description: 'Define mission, hazards, and baseline constraints'
         },
         {
           path: '/istar-models',
@@ -73,5 +80,11 @@ export class AppComponent {
 
   closeNav(): void {
     this.navOpen.set(false);
+  }
+
+  logout(): void {
+    this.authService.signOut();
+    this.closeNav();
+    this.router.navigate(['/login']);
   }
 }
