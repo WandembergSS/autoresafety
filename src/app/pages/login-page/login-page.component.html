@@ -7,7 +7,7 @@
         and generate safety artefacts with collaborative support.
       </p>
       <ul>
-        <li>Guided ReSafety flow with contextual assistance.</li>
+        <li>Guided ReSafety flow with AI assistance.</li>
         <li>iStar4Safety models linked across STPA steps.</li>
         <li>Safety requirements generation with full history.</li>
       </ul>
@@ -18,20 +18,19 @@
     <header>
       <h2>Sign in to AutoReSafety</h2>
       <p>Use your corporate credentials to access the studio.</p>
-      <p class="hint">Demo credentials: analyst&#64;resafety.ai / resafety123.</p>
     </header>
 
     <label class="field">
-      <span>Email</span>
-      <input type="email" formControlName="email" placeholder="analyst@company.com" />
-      @if (loginForm.controls.email.invalid && loginForm.controls.email.touched) {
-        <small class="hint">Enter a valid email address.</small>
+      <span>Username</span>
+      <input type="text" formControlName="username" placeholder="your.username" autocomplete="username" />
+      @if (loginForm.controls.username.invalid && loginForm.controls.username.touched) {
+        <small class="hint">Enter your username.</small>
       }
     </label>
 
     <label class="field">
       <span>Password</span>
-      <input type="password" formControlName="password" placeholder="Your password" />
+      <input type="password" formControlName="password" placeholder="Your password" autocomplete="current-password" />
       @if (loginForm.controls.password.invalid && loginForm.controls.password.touched) {
         <small class="hint">Password must contain at least 6 characters.</small>
       }
@@ -58,6 +57,6 @@
       <p class="success">Login successful. Redirecting to the dashboard...</p>
     }
 
-    <p class="support">Need access? Contact the AutoReSafety Studio administrator.</p>
+    <p class="support">Need access? Contact the AutoReSafety administrator.</p>
   </form>
 </section>

@@ -37,7 +37,60 @@
     }
 
     <main class="shell__content" (click)="closeNav()">
-      <router-outlet />
+      @if (isNavigating()) {
+        <section class="route-skeleton" aria-hidden="true">
+          <div class="skeleton skeleton--title"></div>
+          <div class="skeleton skeleton--line"></div>
+          <div class="skeleton skeleton--line skeleton--line-short"></div>
+          <div class="route-skeleton__grid">
+            <div class="skeleton skeleton--card"></div>
+            <div class="skeleton skeleton--card"></div>
+            <div class="skeleton skeleton--card"></div>
+          </div>
+        </section>
+      }
+
+      <div class="shell__router" [class.shell__router--loading]="isNavigating()">
+        <router-outlet />
+      </div>
     </main>
   </div>
+
+  <footer class="shell__footer">
+    <div class="shell__footer-grid">
+      <div>
+        <p class="footer__year">&copy; 2026 CIn UFPE - All rights reserved</p>
+      </div>
+      <div>
+        <p class="footer__label">Responsible technicians for the app</p>
+        <ul>
+          <li>
+            Wandemberg Silva dos Santos, Master candidate<br />
+            Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
+            Recife-PE – Brasil
+          </li>
+          <li>
+            Jaelson Freire Brelaz de Castro - PhD. in Computing<br />
+            Imperial College of Science, Technology and Medicine<br />
+            University of London - Reino Unido
+          </li>
+          <li>
+            Sarah Moniky Silva Ribeiro - PhD.<br />
+            Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
+            Recife-PE – Brasil
+          </li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer__label">CIn contact</p>
+        <address class="footer__address">
+          <p>(+55 81) 2126-8430</p>
+          <p>contato&#64;cin.ufpe.br</p>
+          <p>Av. Jornalista Aníbal Fernandes, s/n – Cidade Universitária.</p>
+          <p>Recife-PE – Brasil</p>
+          <p>CEP: 50.740-560</p>
+        </address>
+      </div>
+    </div>
+  </footer>
 </div>

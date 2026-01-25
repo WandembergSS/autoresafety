@@ -9,122 +9,289 @@
     </p>
   </header>
 
-  <div class="page__grid">
-    <section class="card">
-      <h3>System mission overview</h3>
-      <form [formGroup]="scopeSummaryForm" class="stack">
-        <label class="field">
-          <span>System name</span>
-          <input type="text" formControlName="systemName" />
-        </label>
-        <label class="field">
-          <span>Mission intent</span>
-          <textarea rows="2" formControlName="mission"></textarea>
-        </label>
-        <label class="field">
-          <span>Operational boundary</span>
-          <textarea rows="3" formControlName="boundary"></textarea>
-        </label>
-        <label class="field">
-          <span>Assumptions</span>
-          <textarea rows="3" formControlName="assumptions"></textarea>
-        </label>
-      </form>
-    </section>
+  <section class="card lane">
+    <header class="lane__header">
+      <h3>Substep 1.1 — Define general concerns</h3>
+      <p>
+        Build a shared understanding of the insulin infusion pump mission, system definition, available knowledge, scope
+        boundaries, and the socio-technical elements that will influence subsequent ReSafety artefacts.
+      </p>
+    </header>
 
-    <section class="card">
-      <h3>Stakeholder objectives ({{ objectiveCount() }})</h3>
-      <form class="inline-form" [formGroup]="objectiveForm" (ngSubmit)="addObjective()">
-        <input type="text" formControlName="description" placeholder="Objective statement" />
-        <input type="text" formControlName="stakeholder" placeholder="Stakeholder" />
-        <select formControlName="priority">
-          <option value="High">High</option>
-          <option value="Medium">Medium</option>
-          <option value="Low">Low</option>
-        </select>
-        <button type="submit">Add</button>
-      </form>
-      <ul class="list">
-        @for (objective of objectives(); track objective.id) {
-          <li>
-            <div>
-              <h4>{{ objective.description }}</h4>
-              <p>Stakeholder: {{ objective.stakeholder }}</p>
-            </div>
-            <span class="tag tag--priority-{{ objective.priority | lowercase }}">{{ objective.priority }}</span>
-          </li>
-        }
-      </ul>
-    </section>
-  </div>
-
-  <div class="page__grid">
-    <section class="card">
-      <h3>System-level hazards ({{ hazardCount() }})</h3>
-      <form class="stack" [formGroup]="hazardForm" (ngSubmit)="addHazard()">
-        <label class="field">
-          <span>Hazard title</span>
-          <input type="text" formControlName="title" placeholder="e.g. Over-infusion due to sensor fault" />
-        </label>
-        <label class="field">
-          <span>Potential loss</span>
-          <textarea rows="2" formControlName="potentialLoss"></textarea>
-        </label>
-        <label class="field field--split">
-          <span>Severity</span>
-          <select formControlName="severity">
-            <option value="Catastrophic">Catastrophic</option>
-            <option value="Major">Major</option>
-            <option value="Minor">Minor</option>
+    <div class="lane__grid">
+      <article class="lane__block">
+        <header>
+          <h4>1.1.1 Clarify analysis objectives ({{ objectiveCount() }})</h4>
+          <p>Capture the intent of this iteration and who depends on the results.</p>
+        </header>
+        <form class="inline-form" [formGroup]="objectiveForm" (ngSubmit)="addObjective()">
+          <input type="text" formControlName="focus" placeholder="Objective focus" />
+          <input type="text" formControlName="stakeholder" placeholder="Stakeholder" />
+          <select formControlName="priority">
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
           </select>
-          <button type="submit">Add hazard</button>
-        </label>
-      </form>
-
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Hazard</th>
-            <th>Potential loss</th>
-            <th>Severity</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (hazard of hazards(); track hazard.id) {
-            <tr>
-              <td>{{ hazard.title }}</td>
-              <td>{{ hazard.potentialLoss }}</td>
-              <td><span class="tag tag--severity">{{ hazard.severity }}</span></td>
-            </tr>
+          <button type="submit">Add</button>
+        </form>
+        <ul class="list">
+          @for (objective of objectives(); track objective.id) {
+            <li>
+              <div>
+                <h5>{{ objective.focus }}</h5>
+                <p>Stakeholder: {{ objective.stakeholder }}</p>
+              </div>
+              <span class="tag tag--priority-{{ objective.priority | lowercase }}">{{ objective.priority }}</span>
+            </li>
           }
-        </tbody>
-      </table>
-    </section>
+        </ul>
+      </article>
 
-    <section class="card">
-      <h3>Initial safety constraints</h3>
-      <form class="stack" [formGroup]="constraintForm" (ngSubmit)="addConstraint()">
-        <label class="field">
-          <span>Constraint statement</span>
-          <textarea rows="2" formControlName="statement"></textarea>
-        </label>
-        <label class="field">
-          <span>Rationale</span>
-          <textarea rows="2" formControlName="rationale"></textarea>
-        </label>
-        <button type="submit">Record constraint</button>
-      </form>
+      <article class="lane__block">
+        <header>
+          <h4>1.1.2 Describe the system definition</h4>
+          <p>Summarize the mission and product scope that will anchor the remaining analysis.</p>
+        </header>
+        <form [formGroup]="generalSummaryForm" class="stack">
+          <label class="field">
+            <span>Analysis purpose</span>
+            <textarea rows="2" formControlName="analysisPurpose"></textarea>
+          </label>
+          <label class="field">
+            <span>System definition</span>
+            <textarea rows="3" formControlName="systemDefinition"></textarea>
+          </label>
+          <label class="field">
+            <span>System boundary</span>
+            <textarea rows="3" formControlName="systemBoundary"></textarea>
+          </label>
+        </form>
+      </article>
 
-      <ul class="list list--dense">
-        @for (constraint of constraints(); track constraint.id) {
-          <li>
-            <div>
-              <h4>{{ constraint.statement }}</h4>
-              <p>{{ constraint.rationale }}</p>
-            </div>
-          </li>
-        }
-      </ul>
-    </section>
-  </div>
+      <article class="lane__block">
+        <header>
+          <h4>1.1.3 Catalogue available resources ({{ resourceCount() }})</h4>
+          <p>List supporting material that will inform hazards, constraints, and responsibilities.</p>
+        </header>
+        <form class="inline-form" [formGroup]="resourceForm" (ngSubmit)="addResource()">
+          <input type="text" formControlName="name" placeholder="Resource name" />
+          <input type="text" formControlName="category" placeholder="Type" />
+          <input type="text" formControlName="reference" placeholder="Reference or link" />
+          <button type="submit">Add</button>
+        </form>
+        <ul class="list list--dense">
+          @for (resource of resources(); track resource.id) {
+            <li>
+              <div>
+                <h5>{{ resource.name }}</h5>
+                <p>{{ resource.category }} · {{ resource.reference }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.1.4 Define scope boundary</h4>
+          <p>Clarify what is inside and outside this iteration’s analysis boundary.</p>
+        </header>
+        <div class="rich-text">
+          <p>{{ generalSummaryForm.get('systemBoundary')?.value }}</p>
+        </div>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.1.5 Identify socio-technical components ({{ componentCount() }})</h4>
+          <p>Document the roles that will own responsibilities and constraints later in the workflow.</p>
+        </header>
+        <form class="inline-form" [formGroup]="componentForm" (ngSubmit)="addComponent()">
+          <input type="text" formControlName="name" placeholder="Component" />
+          <input type="text" formControlName="notes" placeholder="Primary role" />
+          <button type="submit">Add</button>
+        </form>
+        <ul class="list">
+          @for (component of systemComponents(); track component.id) {
+            <li>
+              <div>
+                <h5>{{ component.name }}</h5>
+                <p>{{ component.notes }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <section class="card lane">
+    <header class="lane__header">
+      <h3>Substep 1.2 — Define safety concerns</h3>
+      <p>
+        Transition from mission framing to safety implications. Establish accidents, hazards, safety constraints,
+        responsibilities, and artefacts that will connect with later iStar4Safety and STPA models.
+      </p>
+    </header>
+
+    <div class="lane__grid">
+      <article class="lane__block">
+        <header>
+          <h4>1.2.1 Identify unacceptable outcomes ({{ accidentCount() }})</h4>
+          <p>Record accidents that motivate safety constraints.</p>
+        </header>
+        <form class="inline-form" [formGroup]="accidentForm" (ngSubmit)="addAccident()">
+          <input type="text" formControlName="code" placeholder="Accident code" />
+          <input type="text" formControlName="description" placeholder="Accident description" />
+          <button type="submit">Add</button>
+        </form>
+        <ul class="list list--dense">
+          @for (accident of accidents(); track accident.id) {
+            <li>
+              <div>
+                <h5>{{ accident.code }}</h5>
+                <p>{{ accident.description }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.2.2 Elicit system hazards ({{ hazardCount() }})</h4>
+          <p>Map hazards back to the accidents they could trigger.</p>
+        </header>
+        <form class="stack" [formGroup]="hazardForm" (ngSubmit)="addHazard()">
+          <label class="field">
+            <span>Hazard code</span>
+            <input type="text" formControlName="code" />
+          </label>
+          <label class="field">
+            <span>Hazard description</span>
+            <textarea rows="2" formControlName="description"></textarea>
+          </label>
+          <label class="field">
+            <span>Related accidents</span>
+            <input type="text" formControlName="linkedAccidents" placeholder="e.g. A1, A2" />
+          </label>
+          <button type="submit">Add hazard</button>
+        </form>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Description</th>
+              <th>Accidents</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (hazard of hazards(); track hazard.id) {
+              <tr>
+                <td>{{ hazard.code }}</td>
+                <td>{{ hazard.description }}</td>
+                <td>{{ hazard.linkedAccidents }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.2.3 Capture safety constraints</h4>
+          <p>State how the socio-technical system prevents or mitigates the hazards.</p>
+        </header>
+        <form class="stack" [formGroup]="constraintForm" (ngSubmit)="addConstraint()">
+          <label class="field">
+            <span>Constraint code</span>
+            <input type="text" formControlName="code" />
+          </label>
+          <label class="field">
+            <span>Constraint statement</span>
+            <textarea rows="2" formControlName="statement"></textarea>
+          </label>
+          <label class="field">
+            <span>Hazards mitigated</span>
+            <input type="text" formControlName="linkedHazards" placeholder="e.g. H1" />
+          </label>
+          <button type="submit">Record constraint</button>
+        </form>
+        <ul class="list list--dense">
+          @for (constraint of constraints(); track constraint.id) {
+            <li>
+              <div>
+                <h5>{{ constraint.code }} — {{ constraint.statement }}</h5>
+                <p>Mitigates: {{ constraint.linkedHazards }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.2.4 Assign safety responsibilities</h4>
+          <p>Trace responsibilities to the components catalogued in Substep 1.1.</p>
+        </header>
+        <form class="stack" [formGroup]="responsibilityForm" (ngSubmit)="addResponsibility()">
+          <label class="field">
+            <span>Component</span>
+            <input type="text" formControlName="component" placeholder="Component" />
+          </label>
+          <label class="field">
+            <span>Responsibility</span>
+            <textarea rows="2" formControlName="responsibility"></textarea>
+          </label>
+          <label class="field">
+            <span>Linked constraints</span>
+            <input type="text" formControlName="linkedConstraints" placeholder="e.g. SC-01" />
+          </label>
+          <button type="submit">Add responsibility</button>
+        </form>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Responsibility</th>
+              <th>Constraints</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (responsibility of responsibilities(); track responsibility.id) {
+              <tr>
+                <td>{{ responsibility.component }}</td>
+                <td>{{ responsibility.responsibility }}</td>
+                <td>{{ responsibility.linkedConstraints }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.2.5 Register supporting artefacts</h4>
+          <p>Record any artefact that substantiates the identified safety responsibilities.</p>
+        </header>
+        <form class="inline-form" [formGroup]="artefactForm" (ngSubmit)="addArtefact()">
+          <input type="text" formControlName="name" placeholder="Artefact name" />
+          <input type="text" formControlName="purpose" placeholder="Purpose" />
+          <input type="text" formControlName="reference" placeholder="Repository or link" />
+          <button type="submit">Add</button>
+        </form>
+        <ul class="list list--dense">
+          @for (artefact of artefacts(); track artefact.id) {
+            <li>
+              <div>
+                <h5>{{ artefact.name }}</h5>
+                <p>{{ artefact.purpose }}</p>
+                <p class="muted">{{ artefact.reference }}</p>
+              </div>
+            </li>
+          }
+        </ul>
+      </article>
+    </div>
+  </section>
 </section>

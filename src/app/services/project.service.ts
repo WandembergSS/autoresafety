@@ -8,9 +8,32 @@ import { Project } from '../models/project.model';
 export class ProjectService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.backendApiUrl}/projects`;
+  private readonly resumeUrl = `${environment.backendApiUrl}/project-resume`;
+  private readonly minimalCreateUrl = `${environment.backendApiUrl}/projects/minimal-project-creation`;
+
+  /**
+   * Returns only non-complete projects with basic fields (Quarkus: GET /api/project-resume).
+   */
+  listOpenResumes(): Observable<Project[]> {
+    return this.http.get<Project[]>(this.resumeUrl);
+  }
 
   list(): Observable<Project[]> {
     return this.http.get<Project[]>(this.baseUrl);
+  }
+
+  /**
+   * Creates a project charter with minimal required data (Quarkus: POST /api/projects/minimal-project-creation).
+   * Backend contract guarantees at least `name` is required.
+   */
+  createMinimal(payload: {
+    name: string;
+    currentStep?: number;
+    domain?: string;
+    owner?: string;
+    description?: string;
+  }): Observable<Project> {
+    return this.http.post<Project>(this.minimalCreateUrl, payload);
   }
 
   create(payload: Pick<Project, 'name' | 'description' | 'status'>): Observable<Project> {

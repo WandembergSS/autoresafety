@@ -24,7 +24,7 @@ export class LoginPageComponent {
   readonly errorMessage = signal<string | null>(null);
 
   readonly loginForm = this.fb.group({
-    email: ['', [Validators.required, Validators.email]],
+    username: ['', [Validators.required]],
     password: ['', [Validators.required, Validators.minLength(6)]],
     remember: [true]
   });
@@ -35,13 +35,13 @@ export class LoginPageComponent {
       return;
     }
 
-    const { email, password } = this.loginForm.getRawValue();
+    const { username, password, remember } = this.loginForm.getRawValue();
 
     this.errorMessage.set(null);
     this.status.set('submitting');
 
     this.authService
-      .signIn(email ?? '', password ?? '')
+      .signIn(username ?? '', password ?? '', remember ?? true)
       .then(() => {
         this.status.set('success');
         const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';
@@ -49,11 +49,10 @@ export class LoginPageComponent {
           this.router.navigateByUrl(redirectTo);
         }, 500);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         this.status.set('idle');
-        this.errorMessage.set(
-          'Invalid credentials. Use analyst@resafety.ai with password resafety123 to sign in.'
-        );
+        const message = error instanceof Error ? error.message : 'Invalid credentials.';
+        this.errorMessage.set(message || 'Invalid credentials.');
         this.loginForm.controls.password.reset('');
       });
   }

@@ -1,6 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  NavigationCancel,
+  NavigationEnd,
+  NavigationError,
+  NavigationStart,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet
+} from '@angular/router';
 
 import { AuthService } from './services/auth.service';
 
@@ -12,12 +22,16 @@ import { AuthService } from './services/auth.service';
   styleUrl: './app.component.scss'
 })
 export class AppComponent {
-  readonly appTitle = 'SafeSecRETS Studio';
+  readonly appTitle = 'AutoReSafety';
   readonly appSubtitle = '7-Step ReSafety Workflow';
   readonly navOpen = signal(false);
+  readonly isNavigating = signal(false);
+  readonly currentUrl = signal('');
+  readonly hasCompletedInitialNavigation = signal(false);
 
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly isAuthenticated = this.authService.authState;
 
@@ -76,6 +90,36 @@ export class AppComponent {
 
   toggleNav(): void {
     this.navOpen.update((value) => !value);
+  }
+
+  constructor() {
+    this.currentUrl.set(this.router.url);
+
+    this.router.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((event) => {
+      if (event instanceof NavigationStart) {
+        const shouldShowSkeleton =
+          this.hasCompletedInitialNavigation() && event.url !== this.currentUrl();
+
+        this.isNavigating.set(shouldShowSkeleton);
+        return;
+      }
+
+      if (
+        event instanceof NavigationEnd ||
+        event instanceof NavigationCancel ||
+        event instanceof NavigationError
+      ) {
+        this.isNavigating.set(false);
+
+        if (event instanceof NavigationEnd) {
+          this.currentUrl.set(event.urlAfterRedirects);
+        }
+
+        if (!this.hasCompletedInitialNavigation()) {
+          this.hasCompletedInitialNavigation.set(true);
+        }
+      }
+    });
   }
 
   closeNav(): void {

@@ -1,7 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Project } from '../../models/project.model';
+import { ProjectService } from '../../services/project.service';
 
 interface HomeProject extends Project {
   domain?: string;
@@ -20,48 +23,22 @@ interface HomeProject extends Project {
 })
 export class HomePageComponent {
   private readonly fb = inject(FormBuilder);
+  private readonly router = inject(Router);
+  private readonly projectService = inject(ProjectService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly projectForm = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(4), Validators.maxLength(120)]],
-    domain: ['', [Validators.required, Validators.minLength(3)]],
+    domain: ['', [Validators.minLength(3), Validators.maxLength(120)]],
     description: ['', Validators.maxLength(500)],
     owner: ['', Validators.maxLength(120)]
   });
 
-  readonly projects = signal<HomeProject[]>([
-    {
-      id: 1,
-      name: 'Automated Insulin Delivery (AID) System',
-      domain: 'Medical IoT',
-      description:
-  'Co-create the ReSafety stack for an AID system with CGM, control app, and insulin pump.',
-      status: 'in-progress',
-      owner: 'Priya Banerjee',
-      currentStep: 4,
-      nextStep: 'Resume Step 4 · Identify Unsafe Control Actions'
-    },
-    {
-      id: 2,
-      name: 'Smart Grid Balancing Agent',
-      domain: 'Critical Energy',
-      description:
-        'Assess distributed balancing agents for constraint violations and cascading loss scenarios in the grid.',
-      status: 'pending',
-      owner: 'Miguel Santos',
-      currentStep: 1,
-      nextStep: 'Kick-off Step 1 · Define SCS Scope'
-    },
-    {
-      id: 3,
-      name: 'Runway Lighting Control',
-      domain: 'Aviation',
-      description: 'Evaluate fail-operational constraints for runway lighting automation.',
-      status: 'complete',
-      owner: 'Laura Chen',
-      currentStep: 7,
-      nextStep: 'Archive evidence & publish traceability report'
-    }
-  ]);
+  readonly projects = signal<HomeProject[]>([]);
+
+  constructor() {
+    this.refreshOpenProjects();
+  }
 
   readonly pendingProjects = computed(() =>
     this.projects().filter((project) => project.status !== 'complete')
@@ -78,20 +55,57 @@ export class HomePageComponent {
     }
 
     const raw = this.projectForm.getRawValue();
-    const nextId = Math.max(0, ...this.projects().map((item) => item.id ?? 0)) + 1;
-    const newProject: HomeProject = {
-      id: nextId,
-      name: raw.name ?? 'Untitled Project',
-      domain: raw.domain ?? 'General',
-      description: raw.description ?? '',
-      status: 'pending',
-      owner: raw.owner ?? 'Unassigned',
-      currentStep: 1,
-      nextStep: 'Kick-off Step 1 · Define SCS Scope'
-    };
+    const name = (raw.name ?? '').trim();
+    const domain = (raw.domain ?? '').trim();
+    const owner = (raw.owner ?? '').trim();
+    const description = (raw.description ?? '').trim();
 
-    this.projects.update((current) => [newProject, ...current]);
-    this.projectForm.reset();
+    if (!name) {
+      this.projectForm.controls.name.setErrors({ required: true });
+      this.projectForm.controls.name.markAsTouched();
+      return;
+    }
+
+    const payload: {
+      name: string;
+      currentStep: number;
+      domain?: string;
+      owner?: string;
+      description?: string;
+    } = { name, currentStep: 1 };
+
+    if (domain) payload.domain = domain;
+    if (owner) payload.owner = owner;
+    if (description) payload.description = description;
+
+    this.projectService
+      .createMinimal(payload)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.projectForm.reset();
+          this.refreshOpenProjects();
+        },
+        error: (error) => {
+          console.error('Failed to create project via POST /api/projects/minimal', error);
+        }
+      });
+  }
+
+  private refreshOpenProjects(): void {
+    this.projectService
+      .listOpenResumes()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (items) => {
+          const mapped = (items ?? []).map((project) => this.toHomeProject(project));
+          this.projects.set(mapped);
+        },
+        error: (error) => {
+          console.error('Failed to load open projects from /api/project-resume', error);
+          this.projects.set([]);
+        }
+      });
   }
 
   updateStatus(projectId: number | undefined, status: 'pending' | 'in-progress' | 'complete'): void {
@@ -121,6 +135,46 @@ export class HomePageComponent {
     this.projects.update((current) => current.filter((project) => project.id !== projectId));
   }
 
+  startProject(project: HomeProject): void {
+    if (!project.id) {
+      return;
+    }
+
+    if (project.status === 'pending') {
+      this.updateStatus(project.id, 'in-progress');
+    }
+
+    const step = project.currentStep ?? 1;
+    this.router.navigate([this.routeForStep(step)], {
+      queryParams: { projectId: project.id }
+    });
+  }
+
+  continueProject(project: HomeProject): void {
+    if (!project.id) {
+      return;
+    }
+
+    const step = project.currentStep ?? 1;
+    this.router.navigate([this.routeForStep(step)], {
+      queryParams: { projectId: project.id }
+    });
+  }
+
+  private routeForStep(step: number): string {
+    const mapping: Record<number, string> = {
+      1: '/scope',
+      2: '/istar-models',
+      3: '/control-structure',
+      4: '/ucas',
+      5: '/controller-constraints',
+      6: '/loss-scenarios',
+      7: '/model-update'
+    };
+
+    return mapping[step] ?? '/';
+  }
+
   private deriveNextStep(
     status: 'pending' | 'in-progress' | 'complete',
     currentStep: number | undefined
@@ -130,7 +184,7 @@ export class HomePageComponent {
     }
 
     if (status === 'in-progress') {
-      const step = currentStep && currentStep < 7 ? currentStep : 2;
+      const step = currentStep && currentStep >= 1 && currentStep <= 7 ? currentStep : 1;
       const labels: Record<number, string> = {
         1: 'Scope Definition',
         2: 'iStar4Safety Models',
@@ -159,7 +213,7 @@ export class HomePageComponent {
     }
 
     if (status === 'in-progress') {
-      return currentStep && currentStep < 7 ? currentStep + 1 : 2;
+      return currentStep && currentStep >= 1 && currentStep <= 7 ? currentStep : 1;
     }
 
     if (status === 'complete') {
@@ -167,5 +221,30 @@ export class HomePageComponent {
     }
 
     return currentStep;
+  }
+
+  private toHomeProject(project: Project): HomeProject {
+    const status = (project.status ?? 'pending').toLowerCase();
+    const step =
+      typeof project.currentStep === 'number' && project.currentStep >= 1 && project.currentStep <= 7
+        ? project.currentStep
+        : status === 'pending'
+          ? 1
+          : undefined;
+
+    const derivedStatus = (['pending', 'in-progress', 'complete'].includes(status)
+      ? status
+      : 'pending') as 'pending' | 'in-progress' | 'complete';
+
+    return {
+      id: project.id,
+      name: project.name,
+      domain: project.domain ?? undefined,
+      owner: project.owner ?? undefined,
+      description: project.description ?? undefined,
+      status: derivedStatus,
+      currentStep: step,
+      nextStep: this.deriveNextStep(derivedStatus, step)
+    };
   }
 }

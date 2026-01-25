@@ -8,7 +8,7 @@
 
   <div class="page__grid">
     <form class="card" [formGroup]="projectForm" (ngSubmit)="createProject()">
-      <h3>Kick off a new analysis</h3>
+      <h3>Start a new analysis</h3>
       <div class="field">
         <label for="project-name">Project name</label>
         <input
@@ -58,25 +58,73 @@
     <section class="card card--summary">
       <h3>7-step ReSafety timeline</h3>
       <ol>
-        <li>Define SCS scope via the ReSafety scope canvas (mission, hazards, constraints).</li>
-        <li>Refine iStar4Safety models to map actors, goals, and responsibilities.</li>
-        <li>Derive the STPA control structure and feedback architecture.</li>
-        <li>Evaluate control actions across STPA contexts to expose UCAs.</li>
-        <li>Translate UCAs into controller constraints and assurance checks.</li>
-        <li>Analyse loss scenarios and author safety requirements for mitigation.</li>
-        <li>Update iStar4Safety artefacts and log evidence for traceability.</li>
+        <li>
+          Define SCS scope via the ReSafety scope canvas (mission, hazards, constraints).
+          <ol class="sub-steps">
+            <li>Define General Concerns</li>
+            <li>Identify Safety Concerns</li>
+            <li>Assign Responsibilities</li>
+          </ol>
+        </li>
+        <li>
+          Refine iStar4Safety models to map actors, goals, and responsibilities.
+          <ol class="sub-steps">
+            <li>Strategic Dependency (SD) Model</li>
+            <li>Strategic Rationale (SR) Model</li>
+            <li>Integrate Safety Goals</li>
+          </ol>
+        </li>
+        <li>
+          Derive the STPA control structure and feedback architecture.
+          <ol class="sub-steps">
+            <li>Identify Controllers and Processes</li>
+            <li>Derive Control Actions</li>
+            <li>Refine Feedback Architecture (Optional)</li>
+          </ol>
+        </li>
+        <li>
+          Evaluate control actions across STPA contexts to expose UCAs.
+          <ol class="sub-steps">
+            <li>Evaluate Failure Situations</li>
+            <li>Link UCAs to Hazards</li>
+            <li>Model Hazardous Conditions (HC)</li>
+          </ol>
+        </li>
+        <li>
+          Translate UCAs into controller constraints and assurance checks.
+          <ol class="sub-steps">
+            <li>Analyze UCAs and HCs</li>
+            <li>Formulate Constraints</li>
+          </ol>
+        </li>
+        <li>
+          Analyse loss scenarios and author safety requirements for mitigation.
+          <ol class="sub-steps">
+            <li>Identify Loss Scenarios (LS)</li>
+            <li>Author Safety Requirements (SR)</li>
+            <li>Ensure Traceability</li>
+          </ol>
+        </li>
+        <li>
+          Update iStar4Safety artefacts and log evidence for traceability.
+          <ol class="sub-steps">
+            <li>Integrate Findings</li>
+            <li>Log Traceability Evidence</li>
+            <li>Verify Model Consistency</li>
+          </ol>
+        </li>
       </ol>
     </section>
   </div>
 
   <section class="list">
     <header class="list__header">
-      <h3>In-flight analyses</h3>
+      <h3>Pending analyses</h3>
   <p>{{ pendingProjects().length }} active projects</p>
     </header>
 
     @if (pendingProjects().length === 0) {
-  <p class="empty">No pending analyses. Create a charter to start Step 1 (Scope).</p>
+  <p class="empty">No active analyses. Create a charter to start Step 1 (Scope).</p>
     } @else {
       <div class="list__grid">
         @for (project of pendingProjects(); track project.id) {
@@ -94,7 +142,11 @@
               Current stage: Step {{ project.currentStep ?? '—' }} · {{ project.nextStep }}
             </p>
             <div class="tile__actions">
-              <button type="button" (click)="updateStatus(project.id, 'in-progress')">Mark in-progress</button>
+              @if (project.status === 'pending') {
+                <button type="button" (click)="startProject(project)">Start</button>
+              } @else {
+                <button type="button" (click)="continueProject(project)">Continue</button>
+              }
               <button type="button" (click)="updateStatus(project.id, 'complete')">Mark complete</button>
               <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
             </div>
@@ -105,6 +157,7 @@
   </section>
 
   <section class="list">
+    <br>
     <header class="list__header">
       <h3>Concluded analyses</h3>
       <p>{{ completedProjects().length }} archived traceability packages</p>
