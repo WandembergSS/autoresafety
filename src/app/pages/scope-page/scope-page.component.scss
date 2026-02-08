@@ -58,6 +58,15 @@
   background: #dbeafe;
 }
 
+.button.button--ai {
+  background-color: #f97316;
+  color: #ffffff;
+}
+
+.button.button--ai:hover {
+  background-color: #ea580c;
+}
+
 .step {
   margin: 0;
   display: inline-flex;
@@ -351,6 +360,7 @@ textarea {
 .field-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
 }
 
 .modal-backdrop {
