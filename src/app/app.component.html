@@ -6,16 +6,22 @@
       </button>
     }
     <div class="shell__title">
-      <h1>{{ appTitle }}</h1>
-      <p class="shell__subtitle">{{ appSubtitle }}</p>
+      <a class="shell__title-link" routerLink="/" aria-label="Go to Home Dashboard">
+        <h1>{{ appTitle }}</h1>
+        <p class="shell__subtitle">{{ appSubtitle }}</p>
+      </a>
     </div>
     @if (isAuthenticated()) {
-      <button type="button" class="shell__logout" (click)="logout()">Sair</button>
+      <button type="button" class="shell__logout" (click)="logout()">Logout</button>
     }
   </header>
 
-  <div class="shell__body" [class.shell__body--no-nav]="!isAuthenticated()">
-    @if (isAuthenticated()) {
+  <div
+    class="shell__body"
+    [class.shell__body--no-nav]="!isAuthenticated()"
+    [class.shell__body--home]="isAuthenticated() && currentUrl() === '/'"
+  >
+    @if (isAuthenticated() && currentUrl() !== '/') {
       <aside class="shell__nav" [class.shell__nav--open]="navOpen()">
         <nav>
           @for (section of navSections; track section.heading) {
@@ -65,17 +71,17 @@
         <p class="footer__label">Responsible technicians for the app</p>
         <ul>
           <li>
-            Wandemberg Silva dos Santos, Master candidate<br />
-            Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
-            Recife-PE – Brasil
-          </li>
-          <li>
-            Jaelson Freire Brelaz de Castro - PhD. in Computing<br />
+            <strong>Jaelson Freire Brelaz de Castro</strong> - PhD. in Computing<br />
             Imperial College of Science, Technology and Medicine<br />
             University of London - Reino Unido
           </li>
           <li>
-            Sarah Moniky Silva Ribeiro - PhD.<br />
+            <strong>Sarah Moniky Silva Ribeiro</strong> - PhD.<br />
+            Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
+            Recife-PE – Brasil
+          </li>
+          <li>
+            <strong>Wandemberg Silva dos Santos</strong>, Master candidate<br />
             Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
             Recife-PE – Brasil
           </li>

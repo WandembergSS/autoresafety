@@ -29,6 +29,19 @@
 	flex: 1;
 }
 
+.shell__title-link {
+	display: inline-flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	color: inherit;
+	text-decoration: none;
+}
+
+.shell__title-link:hover,
+.shell__title-link:focus-visible {
+	text-decoration: underline;
+}
+
 .shell__header h1 {
 	margin: 0;
 	font-size: clamp(1.5rem, 2.5vw, 2rem);
@@ -75,6 +88,10 @@
 	display: grid;
 	grid-template-columns: 280px 1fr;
 	gap: 0;
+}
+
+.shell__body--home {
+	grid-template-columns: 1fr;
 }
 
 .shell__body--no-nav {

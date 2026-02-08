@@ -10,6 +10,7 @@ export class ProjectService {
   private readonly baseUrl = `${environment.backendApiUrl}/projects`;
   private readonly resumeUrl = `${environment.backendApiUrl}/project-resume`;
   private readonly minimalCreateUrl = `${environment.backendApiUrl}/projects/minimal-project-creation`;
+  private readonly minimalUpdateUrl = `${environment.backendApiUrl}/projects/minimal-project-update`;
 
   /**
    * Returns only non-complete projects with basic fields (Quarkus: GET /api/project-resume).
@@ -34,6 +35,13 @@ export class ProjectService {
     description?: string;
   }): Observable<Project> {
     return this.http.post<Project>(this.minimalCreateUrl, payload);
+  }
+
+  /**
+   * Updates only the project status (Quarkus: POST /api/projects/minimal-project-update).
+   */
+  updateMinimalStatus(payload: { id: number; status: string }): Observable<Project> {
+    return this.http.post<Project>(this.minimalUpdateUrl, payload);
   }
 
   create(payload: Pick<Project, 'name' | 'description' | 'status'>): Observable<Project> {

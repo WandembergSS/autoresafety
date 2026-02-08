@@ -23,7 +23,8 @@ export class AuthInterceptor implements HttpInterceptor {
     const isPublicEndpoint =
       requestPath === '/api/project-resume' ||
       requestPath.startsWith('/api/project-resume/') ||
-      requestPath === '/api/projects/minimal-project-creation';
+      requestPath === '/api/projects/minimal-project-creation' ||
+      requestPath === '/api/projects/minimal-project-update';
     if (isPublicEndpoint) {
       return next.handle(req);
     }

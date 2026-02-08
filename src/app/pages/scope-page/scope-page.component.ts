@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 
 interface AnalysisObjective {
   id: number;
@@ -66,6 +67,7 @@ interface ArtefactEntry {
 })
 export class ScopePageComponent {
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
 
   readonly generalSummaryForm = this.fb.group({
     analysisPurpose: [
@@ -292,6 +294,76 @@ export class ScopePageComponent {
   readonly accidentCount = computed(() => this.accidents().length);
   readonly resourceCount = computed(() => this.resources().length);
   readonly componentCount = computed(() => this.systemComponents().length);
+
+  constructor() {
+    const prefill = this.route.snapshot.queryParamMap.get('prefill');
+
+    if (prefill === 'empty') {
+      this.applyEmptyPrefill();
+    }
+
+    if (prefill === 'ai') {
+      this.applyAiPrefill();
+    }
+  }
+
+  private applyEmptyPrefill(): void {
+    this.generalSummaryForm.reset({
+      analysisPurpose: '',
+      systemDefinition: '',
+      systemBoundary: ''
+    });
+
+    this.objectiveForm.reset({ focus: '', stakeholder: '', priority: 'High' });
+    this.resourceForm.reset({ name: '', category: '', reference: '' });
+    this.componentForm.reset({ name: '', notes: '' });
+    this.accidentForm.reset({ code: '', description: '' });
+    this.hazardForm.reset({ code: '', description: '', linkedAccidents: '' });
+    this.constraintForm.reset({ code: '', statement: '', linkedHazards: '' });
+    this.responsibilityForm.reset({ component: '', responsibility: '', linkedConstraints: '' });
+    this.artefactForm.reset({ name: '', purpose: '', reference: '' });
+
+    this.objectives.set([]);
+    this.resources.set([]);
+    this.systemComponents.set([]);
+    this.accidents.set([]);
+    this.hazards.set([]);
+    this.constraints.set([]);
+    this.responsibilities.set([]);
+    this.artefacts.set([]);
+
+    this.nextObjectiveId = 0;
+    this.nextResourceId = 0;
+    this.nextComponentId = 0;
+    this.nextAccidentId = 0;
+    this.nextHazardId = 0;
+    this.nextConstraintId = 0;
+    this.nextResponsibilityId = 0;
+    this.nextArtefactId = 0;
+  }
+
+  private applyAiPrefill(): void {
+    this.applyEmptyPrefill();
+
+    const lorem = 'Lorem ipsum dolor sit amet.';
+    const loremLong =
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
+
+    this.generalSummaryForm.setValue({
+      analysisPurpose: loremLong,
+      systemDefinition: loremLong,
+      systemBoundary: loremLong
+    });
+
+    this.objectiveForm.setValue({ focus: lorem, stakeholder: lorem, priority: 'High' });
+    this.resourceForm.setValue({ name: lorem, category: lorem, reference: lorem });
+    this.componentForm.setValue({ name: lorem, notes: lorem });
+    this.accidentForm.setValue({ code: lorem, description: lorem });
+    this.hazardForm.setValue({ code: lorem, description: lorem, linkedAccidents: lorem });
+    this.constraintForm.setValue({ code: lorem, statement: lorem, linkedHazards: lorem });
+    this.responsibilityForm.setValue({ component: lorem, responsibility: lorem, linkedConstraints: lorem });
+    this.artefactForm.setValue({ name: lorem, purpose: lorem, reference: lorem });
+  }
 
   addObjective(): void {
     if (this.objectiveForm.invalid) {

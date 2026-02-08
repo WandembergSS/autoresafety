@@ -52,139 +52,187 @@
         ></textarea>
       </div>
 
-      <button type="submit" class="primary">Create project charter</button>
+      <div class="form__actions">
+        <button type="submit" class="primary button--with-info">
+          <span>Create project charter</span>
+          <span
+            class="button__info"
+            data-tooltip="Creates a blank project and opens Step 1 with empty fields."
+            aria-label="Creates a blank project and opens Step 1 with empty fields."
+          >
+            i
+          </span>
+        </button>
+        <button type="button" class="primary button--ai" (click)="createProjectWithAi()">
+          <span>Create projeto With AI</span>
+          <span
+            class="button__info"
+            data-tooltip="AI will only help fill the fields in Step 1 (Define SCS Scope). The quality depends on the information provided in this form."
+            aria-label="AI fills only Step 1; quality depends on the information provided in this form."
+          >
+            i
+          </span>
+        </button>
+      </div>
     </form>
+    <div class="page__column">
+      <section class="list">
+        <header class="list__header">
+          <h3>Pending analyses</h3>
+          <p>{{ pendingProjects().length }} active projects</p>
+        </header>
 
-    <section class="card card--summary">
-      <h3>7-step ReSafety timeline</h3>
-      <ol>
-        <li>
-          Define SCS scope via the ReSafety scope canvas (mission, hazards, constraints).
-          <ol class="sub-steps">
-            <li>Define General Concerns</li>
-            <li>Identify Safety Concerns</li>
-            <li>Assign Responsibilities</li>
-          </ol>
-        </li>
-        <li>
-          Refine iStar4Safety models to map actors, goals, and responsibilities.
-          <ol class="sub-steps">
-            <li>Strategic Dependency (SD) Model</li>
-            <li>Strategic Rationale (SR) Model</li>
-            <li>Integrate Safety Goals</li>
-          </ol>
-        </li>
-        <li>
-          Derive the STPA control structure and feedback architecture.
-          <ol class="sub-steps">
-            <li>Identify Controllers and Processes</li>
-            <li>Derive Control Actions</li>
-            <li>Refine Feedback Architecture (Optional)</li>
-          </ol>
-        </li>
-        <li>
-          Evaluate control actions across STPA contexts to expose UCAs.
-          <ol class="sub-steps">
-            <li>Evaluate Failure Situations</li>
-            <li>Link UCAs to Hazards</li>
-            <li>Model Hazardous Conditions (HC)</li>
-          </ol>
-        </li>
-        <li>
-          Translate UCAs into controller constraints and assurance checks.
-          <ol class="sub-steps">
-            <li>Analyze UCAs and HCs</li>
-            <li>Formulate Constraints</li>
-          </ol>
-        </li>
-        <li>
-          Analyse loss scenarios and author safety requirements for mitigation.
-          <ol class="sub-steps">
-            <li>Identify Loss Scenarios (LS)</li>
-            <li>Author Safety Requirements (SR)</li>
-            <li>Ensure Traceability</li>
-          </ol>
-        </li>
-        <li>
-          Update iStar4Safety artefacts and log evidence for traceability.
-          <ol class="sub-steps">
-            <li>Integrate Findings</li>
-            <li>Log Traceability Evidence</li>
-            <li>Verify Model Consistency</li>
-          </ol>
-        </li>
-      </ol>
-    </section>
+        @if (pendingProjects().length === 0) {
+          <p class="empty">No active analyses. Create a charter to start Step 1 (Scope).</p>
+        } @else {
+          <div class="list__grid">
+            @for (project of pendingProjects(); track project.id) {
+              <article class="tile">
+                <div class="tile__heading">
+                  <h4>{{ project.name }}</h4>
+                  <span class="status status--{{ project.status.toLowerCase() }}">{{ project.status }}</span>
+                </div>
+                <p class="tile__meta">
+                  <strong>Domain:</strong> {{ project.domain }} · <strong>Lead analyst:</strong>
+                  {{ project.owner ?? 'Unassigned' }}
+                </p>
+                <p class="tile__description">{{ project.description }}</p>
+                <p class="tile__next">
+                  Current stage: Step {{ project.currentStep ?? '—' }} · {{ project.nextStep }}
+                </p>
+                <div class="tile__actions">
+                  @if (['completed', 'canceled', 'cancelled', 'removed'].includes(project.status.toLowerCase())) {
+                    <button type="button" (click)="updateStatus(project.id, 'REOPENED')">Reopen</button>
+                  } @else {
+                    <button type="button" (click)="startProject(project)">Continue</button>
+                  }
+                  @if (['pending', 'reopened'].includes(project.status.toLowerCase())) {
+                    <button type="button" (click)="updateStatus(project.id, 'CANCELLED')">Cancel</button>
+                  }
+                  <button type="button" (click)="updateStatus(project.id, 'COMPLETED')">Mark complete</button>
+                  <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
+                </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+
+      <section class="list">
+        <header class="list__header">
+          <h3>Concluded analyses</h3>
+          <p>{{ completedProjects().length }} archived traceability packages</p>
+        </header>
+
+        @if (completedProjects().length === 0) {
+          <p class="empty">No completed projects yet. Finish a workflow to see history here.</p>
+        } @else {
+          <div class="list__grid list__grid--compact">
+            @for (project of completedProjects(); track project.id) {
+              <article class="tile tile--compact">
+                  <div class="tile__heading">
+                    <h4>{{ project.name }}</h4>
+                    <span class="status status--{{ project.status.toLowerCase() }}">{{ project.status }}</span>
+                  </div>
+                  <p class="tile__meta">
+                    <strong>Domain:</strong> {{ project.domain }} · <strong>Lead analyst:</strong>
+                    {{ project.owner ?? 'Unassigned' }}
+                  </p>
+                  <p class="tile__description">{{ project.description }}</p>
+                  <div class="tile__actions">
+                    <button type="button" (click)="updateStatus(project.id, 'REOPENED')">Reopen</button>
+                    <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
+                  </div>
+              </article>
+            }
+          </div>
+        }
+      </section>
+    </div>
   </div>
 
-  <section class="list">
-    <header class="list__header">
-      <h3>Pending analyses</h3>
-  <p>{{ pendingProjects().length }} active projects</p>
-    </header>
+  <section class="card card--summary">
+    <h3>7-step ReSafety timeline</h3>
+    <p class="timeline__intro">
+      The RESafety framework is an iterative and incremental process designed to model safety requirements and
+      generate safety analysis artifacts by integrating System-Theoretic Process Analysis (STPA) with the iStar4Safety
+      language. The process consists of seven main steps, several of which contain detailed substeps and workflows.
+    </p>
+    <div class="timeline-diagram" aria-label="7-step ReSafety timeline diagram">
+      @for (step of timelineSteps; track step.id; let idx = $index) {
+        <button type="button" class="timeline-step" (click)="openTimelineStep(step)">
+          <span class="timeline-step__index">{{ step.id }}</span>
+          <div>
+            <h4>{{ step.title }}</h4>
+            <p>{{ step.description }}</p>
+          </div>
+        </button>
+        @if (idx < timelineSteps.length - 1) {
+          <span class="timeline-arrow" aria-hidden="true">→</span>
+        }
+      }
+    </div>
+    <div class="timeline-extras">
+      @for (extra of timelineExtras; track extra.title) {
+        <button type="button" class="timeline-step timeline-step--aux" (click)="openTimelineStep(extra)">
+          <div>
+            <h4>{{ extra.title }}</h4>
+            <p>{{ extra.description }}</p>
+          </div>
+        </button>
+      }
+    </div>
+  </section>
 
-    @if (pendingProjects().length === 0) {
-  <p class="empty">No active analyses. Create a charter to start Step 1 (Scope).</p>
-    } @else {
-      <div class="list__grid">
-        @for (project of pendingProjects(); track project.id) {
-          <article class="tile">
-            <div class="tile__heading">
-              <h4>{{ project.name }}</h4>
-              <span class="status status--{{ project.status }}">{{ project.status }}</span>
-            </div>
-            <p class="tile__meta">
-              <strong>Domain:</strong> {{ project.domain }} · <strong>Lead analyst:</strong>
-              {{ project.owner ?? 'Unassigned' }}
-            </p>
-            <p class="tile__description">{{ project.description }}</p>
-            <p class="tile__next">
-              Current stage: Step {{ project.currentStep ?? '—' }} · {{ project.nextStep }}
-            </p>
-            <div class="tile__actions">
-              @if (project.status === 'pending') {
-                <button type="button" (click)="startProject(project)">Start</button>
-              } @else {
-                <button type="button" (click)="continueProject(project)">Continue</button>
+  @if (selectedTimelineStep()) {
+    <div class="modal-backdrop" (click)="closeTimelineModalFromBackdrop()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          @if (selectedTimelineStep()!.id) {
+            <h4>Step {{ selectedTimelineStep()!.id }} · {{ selectedTimelineStep()!.title }}</h4>
+          } @else {
+            <h4>{{ selectedTimelineStep()!.title }}</h4>
+          }
+          <button type="button" class="modal__close" (click)="closeTimelineModal()">×</button>
+        </header>
+        <p class="modal__description">{{ selectedTimelineStep()!.description }}</p>
+        @if (selectedTimelineStep()!.substeps?.length) {
+          @if (isDeepDetailModal()) {
+            <div class="modal__details">
+              @for (item of selectedTimelineStep()!.substeps!; track item) {
+                <p class="modal__detail">
+                  @if (getDetailLabel(item)) {
+                    <strong>{{ getDetailLabel(item) }}</strong> {{ getDetailText(item) }}
+                  } @else {
+                    {{ item }}
+                  }
+                </p>
               }
-              <button type="button" (click)="updateStatus(project.id, 'complete')">Mark complete</button>
-              <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
             </div>
-          </article>
+          } @else {
+            <div class="modal__diagram">
+              @for (item of selectedTimelineStep()!.substeps!; track item; let idx = $index) {
+                <button
+                  type="button"
+                  class="modal__step"
+                  [class.modal__step--action]="hasSubstepDetail(item)"
+                  (click)="hasSubstepDetail(item) && openSubstepDetail(item)"
+                >
+                  @if (shouldShowSubstepIndex()) {
+                    <span class="modal__step-index">{{ idx + 1 }}</span>
+                  }
+                  <p>
+                    <span class="modal__step-title">{{ getSubstepDisplayTitle(item) }}</span>
+                    @if (getSubstepDescription(item)) {
+                      <span class="modal__step-desc">: {{ getSubstepDescription(item) }}</span>
+                    }
+                  </p>
+                </button>
+              }
+            </div>
+          }
         }
       </div>
-    }
-  </section>
-
-  <section class="list">
-    <br>
-    <header class="list__header">
-      <h3>Concluded analyses</h3>
-      <p>{{ completedProjects().length }} archived traceability packages</p>
-    </header>
-
-    @if (completedProjects().length === 0) {
-      <p class="empty">No completed projects yet. Finish a workflow to see history here.</p>
-    } @else {
-      <div class="list__grid list__grid--compact">
-        @for (project of completedProjects(); track project.id) {
-          <article class="tile tile--compact">
-              <div class="tile__heading">
-                <h4>{{ project.name }}</h4>
-                <span class="status status--complete">Complete</span>
-              </div>
-              <p class="tile__meta">
-                <strong>Domain:</strong> {{ project.domain }} · <strong>Lead analyst:</strong>
-                {{ project.owner ?? 'Unassigned' }}
-              </p>
-              <p class="tile__description">{{ project.description }}</p>
-              <div class="tile__actions">
-                <button type="button" (click)="updateStatus(project.id, 'pending')">Reopen</button>
-                <button type="button" class="danger" (click)="removeProject(project.id)">Remove</button>
-              </div>
-          </article>
-        }
-      </div>
-    }
-  </section>
+    </div>
+  }
 </section>
