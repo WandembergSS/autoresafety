@@ -4,16 +4,20 @@
     <h2>Define the Scope of the Safety-Critical System</h2>
     <p>
   Populate the ReSafety project rationale and project scope blocks. Establish the mission context, hazards, and
-      high-level constraints that guide the remaining RESafety analysis. All data shown is mock content for prototyping the
-      experience.
+      high-level constraints that guide the remaining RESafety analysis.
     </p>
   </header>
 
+  <div class="page-actions">
+    <button type="button" class="button button--secondary" (click)="saveStepOne()">Save</button>
+    <button type="button" class="button" (click)="saveStepOne(true)">Save and Continue</button>
+  </div>
+
   <section class="card lane">
     <header class="lane__header">
-      <h3>Substep 1.1 — Define general concerns</h3>
+      <h3>1.1 — General concerns</h3>
       <p>
-        Build a shared understanding of the insulin infusion pump mission, system definition, available knowledge, scope
+        Build a shared understanding of the mission, system definition, available knowledge, scope
         boundaries, and the socio-technical elements that will influence subsequent ReSafety artefacts.
       </p>
     </header>
@@ -21,56 +25,45 @@
     <div class="lane__grid">
       <article class="lane__block">
         <header>
-          <h4>1.1.1 Clarify analysis objectives ({{ objectiveCount() }})</h4>
-          <p>Capture the intent of this iteration and who depends on the results.</p>
+          <h4>1.1.1 Clarify analysis objectives</h4>
+          <p>Capture the intent of this iteration.</p>
         </header>
-        <form class="inline-form" [formGroup]="objectiveForm" (ngSubmit)="addObjective()">
-          <input type="text" formControlName="focus" placeholder="Objective focus" />
-          <input type="text" formControlName="stakeholder" placeholder="Stakeholder" />
-          <select formControlName="priority">
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-          <button type="submit">Add</button>
+        <form class="stack" [formGroup]="analysisObjectiveForm">
+          <label class="field">
+            <textarea
+              rows="4"
+              formControlName="objectivesText"
+              placeholder="Describe the analysis objectives for Step 1"
+            ></textarea>
+          </label>
+          <div class="field-actions">
+            <button type="button" (click)="openObjectiveModal()">Expand</button>
+          </div>
         </form>
-        <ul class="list">
-          @for (objective of objectives(); track objective.id) {
-            <li>
-              <div>
-                <h5>{{ objective.focus }}</h5>
-                <p>Stakeholder: {{ objective.stakeholder }}</p>
-              </div>
-              <span class="tag tag--priority-{{ objective.priority | lowercase }}">{{ objective.priority }}</span>
-            </li>
-          }
-        </ul>
       </article>
 
       <article class="lane__block">
         <header>
-          <h4>1.1.2 Describe the system definition</h4>
-          <p>Summarize the mission and product scope that will anchor the remaining analysis.</p>
+          <h4>1.1.2 System definition</h4>
+          <p>Briefly introduce the system, along with a concise explanation of its purpose.</p>
         </header>
         <form [formGroup]="generalSummaryForm" class="stack">
           <label class="field">
-            <span>Analysis purpose</span>
-            <textarea rows="2" formControlName="analysisPurpose"></textarea>
+            <textarea
+              rows="4"
+              formControlName="systemDefinition"
+              placeholder="Describe the system definition"
+            ></textarea>
           </label>
-          <label class="field">
-            <span>System definition</span>
-            <textarea rows="3" formControlName="systemDefinition"></textarea>
-          </label>
-          <label class="field">
-            <span>System boundary</span>
-            <textarea rows="3" formControlName="systemBoundary"></textarea>
-          </label>
+          <div class="field-actions">
+            <button type="button" (click)="openSystemDefinitionModal()">Expand</button>
+          </div>
         </form>
       </article>
 
       <article class="lane__block">
         <header>
-          <h4>1.1.3 Catalogue available resources ({{ resourceCount() }})</h4>
+          <h4>1.1.3 Resources Needed ({{ resourceCount() }})</h4>
           <p>List supporting material that will inform hazards, constraints, and responsibilities.</p>
         </header>
         <form class="inline-form" [formGroup]="resourceForm" (ngSubmit)="addResource()">
@@ -79,6 +72,161 @@
           <input type="text" formControlName="reference" placeholder="Reference or link" />
           <button type="submit">Add</button>
         </form>
+        @if (resourceForm.controls.name.invalid && resourceForm.controls.name.touched) {
+          <small class="hint">Resource name is required.</small>
+        }
+        <div class="field-actions">
+          <button type="button" (click)="openResourceModal()">Expand</button>
+        </div>
+        <ul class="list list--dense">
+          @for (resource of resources(); track resource.id) {
+            <li>
+              <div>
+                <h5>{{ resource.name }}</h5>
+                <p>{{ resource.category }} · {{ resource.reference }}</p>
+              </div>
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="Remove resource"
+                (click)="removeResource(resource.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.1.4 System boundary</h4>
+          <p>Boundaries of the system under analysis.</p>
+        </header>
+        <form [formGroup]="generalSummaryForm" class="stack">
+          <label class="field">
+            <textarea
+              rows="4"
+              formControlName="systemBoundary"
+              placeholder="Describe the system boundary"
+            ></textarea>
+          </label>
+          <div class="field-actions">
+            <button type="button" (click)="openSystemBoundaryModal()">Expand</button>
+          </div>
+        </form>
+      </article>
+
+      <article class="lane__block">
+        <header>
+          <h4>1.1.5 System components ({{ componentCount() }})</h4>
+          <p>Basic components of the system.</p>
+        </header>
+        <form class="inline-form" [formGroup]="componentForm" (ngSubmit)="addComponent()">
+          <input type="text" formControlName="name" placeholder="Component" />
+          <input type="text" formControlName="description" placeholder="Description" />
+          <button type="submit">Add</button>
+        </form>
+        @if (componentForm.controls.name.invalid && componentForm.controls.name.touched) {
+          <small class="hint">Component name is required.</small>
+        }
+        <div class="field-actions">
+          <button type="button" (click)="openComponentModal()">Expand</button>
+        </div>
+        <ul class="list">
+          @for (component of systemComponents(); track component.id) {
+            <li>
+              <div>
+                <h5>{{ component.name }}</h5>
+                <p>{{ component.description }}</p>
+              </div>
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="Remove component"
+                (click)="removeComponent(component.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </li>
+          }
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  @if (isObjectiveModalOpen()) {
+    <div class="modal-backdrop" (click)="closeObjectiveModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Analysis objectives</h4>
+          <button type="button" class="modal__close" (click)="closeObjectiveModal()">×</button>
+        </header>
+        <form class="stack" [formGroup]="analysisObjectiveModalForm">
+          <label class="field">
+            <textarea
+              rows="12"
+              formControlName="objectivesText"
+              placeholder="Describe the analysis objectives for Step 1"
+            ></textarea>
+          </label>
+          <div class="form__actions">
+            <button type="button" class="primary" (click)="confirmObjectiveModal()">Finish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isSystemDefinitionModalOpen()) {
+    <div class="modal-backdrop" (click)="closeSystemDefinitionModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>System definition</h4>
+          <button type="button" class="modal__close" (click)="closeSystemDefinitionModal()">×</button>
+        </header>
+        <form class="stack" [formGroup]="systemDefinitionModalForm">
+          <label class="field">
+            <textarea
+              rows="12"
+              formControlName="systemDefinitionText"
+              placeholder="Describe the system definition"
+            ></textarea>
+          </label>
+          <div class="form__actions">
+            <button type="button" class="primary" (click)="confirmSystemDefinitionModal()">Finish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isResourceModalOpen()) {
+    <div class="modal-backdrop" (click)="closeResourceModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Resources needed</h4>
+          <button type="button" class="modal__close" (click)="closeResourceModal()">×</button>
+        </header>
+        <form class="inline-form" [formGroup]="resourceModalForm" (ngSubmit)="addResource(resourceModalForm)">
+          <input type="text" formControlName="name" placeholder="Resource name" />
+          <input type="text" formControlName="category" placeholder="Type" />
+          <input type="text" formControlName="reference" placeholder="Reference or link" />
+          <button type="submit">Add</button>
+        </form>
+        @if (resourceModalForm.controls.name.invalid && resourceModalForm.controls.name.touched) {
+          <small class="hint">Resource name is required.</small>
+        }
         <ul class="list list--dense">
           @for (resource of resources(); track resource.id) {
             <li>
@@ -89,45 +237,71 @@
             </li>
           }
         </ul>
-      </article>
-
-      <article class="lane__block">
-        <header>
-          <h4>1.1.4 Define scope boundary</h4>
-          <p>Clarify what is inside and outside this iteration’s analysis boundary.</p>
-        </header>
-        <div class="rich-text">
-          <p>{{ generalSummaryForm.get('systemBoundary')?.value }}</p>
+        <div class="form__actions">
+          <button type="button" class="primary" (click)="confirmResourceModal()">Finish</button>
         </div>
-      </article>
+      </div>
+    </div>
+  }
 
-      <article class="lane__block">
-        <header>
-          <h4>1.1.5 Identify socio-technical components ({{ componentCount() }})</h4>
-          <p>Document the roles that will own responsibilities and constraints later in the workflow.</p>
+  @if (isComponentModalOpen()) {
+    <div class="modal-backdrop" (click)="closeComponentModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>System components</h4>
+          <button type="button" class="modal__close" (click)="closeComponentModal()">×</button>
         </header>
-        <form class="inline-form" [formGroup]="componentForm" (ngSubmit)="addComponent()">
+        <form class="inline-form" [formGroup]="componentModalForm" (ngSubmit)="addComponent(componentModalForm)">
           <input type="text" formControlName="name" placeholder="Component" />
-          <input type="text" formControlName="notes" placeholder="Primary role" />
+          <input type="text" formControlName="description" placeholder="Description" />
           <button type="submit">Add</button>
         </form>
+        @if (componentModalForm.controls.name.invalid && componentModalForm.controls.name.touched) {
+          <small class="hint">Component name is required.</small>
+        }
         <ul class="list">
           @for (component of systemComponents(); track component.id) {
             <li>
               <div>
                 <h5>{{ component.name }}</h5>
-                <p>{{ component.notes }}</p>
+                <p>{{ component.description }}</p>
               </div>
             </li>
           }
         </ul>
-      </article>
+        <div class="form__actions">
+          <button type="button" class="primary" (click)="confirmComponentModal()">Finish</button>
+        </div>
+      </div>
     </div>
-  </section>
+  }
+
+  @if (isSystemBoundaryModalOpen()) {
+    <div class="modal-backdrop" (click)="closeSystemBoundaryModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>System boundary</h4>
+          <button type="button" class="modal__close" (click)="closeSystemBoundaryModal()">×</button>
+        </header>
+        <form class="stack" [formGroup]="systemBoundaryModalForm">
+          <label class="field">
+            <textarea
+              rows="12"
+              formControlName="systemBoundaryText"
+              placeholder="Describe the system boundary"
+            ></textarea>
+          </label>
+          <div class="form__actions">
+            <button type="button" class="primary" (click)="confirmSystemBoundaryModal()">Finish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
 
   <section class="card lane">
     <header class="lane__header">
-      <h3>Substep 1.2 — Define safety concerns</h3>
+      <h3>1.2 — Safety concerns</h3>
       <p>
         Transition from mission framing to safety implications. Establish accidents, hazards, safety constraints,
         responsibilities, and artefacts that will connect with later iStar4Safety and STPA models.
@@ -294,4 +468,9 @@
       </article>
     </div>
   </section>
+
+  <div class="page-actions page-actions--bottom">
+    <button type="button" class="button button--secondary" (click)="saveStepOne()">Save</button>
+    <button type="button" class="button" (click)="saveStepOne(true)">Save and Continue</button>
+  </div>
 </section>

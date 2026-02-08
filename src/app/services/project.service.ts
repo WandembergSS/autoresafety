@@ -11,6 +11,8 @@ export class ProjectService {
   private readonly resumeUrl = `${environment.backendApiUrl}/project-resume`;
   private readonly minimalCreateUrl = `${environment.backendApiUrl}/projects/minimal-project-creation`;
   private readonly minimalUpdateUrl = `${environment.backendApiUrl}/projects/minimal-project-update`;
+  private readonly stepOneInfoUrl = `${environment.backendApiUrl}/projects/step_one_project_information`;
+  private readonly stepOneUpdateUrl = `${environment.backendApiUrl}/projects/step_one_project_update`;
 
   /**
    * Returns only non-complete projects with basic fields (Quarkus: GET /api/project-resume).
@@ -42,6 +44,24 @@ export class ProjectService {
    */
   updateMinimalStatus(payload: { id: number; status: string }): Observable<Project> {
     return this.http.post<Project>(this.minimalUpdateUrl, payload);
+  }
+
+  /**
+   * Returns Step 1 (Scope) data for a project document.
+   * GET /api/projects/step_one_project_information/{id}
+   */
+  getStepOneScope(projectId: number): Observable<Record<string, unknown>> {
+    return this.http.get<Record<string, unknown>>(`${this.stepOneInfoUrl}/${projectId}`, {
+      transferCache: false
+    });
+  }
+
+  /**
+   * Updates Step 1 (Scope) data for a project document.
+   * POST /api/projects/step_one_project_update
+   */
+  updateStepOneScope(payload: object): Observable<void> {
+    return this.http.post<void>(this.stepOneUpdateUrl, payload);
   }
 
   create(payload: Pick<Project, 'name' | 'description' | 'status'>): Observable<Project> {

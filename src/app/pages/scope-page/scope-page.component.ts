@@ -1,13 +1,21 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { EMPTY } from 'rxjs';
+import { catchError, switchMap, tap } from 'rxjs/operators';
+import { ProjectService } from '../../services/project.service';
 
 interface AnalysisObjective {
   id: number;
   focus: string;
   stakeholder: string;
   priority: 'High' | 'Medium' | 'Low';
+}
+
+interface Step1ObjectiveDto extends AnalysisObjective {
+  rationale?: string;
 }
 
 interface ReferenceResource {
@@ -17,16 +25,29 @@ interface ReferenceResource {
   reference: string;
 }
 
+interface Step1ResourceDto extends ReferenceResource {
+  sourceType?: 'manual' | 'standard' | 'repo' | 'paper';
+  rationale?: string;
+}
+
 interface SystemComponentEntry {
   id: number;
   name: string;
-  notes: string;
+  description: string;
+}
+
+interface Step1SystemComponentDto extends SystemComponentEntry {
+  rationale?: string;
 }
 
 interface AccidentEntry {
   id: number;
   code: string;
   description: string;
+}
+
+interface Step1AccidentDto extends AccidentEntry {
+  rationale?: string;
 }
 
 interface HazardEntry {
@@ -36,11 +57,27 @@ interface HazardEntry {
   linkedAccidents: string;
 }
 
+interface Step1HazardDto {
+  id: number;
+  code: string;
+  description: string;
+  linkedAccidents: string[];
+  rationale?: string;
+}
+
 interface SafetyConstraintEntry {
   id: number;
   code: string;
   statement: string;
   linkedHazards: string;
+}
+
+interface Step1SafetyConstraintDto {
+  id: number;
+  code: string;
+  statement: string;
+  linkedHazards: string[];
+  rationale?: string;
 }
 
 interface ResponsibilityEntry {
@@ -50,11 +87,44 @@ interface ResponsibilityEntry {
   linkedConstraints: string;
 }
 
+interface Step1ResponsibilityDto {
+  id: number;
+  component: string;
+  responsibility: string;
+  linkedConstraints: string[];
+  rationale?: string;
+}
+
 interface ArtefactEntry {
   id: number;
   name: string;
   purpose: string;
   reference: string;
+}
+
+interface Step1ArtefactDto extends ArtefactEntry {
+  rationale?: string;
+}
+
+interface Step1GeneralSummaryDto {
+  analysisPurpose?: string;
+  assumptions?: string;
+  systemDefinition?: string;
+  systemBoundary?: string;
+  outOfScope?: string;
+}
+
+interface Step1ScopeDto {
+  lastUpdatedBy?: string;
+  generalSummary?: Step1GeneralSummaryDto;
+  objectives?: string;
+  resources?: Step1ResourceDto[];
+  systemComponents?: Step1SystemComponentDto[];
+  accidents?: Step1AccidentDto[];
+  hazards?: Step1HazardDto[];
+  safetyConstraints?: Step1SafetyConstraintDto[];
+  responsibilities?: Step1ResponsibilityDto[];
+  artefacts?: Step1ArtefactDto[];
 }
 
 @Component({
@@ -68,19 +138,16 @@ interface ArtefactEntry {
 export class ScopePageComponent {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly projectService = inject(ProjectService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly generalSummaryForm = this.fb.group({
-    analysisPurpose: [
-      'Model the Insulin Infusion Pump (IIP) iteratively to produce successive refinements of safety artefacts.',
-      Validators.required
-    ],
     systemDefinition: [
       'The IIP is a safety-critical device that automates basal and bolus insulin delivery to support Type 1 Diabetes management.',
       Validators.required
     ],
-    systemBoundary: [
-      'From configuration of infusion parameters by the patient to confirmed delivery of the dose through the catheter.'
-    ]
+    systemBoundary: ['']
   });
 
   readonly objectiveForm = this.fb.group({
@@ -89,15 +156,42 @@ export class ScopePageComponent {
     priority: ['High', Validators.required]
   });
 
+  readonly analysisObjectiveForm = this.fb.group({
+    objectivesText: ['']
+  });
+
+  readonly analysisObjectiveModalForm = this.fb.group({
+    objectivesText: ['']
+  });
+
+  readonly systemDefinitionModalForm = this.fb.group({
+    systemDefinitionText: ['']
+  });
+
+  readonly systemBoundaryModalForm = this.fb.group({
+    systemBoundaryText: ['']
+  });
+
   readonly resourceForm = this.fb.group({
     name: ['', Validators.required],
-    category: ['Article', Validators.required],
-    reference: ['', Validators.required]
+    category: [''],
+    reference: ['']
+  });
+
+  readonly resourceModalForm = this.fb.group({
+    name: ['', Validators.required],
+    category: [''],
+    reference: ['']
   });
 
   readonly componentForm = this.fb.group({
     name: ['', Validators.required],
-    notes: ['', Validators.required]
+    description: ['']
+  });
+
+  readonly componentModalForm = this.fb.group({
+    name: ['', Validators.required],
+    description: ['']
   });
 
   readonly accidentForm = this.fb.group({
@@ -157,7 +251,7 @@ export class ScopePageComponent {
     {
       id: 1,
       name: 'Martinazzo (2022) – STPA of Insulin Pumps',
-      category: 'Article',
+      category: 'Manual',
       reference: 'martinazzo-2022-stpa-insulin.pdf'
     },
     {
@@ -178,17 +272,17 @@ export class ScopePageComponent {
     {
       id: 1,
       name: 'Patient (Human Controller)',
-      notes: 'Configures infusion parameters and supervises therapy.'
+      description: 'Configures infusion parameters and supervises therapy.'
     },
     {
       id: 2,
       name: 'Insulin Pump',
-      notes: 'Executes basal/bolus delivery and enforces configuration constraints.'
+      description: 'Executes basal/bolus delivery and enforces configuration constraints.'
     },
     {
       id: 3,
       name: 'Infusion Set',
-      notes: 'Provides physical channel for insulin delivery; integrity is critical.'
+      description: 'Provides physical channel for insulin delivery; integrity is critical.'
     }
   ]);
 
@@ -295,11 +389,155 @@ export class ScopePageComponent {
   readonly resourceCount = computed(() => this.resources().length);
   readonly componentCount = computed(() => this.systemComponents().length);
 
-  constructor() {
-    const prefill = this.route.snapshot.queryParamMap.get('prefill');
+  readonly isObjectiveModalOpen = signal(false);
+  readonly isSystemDefinitionModalOpen = signal(false);
+  readonly isResourceModalOpen = signal(false);
+  readonly isSystemBoundaryModalOpen = signal(false);
+  readonly isComponentModalOpen = signal(false);
+  readonly currentProjectId = signal<number | null>(null);
 
+  constructor() {
+    this.initializeFromRoute();
+  }
+
+  openObjectiveModal(): void {
+    this.analysisObjectiveModalForm.setValue({
+      objectivesText: this.analysisObjectiveForm.get('objectivesText')?.value ?? ''
+    });
+    this.isObjectiveModalOpen.set(true);
+  }
+
+  closeObjectiveModal(): void {
+    this.isObjectiveModalOpen.set(false);
+  }
+
+  confirmObjectiveModal(): void {
+    this.analysisObjectiveForm.setValue({
+      objectivesText: this.analysisObjectiveModalForm.get('objectivesText')?.value ?? ''
+    });
+    this.closeObjectiveModal();
+  }
+
+  openSystemDefinitionModal(): void {
+    this.systemDefinitionModalForm.setValue({
+      systemDefinitionText: this.generalSummaryForm.get('systemDefinition')?.value ?? ''
+    });
+    this.isSystemDefinitionModalOpen.set(true);
+  }
+
+  closeSystemDefinitionModal(): void {
+    this.isSystemDefinitionModalOpen.set(false);
+  }
+
+  confirmSystemDefinitionModal(): void {
+    this.generalSummaryForm.patchValue({
+      systemDefinition: this.systemDefinitionModalForm.get('systemDefinitionText')?.value ?? ''
+    });
+    this.closeSystemDefinitionModal();
+  }
+
+  openSystemBoundaryModal(): void {
+    this.systemBoundaryModalForm.setValue({
+      systemBoundaryText: this.generalSummaryForm.get('systemBoundary')?.value ?? ''
+    });
+    this.isSystemBoundaryModalOpen.set(true);
+  }
+
+  closeSystemBoundaryModal(): void {
+    this.isSystemBoundaryModalOpen.set(false);
+  }
+
+  confirmSystemBoundaryModal(): void {
+    this.generalSummaryForm.patchValue({
+      systemBoundary: this.systemBoundaryModalForm.get('systemBoundaryText')?.value ?? ''
+    });
+    this.closeSystemBoundaryModal();
+  }
+
+  openResourceModal(): void {
+    this.resourceModalForm.setValue({
+      name: this.resourceForm.get('name')?.value ?? '',
+      category: this.resourceForm.get('category')?.value ?? 'Article',
+      reference: this.resourceForm.get('reference')?.value ?? ''
+    });
+    this.isResourceModalOpen.set(true);
+  }
+
+  closeResourceModal(): void {
+    this.isResourceModalOpen.set(false);
+  }
+
+  confirmResourceModal(): void {
+    this.resourceForm.setValue({
+      name: this.resourceModalForm.get('name')?.value ?? '',
+      category: this.resourceModalForm.get('category')?.value ?? 'Article',
+      reference: this.resourceModalForm.get('reference')?.value ?? ''
+    });
+    this.closeResourceModal();
+  }
+
+  openComponentModal(): void {
+    this.componentModalForm.setValue({
+      name: this.componentForm.get('name')?.value ?? '',
+      description: this.componentForm.get('description')?.value ?? ''
+    });
+    this.isComponentModalOpen.set(true);
+  }
+
+  closeComponentModal(): void {
+    this.isComponentModalOpen.set(false);
+  }
+
+  confirmComponentModal(): void {
+    this.componentForm.setValue({
+      name: this.componentModalForm.get('name')?.value ?? '',
+      description: this.componentModalForm.get('description')?.value ?? ''
+    });
+    this.closeComponentModal();
+  }
+
+  private initializeFromRoute(): void {
+    this.route.queryParamMap
+      .pipe(
+        switchMap((params) => {
+          const prefill = params.get('prefill');
+          const projectIdParam = params.get('projectId');
+          const projectId = projectIdParam ? Number(projectIdParam) : undefined;
+
+          this.currentProjectId.set(projectId && !Number.isNaN(projectId) ? projectId : null);
+
+          if (!projectId || Number.isNaN(projectId)) {
+            this.applyPrefill(prefill);
+            return EMPTY;
+          }
+
+          return this.projectService.getStepOneScope(projectId).pipe(
+            tap((scope) => {
+              if (!scope || Object.keys(scope).length === 0) {
+                this.applyPrefill(prefill);
+                return;
+              }
+              this.applyStep1Scope(scope as Step1ScopeDto);
+            }),
+            catchError((error) => {
+              console.error(
+                `Failed to load Step 1 scope from /api/projects/step_one_project_information/${projectId}`,
+                error
+              );
+              this.applyPrefill(prefill);
+              return EMPTY;
+            })
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe();
+  }
+
+  private applyPrefill(prefill: string | null): void {
     if (prefill === 'empty') {
       this.applyEmptyPrefill();
+      return;
     }
 
     if (prefill === 'ai') {
@@ -307,23 +545,191 @@ export class ScopePageComponent {
     }
   }
 
+  private applyStep1Scope(scope: Step1ScopeDto): void {
+    const summary = scope.generalSummary ?? {};
+
+    this.generalSummaryForm.reset({
+      systemDefinition: summary.systemDefinition ?? '',
+      systemBoundary: summary.systemBoundary ?? ''
+    });
+
+    this.analysisObjectiveForm.reset({
+      objectivesText: scope.objectives ?? ''
+    });
+
+    const resources = (scope.resources ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      reference: item.reference
+    }));
+
+    const systemComponents = (scope.systemComponents ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      description: item.description
+    }));
+
+    const accidents = (scope.accidents ?? []).map((item) => ({
+      id: item.id,
+      code: item.code,
+      description: item.description
+    }));
+
+    const hazards = (scope.hazards ?? []).map((item) => ({
+      id: item.id,
+      code: item.code,
+      description: item.description,
+      linkedAccidents: this.joinCodes(item.linkedAccidents)
+    }));
+
+    const constraints = (scope.safetyConstraints ?? []).map((item) => ({
+      id: item.id,
+      code: item.code,
+      statement: item.statement,
+      linkedHazards: this.joinCodes(item.linkedHazards)
+    }));
+
+    const responsibilities = (scope.responsibilities ?? []).map((item) => ({
+      id: item.id,
+      component: item.component,
+      responsibility: item.responsibility,
+      linkedConstraints: this.joinCodes(item.linkedConstraints)
+    }));
+
+    const artefacts = (scope.artefacts ?? []).map((item) => ({
+      id: item.id,
+      name: item.name,
+      purpose: item.purpose,
+      reference: item.reference
+    }));
+
+    this.resources.set(resources);
+    this.systemComponents.set(systemComponents);
+    this.accidents.set(accidents);
+    this.hazards.set(hazards);
+    this.constraints.set(constraints);
+    this.responsibilities.set(responsibilities);
+    this.artefacts.set(artefacts);
+
+    this.nextResourceId = this.getNextId(resources);
+    this.nextComponentId = this.getNextId(systemComponents);
+    this.nextAccidentId = this.getNextId(accidents);
+    this.nextHazardId = this.getNextId(hazards);
+    this.nextConstraintId = this.getNextId(constraints);
+    this.nextResponsibilityId = this.getNextId(responsibilities);
+    this.nextArtefactId = this.getNextId(artefacts);
+  }
+
+  private normalizePriority(priority: string | undefined): AnalysisObjective['priority'] {
+    if (priority === 'High' || priority === 'Medium' || priority === 'Low') {
+      return priority;
+    }
+    return 'Medium';
+  }
+
+  private joinCodes(values: string[] | undefined): string {
+    return (values ?? []).join(', ');
+  }
+
+  private splitCodes(value: string | null | undefined): string[] {
+    return (value ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  }
+
+  saveStepOne(continueAfterSave = false): void {
+    const projectId = this.currentProjectId();
+
+    if (!projectId) {
+      console.warn('Missing projectId; cannot save Step 1 scope.');
+      return;
+    }
+
+    const payload: Step1ScopeDto & { id: number } = {
+      id: projectId,
+      lastUpdatedBy: 'admin',
+      generalSummary: {
+        systemDefinition: this.generalSummaryForm.get('systemDefinition')?.value ?? '',
+        systemBoundary: this.generalSummaryForm.get('systemBoundary')?.value ?? ''
+      },
+      objectives: this.analysisObjectiveForm.get('objectivesText')?.value ?? '',
+      resources: this.resources().map((item) => ({
+        id: item.id,
+        name: item.name,
+        category: item.category,
+        reference: item.reference
+      })),
+      systemComponents: this.systemComponents().map((item) => ({
+        id: item.id,
+        name: item.name,
+        description: item.description
+      })),
+      accidents: this.accidents().map((item) => ({
+        id: item.id,
+        code: item.code,
+        description: item.description
+      })),
+      hazards: this.hazards().map((item) => ({
+        id: item.id,
+        code: item.code,
+        description: item.description,
+        linkedAccidents: this.splitCodes(item.linkedAccidents)
+      })),
+      safetyConstraints: this.constraints().map((item) => ({
+        id: item.id,
+        code: item.code,
+        statement: item.statement,
+        linkedHazards: this.splitCodes(item.linkedHazards)
+      })),
+      responsibilities: this.responsibilities().map((item) => ({
+        id: item.id,
+        component: item.component,
+        responsibility: item.responsibility,
+        linkedConstraints: this.splitCodes(item.linkedConstraints)
+      })),
+      artefacts: this.artefacts().map((item) => ({
+        id: item.id,
+        name: item.name,
+        purpose: item.purpose,
+        reference: item.reference
+      }))
+    };
+
+    this.projectService
+      .updateStepOneScope(payload)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          if (continueAfterSave) {
+            this.router.navigate(['/istar-models'], { queryParams: { projectId } });
+          }
+        },
+        error: (error) => {
+          console.error('Failed to update Step 1 scope via POST /api/projects/step_one_project_update', error);
+        }
+      });
+  }
+
+  private getNextId<T extends { id: number }>(items: T[]): number {
+    return items.reduce((max, item) => Math.max(max, item.id), 0);
+  }
+
   private applyEmptyPrefill(): void {
     this.generalSummaryForm.reset({
-      analysisPurpose: '',
       systemDefinition: '',
       systemBoundary: ''
     });
 
-    this.objectiveForm.reset({ focus: '', stakeholder: '', priority: 'High' });
+    this.analysisObjectiveForm.reset({ objectivesText: '' });
     this.resourceForm.reset({ name: '', category: '', reference: '' });
-    this.componentForm.reset({ name: '', notes: '' });
+    this.componentForm.reset({ name: '', description: '' });
     this.accidentForm.reset({ code: '', description: '' });
     this.hazardForm.reset({ code: '', description: '', linkedAccidents: '' });
     this.constraintForm.reset({ code: '', statement: '', linkedHazards: '' });
     this.responsibilityForm.reset({ component: '', responsibility: '', linkedConstraints: '' });
     this.artefactForm.reset({ name: '', purpose: '', reference: '' });
-
-    this.objectives.set([]);
     this.resources.set([]);
     this.systemComponents.set([]);
     this.accidents.set([]);
@@ -332,7 +738,6 @@ export class ScopePageComponent {
     this.responsibilities.set([]);
     this.artefacts.set([]);
 
-    this.nextObjectiveId = 0;
     this.nextResourceId = 0;
     this.nextComponentId = 0;
     this.nextAccidentId = 0;
@@ -350,14 +755,13 @@ export class ScopePageComponent {
       'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.';
 
     this.generalSummaryForm.setValue({
-      analysisPurpose: loremLong,
       systemDefinition: loremLong,
       systemBoundary: loremLong
     });
 
-    this.objectiveForm.setValue({ focus: lorem, stakeholder: lorem, priority: 'High' });
+    this.analysisObjectiveForm.setValue({ objectivesText: loremLong });
     this.resourceForm.setValue({ name: lorem, category: lorem, reference: lorem });
-    this.componentForm.setValue({ name: lorem, notes: lorem });
+    this.componentForm.setValue({ name: lorem, description: lorem });
     this.accidentForm.setValue({ code: lorem, description: lorem });
     this.hazardForm.setValue({ code: lorem, description: lorem, linkedAccidents: lorem });
     this.constraintForm.setValue({ code: lorem, statement: lorem, linkedHazards: lorem });
@@ -385,13 +789,13 @@ export class ScopePageComponent {
     this.objectiveForm.reset({ priority: 'Medium' });
   }
 
-  addResource(): void {
-    if (this.resourceForm.invalid) {
-      this.resourceForm.markAllAsTouched();
+  addResource(form: FormGroup = this.resourceForm as FormGroup): void {
+    if (form.invalid) {
+      form.markAllAsTouched();
       return;
     }
 
-    const value = this.resourceForm.getRawValue();
+    const value = form.getRawValue();
     this.resources.update((current) => [
       {
         id: ++this.nextResourceId,
@@ -402,26 +806,34 @@ export class ScopePageComponent {
       ...current
     ]);
 
-    this.resourceForm.reset({ category: 'Article' });
+    form.reset({ category: '' });
   }
 
-  addComponent(): void {
-    if (this.componentForm.invalid) {
-      this.componentForm.markAllAsTouched();
+  addComponent(form: FormGroup = this.componentForm as FormGroup): void {
+    if (form.invalid) {
+      form.markAllAsTouched();
       return;
     }
 
-    const value = this.componentForm.getRawValue();
+    const value = form.getRawValue();
     this.systemComponents.update((current) => [
       {
         id: ++this.nextComponentId,
         name: value.name ?? 'Component',
-        notes: value.notes ?? 'Role to be detailed'
+        description: value.description ?? 'Description not provided'
       },
       ...current
     ]);
 
-    this.componentForm.reset();
+    form.reset();
+  }
+
+  removeResource(resourceId: number): void {
+    this.resources.update((current) => current.filter((item) => item.id !== resourceId));
+  }
+
+  removeComponent(componentId: number): void {
+    this.systemComponents.update((current) => current.filter((item) => item.id !== componentId));
   }
 
   addAccident(): void {

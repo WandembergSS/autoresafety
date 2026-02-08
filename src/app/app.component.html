@@ -29,6 +29,7 @@
             @for (link of section.links; track link.path) {
               <a
                 [routerLink]="link.path"
+                queryParamsHandling="preserve"
                 (click)="closeNav()"
                 routerLinkActive="active"
                 [routerLinkActiveOptions]="{ exact: link.path === '/' }"
