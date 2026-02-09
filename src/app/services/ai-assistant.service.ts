@@ -15,12 +15,22 @@ export interface GenerationResponse {
   suggestions: string[];
 }
 
+export interface AskRequest {
+  question: string;
+  context?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AiAssistantService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.backendApiUrl}/assistant`;
+  private readonly askUrl = `${environment.backendApiUrl}/ai/ask`;
 
   generate(request: GenerationRequest): Observable<GenerationResponse> {
     return this.http.post<GenerationResponse>(`${this.baseUrl}/generate`, request);
+  }
+
+  ask(request: AskRequest): Observable<unknown> {
+    return this.http.post<unknown>(this.askUrl, request);
   }
 }

@@ -5,6 +5,7 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
+import { AiAssistantService } from '../../services/ai-assistant.service';
 import { ProjectService } from '../../services/project.service';
 
 interface AnalysisObjective {
@@ -140,6 +141,7 @@ export class ScopePageComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
+  private readonly aiAssistant = inject(AiAssistantService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly generalSummaryForm = this.fb.group({
@@ -710,6 +712,92 @@ export class ScopePageComponent {
           console.error('Failed to update Step 1 scope via POST /api/projects/step_one_project_update', error);
         }
       });
+  }
+
+  generateObjectivesWithAi(): void {
+    this.requestAiText(
+      'Give me the a analysis objectives of a generic project Safety-Critical System',
+      (text) => {
+        this.analysisObjectiveForm.patchValue({ objectivesText: text });
+        this.analysisObjectiveModalForm.patchValue({ objectivesText: text });
+      }
+    );
+  }
+
+  generateSystemDefinitionWithAi(): void {
+    this.requestAiText(
+      'Give me the a system definition of a generic project Safety-Critical System',
+      (text) => {
+        this.generalSummaryForm.patchValue({ systemDefinition: text });
+        this.systemDefinitionModalForm.patchValue({ systemDefinitionText: text });
+      }
+    );
+  }
+
+  generateSystemBoundaryWithAi(): void {
+    this.requestAiText(
+      'Give me the a system boundary of a generic project Safety-Critical System',
+      (text) => {
+        this.generalSummaryForm.patchValue({ systemBoundary: text });
+        this.systemBoundaryModalForm.patchValue({ systemBoundaryText: text });
+      }
+    );
+  }
+
+  private requestAiText(question: string, onText: (text: string) => void): void {
+    this.aiAssistant
+      .ask({ question })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (response) => {
+          const text = this.extractAiText(response);
+          if (text) {
+            onText(text);
+          }
+        },
+        error: (error) => {
+          console.error('Failed to fetch AI response from /api/ai/ask', error);
+        }
+      });
+  }
+
+  private extractAiText(response: unknown): string {
+    if (typeof response === 'string') {
+      return response.trim();
+    }
+
+    if (!response || typeof response !== 'object') {
+      return '';
+    }
+
+    const anyResponse = response as Record<string, unknown>;
+    const directFields = ['answer', 'response', 'text', 'content', 'message', 'result'];
+
+    for (const key of directFields) {
+      const value = anyResponse[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    const choices = anyResponse['choices'];
+    if (Array.isArray(choices) && choices.length > 0) {
+      const first = choices[0] as Record<string, unknown> | undefined;
+      if (first) {
+        const message = first['message'] as Record<string, unknown> | undefined;
+        const messageContent = message?.['content'];
+        if (typeof messageContent === 'string' && messageContent.trim()) {
+          return messageContent.trim();
+        }
+
+        const text = first['text'];
+        if (typeof text === 'string' && text.trim()) {
+          return text.trim();
+        }
+      }
+    }
+
+    return '';
   }
 
   private getNextId<T extends { id: number }>(items: T[]): number {

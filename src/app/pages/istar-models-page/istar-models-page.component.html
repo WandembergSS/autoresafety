@@ -79,29 +79,19 @@
     </section>
   </div>
 
-  <section class="card card--note">
-    <h3>Visual modeller placeholder</h3>
-    <p>
-      In the functional product, this area would host an interactive canvas for iStar diagrams. For now, it provides a textual
-      summary and a mock legend describing how elements map to safety concepts.
-    </p>
-    <div class="legend">
-      <div>
-        <strong>Legend</strong>
-        <ul>
-          <li><span class="chip chip--goal"></span> Safety Goal</li>
-          <li><span class="chip chip--hazard"></span> Hazard / Obstruction</li>
-          <li><span class="chip chip--task"></span> Safety Task</li>
-        </ul>
-      </div>
-      <div>
-        <strong>Traceability snippet</strong>
-        <p>
-          Controller <em>Infusion Controller</em> <strong>achieves</strong> goal <em>Maintain basal delivery</em> and <strong>depends on</strong>
-          <em>Human Caregiver</em> for <em>Regimen approval</em>. Hazard <em>Over-infusion</em> obstructs this goal and is mitigated by safety task
-          <em>Dual configuration approval</em>.
-        </p>
-      </div>
+  <section class="card modeller">
+    <header class="modeller__header">
+      <h3>Visual modeller</h3>
+      <p>Embedded iStar4Safety modeller.</p>
+    </header>
+    <div class="modeller__frame">
+      <iframe
+        title="iStar4Safety modeller"
+        src="https://www.cin.ufpe.br/~jhcp/pistar/4safety/"
+        loading="lazy"
+        referrerpolicy="no-referrer"
+        allowfullscreen
+      ></iframe>
     </div>
   </section>
 </section>

@@ -37,7 +37,9 @@
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai">Generate with AI</button>
+            <button type="button" class="button button--ai" (click)="generateObjectivesWithAi()">
+              Generate with AI
+            </button>
             <button type="button" (click)="openObjectiveModal()">Expand</button>
           </div>
         </form>
@@ -57,7 +59,9 @@
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai">Generate with AI</button>
+            <button type="button" class="button button--ai" (click)="generateSystemDefinitionWithAi()">
+              Generate with AI
+            </button>
             <button type="button" (click)="openSystemDefinitionModal()">Expand</button>
           </div>
         </form>
@@ -120,7 +124,9 @@
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai">Generate with AI</button>
+            <button type="button" class="button button--ai" (click)="generateSystemBoundaryWithAi()">
+              Generate with AI
+            </button>
             <button type="button" (click)="openSystemBoundaryModal()">Expand</button>
           </div>
         </form>
