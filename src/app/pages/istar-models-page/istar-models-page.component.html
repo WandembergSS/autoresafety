@@ -1,77 +1,509 @@
 <section class="page">
   <header class="page__header">
     <p class="step">Step 2</p>
-    <h2>Define the iStar4Safety Models</h2>
-    <p>
-  Extend the ReSafety scope into Strategic Dependency and Strategic Rationale views. Use these mock tables to align
-      actors, responsibilities, and &lt;&lt;SafetyGoal&gt;&gt; elements before transitioning into the STPA control structure.
+    <div class="page__title-row">
+      <h2>Define the iStar4Safety Models</h2>
+      <button type="button" class="button button--ai" aria-label="Generate with AI">🤖 Generate with AI</button>
+    </div>
+    <p class="page__subtitle">
+      Use the five structured stages below to build your iStar4Safety SD and SR models.
+      Start with SD model actors, then proceed through SR model intentional elements and relationships, and complete social dependencies.
     </p>
+    <div class="bpmn-preview-inline">
+      <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+      <button
+        type="button"
+        class="bpmn-preview-thumb"
+        (click)="openBpmnModelModal()"
+        aria-label="Open BPMN model preview"
+      >
+        <img src="/assets/istar-models-bpmn.jpg" alt="Small preview of the Step 2 BPMN model" />
+      </button>
+    </div>
   </header>
 
-  <div class="grid">
-    <section class="card">
-      <div class="card__header">
-        <h3>Actor roster</h3>
-        <form class="inline-form" [formGroup]="actorForm" (ngSubmit)="addActor()">
-          <input type="text" placeholder="Actor name" formControlName="name" />
-          <select formControlName="type">
-            <option value="Controller">Controller</option>
-            <option value="Sensor">Sensor</option>
-            <option value="Environment">Environment</option>
-            <option value="Stakeholder">Stakeholder</option>
-          </select>
-          <input type="text" placeholder="Primary responsibility" formControlName="responsibility" />
-          <button type="submit">Add actor</button>
-        </form>
-      </div>
+  <div class="page-actions">
+    <button type="button" class="button button--secondary" [disabled]="isSavingStepTwo()" (click)="saveStepTwo()">
+      {{ isSavingStepTwo() ? 'Saving...' : 'Save' }}
+    </button>
+    <button type="button" class="button" [disabled]="isSavingStepTwo()" (click)="saveStepTwo(true)">
+      {{ isSavingStepTwo() ? 'Saving...' : 'Save and Continue' }}
+    </button>
+  </div>
 
-      <div class="actor-table">
-        @for (actor of actors(); track actor.id) {
-          <article class="actor-card">
-            <header>
-              <h4>{{ actor.name }}</h4>
-              <span class="badge badge--{{ actor.type | lowercase }}">{{ actor.type }}</span>
-            </header>
-            <ul>
-              @for (responsibility of actor.responsibilities; track responsibility) {
-                <li>{{ responsibility }}</li>
-              }
-            </ul>
-          </article>
-        }
+  @if (stepTwoSaveMessage()) {
+    <div class="save-feedback save-feedback--success">
+      {{ stepTwoSaveMessage() }}
+    </div>
+  }
+
+  @if (stepTwoSaveError()) {
+    <div class="save-feedback save-feedback--error">
+      {{ stepTwoSaveError() }}
+    </div>
+  }
+
+  <section class="card modeller">
+    <header class="modeller__header">
+      <h3>Strategic Dependency (SD) and the Strategic Rationale (SR)</h3>
+      <p>Embedded iStar4Safety modeller.</p>
+      <div class="modeller__controls">
+        <div class="modeller__actions-row">
+          <button type="button" class="modeller__action" (click)="saveCurrentModel()">
+            Save current model
+          </button>
+          <div class="modeller__ai-actions" aria-label="AI-assisted model actions">
+            <span class="modeller__tooltip-target" [attr.title]="null">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddActors() || isAddActorsAiRunning()"
+                (click)="openAddActorsAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddActorsAiRunning() ? 'Adding Actors...' : 'Add Actors' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddGoalsDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddGoals() || isAddGoalsAiRunning()"
+                (click)="openAddGoalsAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddGoalsAiRunning() ? 'Adding Goals...' : 'Add Goals' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddQualityDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddQuality() || isAddQualityAiRunning()"
+                (click)="openAddQualityAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddQualityAiRunning() ? 'Adding Quality...' : 'Add Quality' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddResourceDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddResource() || isAddResourceAiRunning()"
+                (click)="openAddResourceAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddResourceAiRunning() ? 'Adding Resource...' : 'Add Resource' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddSafetyGoalDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddSafetyGoal() || isAddSafetyGoalAiRunning()"
+                (click)="openAddSafetyGoalAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddSafetyGoalAiRunning() ? 'Adding Safety goal...' : 'Add Safety goal' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddHazardDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddHazard() || isAddHazardAiRunning()"
+                (click)="openAddHazardAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddHazardAiRunning() ? 'Adding Hazard...' : 'Add Hazard' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddSafetyTaskDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddSafetyTask() || isAddSafetyTaskAiRunning()"
+                (click)="openAddSafetyTaskAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddSafetyTaskAiRunning() ? 'Adding Safety Task...' : 'Add Safety Task' }}</span>
+              </button>
+            </span>
+            <span class="modeller__tooltip-target" [attr.title]="getAiAddSafetyResourceDisabledReason()">
+              <button
+                type="button"
+                class="button button--ai modeller__ai-action"
+                [disabled]="!canAiAddSafetyResource() || isAddSafetyResourceAiRunning()"
+                (click)="openAddSafetyResourceAiModal()"
+              >
+                <span aria-hidden="true">🤖</span>
+                <span>{{ isAddSafetyResourceAiRunning() ? 'Adding Safety Resource...' : 'Add Safety Resource' }}</span>
+              </button>
+            </span>
+          </div>
+        </div>
+        <span class="modeller__hint">Downloads the current model state from the embedded tool.</span>
       </div>
+    </header>
+    <div class="modeller__frame">
+      <iframe
+        title="iStar4Safety modeller"
+        src="/assets/pistar/iStar4Safety.html"
+        loading="lazy"
+        #modellerFrame
+        (load)="onModellerLoaded()"
+        allowfullscreen
+      ></iframe>
+    </div>
+  </section>
+
+  <div class="forms-grid">
+    <section class="card">
+      <h3>SD Model: Define Actors</h3>
+      <p class="hint">Define all actors for the Strategic Dependency (SD) model. Complete this step before proceeding to the SR model forms (2.2.x).</p>
+      <form class="inline-form" [formGroup]="actorDefinitionForm" (ngSubmit)="addActorDefinition()">
+        <input type="text" placeholder="Actor name" formControlName="actorName" />
+        <select formControlName="actorType">
+          <option value="Actor">Actor</option>
+          <option value="Agent">Agent</option>
+          <option value="Role">Role</option>
+        </select>
+        <select formControlName="isATargetActorId">
+          <option value="">is-a (optional)</option>
+          @for (actor of actors(); track actor.id) {
+            <option [value]="actor.id">{{ actor.name }}</option>
+          }
+        </select>
+        <select formControlName="participatesInTargetActorId">
+          <option value="">participates-in (optional)</option>
+          @for (actor of actors(); track actor.id) {
+            <option [value]="actor.id">{{ actor.name }}</option>
+          }
+        </select>
+        <button type="submit">Add actor</button>
+      </form>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Associations</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (actor of actors(); track actor.id) {
+            <tr>
+              <td>{{ actor.name }}</td>
+              <td>{{ actor.type }}</td>
+              <td>{{ describeActorAssociations(actor) }}</td>
+              <td>
+                <button type="button" class="danger" (click)="removeActorDefinition(actor.id)">Remove</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
     </section>
 
     <section class="card">
-      <div class="card__header">
-        <h3>Goal and hazard links</h3>
-        <form class="inline-form" [formGroup]="goalForm" (ngSubmit)="addGoalLink()">
-          <input type="text" placeholder="Actor" formControlName="fromActor" />
-          <input type="text" placeholder="Goal or hazard statement" formControlName="goal" />
-          <select formControlName="linkType">
-            <option value="achieves">Achieves</option>
-            <option value="depends-on">Depends on</option>
-            <option value="obstructs">Obstructs</option>
-            <option value="satisfies">Satisfies</option>
-          </select>
-          <button type="submit">Add link</button>
-        </form>
-      </div>
+      <h3>SR Model: Define Main Goals</h3>
+      <p class="hint">Define the standard intentional elements (Goals, Tasks, Resources, Qualities) for each actor's SR model.</p>
+      <form class="inline-form" [formGroup]="standardIntentionalElementForm" (ngSubmit)="addStandardIntentionalElement()">
+        <select formControlName="actorId" [disabled]="!canStartStep22()">
+          <option value="">Belongs to actor</option>
+          @for (actor of actors(); track actor.id) {
+            <option [value]="actor.id">{{ actor.name }}</option>
+          }
+        </select>
+        <input type="text" placeholder="Element name" formControlName="elementName" [disabled]="!canStartStep22()" />
+        <select formControlName="elementType" [disabled]="!canStartStep22()">
+          <option value="Goal">Goal</option>
+          <option value="Task">Task</option>
+          <option value="Resource">Resource</option>
+          <option value="Quality">Quality</option>
+        </select>
+        <button type="submit" [disabled]="!canStartStep22()">Add element</button>
+      </form>
+      @if (!canStartStep22()) {
+        <p class="hint">Complete 2.1 first by defining at least one actor.</p>
+      }
 
       <table class="table">
         <thead>
           <tr>
             <th>Actor</th>
-            <th>Goal / Hazard</th>
-            <th>Link</th>
+            <th>Element</th>
+            <th>Type</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (link of goalLinks(); track link.id) {
+          @for (element of standardIntentionalElements(); track element.id) {
             <tr>
-              <td>{{ link.fromActor }}</td>
-              <td>{{ link.goal }}</td>
-              <td><span class="badge badge--link">{{ link.linkType }}</span></td>
+              <td>{{ getActorName(element.actorId) }}</td>
+              <td>{{ element.name }}</td>
+              <td>{{ element.type }}</td>
+              <td>
+                <button type="button" class="danger" (click)="removeStandardIntentionalElement(element.id)">Remove</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h3>SR Model: Safety Constraints and Responsibilities</h3>
+      <p class="hint">Model SafetyGoals (SC-xx = Safety Constraint, R-xx = Responsibility), Hazards (H/UCA-xx), SafetyTasks, and SafetyResources.</p>
+      <form class="inline-form" [formGroup]="safetyIntentionalElementForm" (ngSubmit)="addSafetyIntentionalElement()">
+        <select formControlName="actorId" [disabled]="!canDoStep222()">
+          <option value="">Belongs to actor</option>
+          @for (actor of actors(); track actor.id) {
+            <option [value]="actor.id">{{ actor.name }}</option>
+          }
+        </select>
+        <input type="text" placeholder="Traceability ID" formControlName="traceabilityId" [disabled]="!canDoStep222()" />
+        <input type="text" placeholder="Element name" formControlName="elementName" [disabled]="!canDoStep222()" />
+        <select formControlName="elementType" [disabled]="!canDoStep222()">
+          <option value="SafetyGoal">SafetyGoal</option>
+          <option value="Hazard">Hazard</option>
+          <option value="SafetyTask">SafetyTask</option>
+          <option value="SafetyResource">SafetyResource</option>
+        </select>
+
+        @if (safetyIntentionalElementForm.controls.elementType.value === 'SafetyGoal') {
+          <select formControlName="safetyGoalKind" [disabled]="!canDoStep222()">
+            <option value="Safety Constraint">Safety Constraint (SC-xx)</option>
+            <option value="Responsibility">Responsibility (R-xx)</option>
+          </select>
+          <select formControlName="accidentLevel" [disabled]="!canDoStep222()">
+            <option value="L1">L1 – Catastrophic</option>
+            <option value="L2">L2 – Very Severe</option>
+            <option value="L3">L3 – Considerable</option>
+            <option value="L4">L4 – Minor</option>
+            <option value="L5">L5 – No Effect</option>
+          </select>
+        }
+
+        @if (safetyIntentionalElementForm.controls.elementType.value === 'Hazard') {
+          <select multiple [disabled]="!canDoStep222()" (change)="onHazardObstructsSelectionChange($event)">
+            @for (goal of getSafetyGoals(); track goal.id) {
+              <option [value]="goal.id">{{ goal.name }}</option>
+            }
+          </select>
+        }
+
+        <button type="submit" [disabled]="!canDoStep222()">Add safety element</button>
+      </form>
+      @if (!canDoStep222()) {
+        <p class="hint">Complete 2.2.1 first by defining at least one main goal.</p>
+      }
+
+      @if (safetyIntentionalElementForm.controls.traceabilityId.errors?.['invalidTraceability']) {
+        <p class="hint">
+          Invalid traceability ID for the selected type/kind.
+          SafetyGoal (Safety Constraint): SC-xx &bull;
+          SafetyGoal (Responsibility): R-xx &bull;
+          Hazard: Hx or UCA-xx &bull;
+          SafetyTask: R-xx &bull;
+          SafetyResource: R-xx or SC-xx.
+        </p>
+      }
+
+      @if (getSelectedSafetyElementProcessWarning()) {
+        <p class="hint">{{ getSelectedSafetyElementProcessWarning() }}</p>
+      }
+
+      @if (processWarnings().length > 0) {
+        <ul class="list list--dense">
+          @for (warning of processWarnings(); track warning) {
+            <li>{{ warning }}</li>
+          }
+        </ul>
+      }
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Actor</th>
+            <th>Traceability</th>
+            <th>Element</th>
+            <th>Type</th>
+            <th>Details</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (element of safetyIntentionalElements(); track element.id) {
+            <tr>
+              <td>{{ getActorName(element.actorId) }}</td>
+              <td>{{ element.traceabilityId || '-' }}</td>
+              <td>{{ element.name }}</td>
+              <td>{{ element.type }}</td>
+              <td>
+                @if (element.type === 'SafetyGoal') {
+                  {{ element.safetyGoalKind ?? 'Safety Constraint' }} &bull; Accident: {{ element.accidentLevel }}
+                }
+                @if (element.type === 'Hazard') {
+                  Obstructs: {{ element.obstructsSafetyGoalIds?.length ?? 0 }} SafetyGoal(s)
+                }
+              </td>
+              <td>
+                <button type="button" class="danger" (click)="removeSafetyIntentionalElement(element.id)">Remove</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h3>SR Model: Internal Relationships</h3>
+      <p class="hint">Define refinement, NeededBy, contribution and qualification links between intentional elements.</p>
+      <form class="inline-form" [formGroup]="internalRelationshipForm" (ngSubmit)="addInternalRelationship()">
+        <select formControlName="sourceElementId" [disabled]="!canDoStep223()">
+          <option value="">Source element</option>
+          @for (element of getAllElements(); track element.id) {
+            <option [value]="element.id">{{ element.name }} ({{ element.type }})</option>
+          }
+        </select>
+        <select formControlName="targetElementId" [disabled]="!canDoStep223()">
+          <option value="">Target element</option>
+          @for (element of getAllElements(); track element.id) {
+            <option [value]="element.id">{{ element.name }} ({{ element.type }})</option>
+          }
+        </select>
+        <select formControlName="relationshipType" [disabled]="!canDoStep223()">
+          <option value="Refinement">Refinement</option>
+          <option value="NeededBy">NeededBy</option>
+          <option value="Contribution">Contribution</option>
+          <option value="Qualification">Qualification</option>
+        </select>
+
+        @if (internalRelationshipForm.controls.relationshipType.value === 'Refinement') {
+          <select formControlName="refinementType" [disabled]="!canDoStep223()">
+            <option value="AND">AND</option>
+            <option value="OR">OR</option>
+          </select>
+        }
+
+        @if (internalRelationshipForm.controls.relationshipType.value === 'Contribution') {
+          <select formControlName="contributionMetric" [disabled]="!canDoStep223()">
+            <option value="Make">Make</option>
+            <option value="Help">Help</option>
+            <option value="Hurt">Hurt</option>
+            <option value="Break">Break</option>
+          </select>
+        }
+
+        <button type="submit" [disabled]="!canDoStep223()">Add relationship</button>
+      </form>
+      @if (!canDoStep223()) {
+        <p class="hint">Complete 2.2.2 first by modeling safety constraints.</p>
+      }
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Target</th>
+            <th>Type</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (relationship of internalRelationships(); track relationship.id) {
+            <tr>
+              <td>{{ getElementName(relationship.sourceElementId) }}</td>
+              <td>{{ getElementName(relationship.targetElementId) }}</td>
+              <td>{{ describeInternalRelationship(relationship) }}</td>
+              <td>
+                <button type="button" class="danger" (click)="removeInternalRelationship(relationship.id)">Remove</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h3>SD/SR Model: Complete Actor Dependencies</h3>
+      <p class="hint">Define social dependencies between actors to complete the SD model and close the SR links across actor boundaries.</p>
+      <form class="inline-form" [formGroup]="socialDependencyForm" (ngSubmit)="addSocialDependency()">
+        <select formControlName="dependerActorId" [disabled]="!canDoStep224()">
+          <option value="">Depender actor</option>
+          @for (actor of actors(); track actor.id) {
+            <option [value]="actor.id">{{ actor.name }}</option>
+          }
+        </select>
+
+        <select formControlName="dependerElementId" [disabled]="!canDoStep224()">
+          <option value="">Depender element (optional)</option>
+          @for (element of getElementsByActor(socialDependencyForm.controls.dependerActorId.value ?? ''); track element.id) {
+            <option [value]="element.id">{{ element.name }} ({{ element.type }})</option>
+          }
+        </select>
+
+        <input type="text" placeholder="Dependum name" formControlName="dependumName" [disabled]="!canDoStep224()" />
+
+        <select formControlName="dependumType" [disabled]="!canDoStep224()">
+          <option value="Goal">Goal</option>
+          <option value="Task">Task</option>
+          <option value="Resource">Resource</option>
+          <option value="Quality">Quality</option>
+        </select>
+
+        <select formControlName="dependeeActorId" [disabled]="!canDoStep224()">
+          <option value="">Dependee actor</option>
+          @for (actor of actors(); track actor.id) {
+            <option [value]="actor.id">{{ actor.name }}</option>
+          }
+        </select>
+
+        <select formControlName="dependeeElementId" [disabled]="!canDoStep224()">
+          <option value="">Dependee element (optional)</option>
+          @for (element of getElementsByActor(socialDependencyForm.controls.dependeeActorId.value ?? ''); track element.id) {
+            <option [value]="element.id">{{ element.name }} ({{ element.type }})</option>
+          }
+        </select>
+
+        <button type="submit" [disabled]="!canDoStep224()">Add dependency</button>
+      </form>
+      @if (!canDoStep224()) {
+        <p class="hint">Complete 2.2.3 first by linking responsibilities to safety constraints.</p>
+      }
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Depender</th>
+            <th>Dependum</th>
+            <th>Dependee</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (dependency of socialDependencies(); track dependency.id) {
+            <tr>
+              <td>
+                {{ getActorName(dependency.dependerActorId) }}
+                @if (dependency.dependerElementId) {
+                  · {{ getElementName(dependency.dependerElementId) }}
+                }
+              </td>
+              <td>{{ dependency.dependum.name }} ({{ dependency.dependum.type }})</td>
+              <td>
+                {{ getActorName(dependency.dependeeActorId) }}
+                @if (dependency.dependeeElementId) {
+                  · {{ getElementName(dependency.dependeeElementId) }}
+                }
+              </td>
+              <td>
+                <button type="button" class="danger" (click)="removeSocialDependency(dependency.id)">Remove</button>
+              </td>
             </tr>
           }
         </tbody>
@@ -79,19 +511,457 @@
     </section>
   </div>
 
-  <section class="card modeller">
-    <header class="modeller__header">
-      <h3>Visual modeller</h3>
-      <p>Embedded iStar4Safety modeller.</p>
-    </header>
-    <div class="modeller__frame">
-      <iframe
-        title="iStar4Safety modeller"
-        src="https://www.cin.ufpe.br/~jhcp/pistar/4safety/"
-        loading="lazy"
-        referrerpolicy="no-referrer"
-        allowfullscreen
-      ></iframe>
+  <section class="card">
+    <h3>Validation</h3>
+    <div class="validation__controls">
+      <button type="button" class="primary" (click)="runValidationAndPreview()">Validate iStar4Safety payload</button>
     </div>
+
+    @if (validationErrors().length > 0) {
+      <div class="validation validation--error">
+        <h4>Validation Errors</h4>
+        <ul>
+          @for (error of validationErrors(); track error) {
+            <li>{{ error }}</li>
+          }
+        </ul>
+      </div>
+    } @else {
+      <div class="validation validation--ok">
+        <p>No validation errors.</p>
+      </div>
+    }
+
+    @if (payloadPreview()) {
+      <textarea readonly class="payload-preview">{{ payloadPreview() }}</textarea>
+    }
   </section>
+
+  @if (isBpmnModelModalOpen()) {
+    <div class="modal-backdrop" (click)="closeBpmnModelModal()">
+      <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>BPMN model</h4>
+          <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
+        </header>
+        <img class="bpmn-model-image" src="/assets/istar-models-bpmn.jpg" alt="BPMN model for iStar4Safety models" />
+      </div>
+    </div>
+  }
+
+  @if (isAddActorsAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddActorsAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Actors with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddActorsAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addActorsAiForm" (ngSubmit)="submitAddActorsAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of actors to add</span>
+              <input type="number" min="1" formControlName="minActors" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of actors to add</span>
+              <input type="number" min="1" formControlName="maxActors" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the actors or structural relationships you want the AI to add."
+            ></textarea>
+          </label>
+
+          @if (addActorsAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addActorsAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button type="button" class="button button--secondary" [disabled]="isAddActorsAiRunning()" (click)="closeAddActorsAiModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddActorsAiRunning()">
+              {{ isAddActorsAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddGoalsAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddGoalsAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Goals with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddGoalsAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addGoalsAiForm" (ngSubmit)="submitAddGoalsAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of goals to add</span>
+              <input type="number" min="1" formControlName="minGoals" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of goals to add</span>
+              <input type="number" min="1" formControlName="maxGoals" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the new standard goals you want the AI to add and which actors they should belong to."
+            ></textarea>
+          </label>
+
+          @if (addGoalsAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addGoalsAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button type="button" class="button button--secondary" [disabled]="isAddGoalsAiRunning()" (click)="closeAddGoalsAiModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddGoalsAiRunning()">
+              {{ isAddGoalsAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddQualityAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddQualityAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Quality with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddQualityAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addQualityAiForm" (ngSubmit)="submitAddQualityAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of qualities to add</span>
+              <input type="number" min="1" formControlName="minQualities" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of qualities to add</span>
+              <input type="number" min="1" formControlName="maxQualities" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the new standard qualities you want the AI to add and which actors, goals, tasks, or resources they should evaluate."
+            ></textarea>
+          </label>
+
+          @if (addQualityAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addQualityAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button type="button" class="button button--secondary" [disabled]="isAddQualityAiRunning()" (click)="closeAddQualityAiModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddQualityAiRunning()">
+              {{ isAddQualityAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddResourceAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddResourceAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Resource with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddResourceAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addResourceAiForm" (ngSubmit)="submitAddResourceAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of resources to add</span>
+              <input type="number" min="1" formControlName="minResources" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of resources to add</span>
+              <input type="number" min="1" formControlName="maxResources" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the new standard resources you want the AI to add and which actors, goals, tasks, or qualities they should support."
+            ></textarea>
+          </label>
+
+          @if (addResourceAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addResourceAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button type="button" class="button button--secondary" [disabled]="isAddResourceAiRunning()" (click)="closeAddResourceAiModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddResourceAiRunning()">
+              {{ isAddResourceAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddSafetyGoalAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddSafetyGoalAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Safety goal with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddSafetyGoalAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addSafetyGoalAiForm" (ngSubmit)="submitAddSafetyGoalAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of safety goals to add</span>
+              <input type="number" min="1" formControlName="minSafetyGoals" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of safety goals to add</span>
+              <input type="number" min="1" formControlName="maxSafetyGoals" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the new safety goals you want the AI to add and which actors, hazards, or responsibilities they should address."
+            ></textarea>
+          </label>
+
+          @if (addSafetyGoalAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addSafetyGoalAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button
+              type="button"
+              class="button button--secondary"
+              [disabled]="isAddSafetyGoalAiRunning()"
+              (click)="closeAddSafetyGoalAiModal()"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddSafetyGoalAiRunning()">
+              {{ isAddSafetyGoalAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddHazardAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddHazardAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Hazard with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddHazardAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addHazardAiForm" (ngSubmit)="submitAddHazardAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of hazards to add</span>
+              <input type="number" min="1" formControlName="minHazards" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of hazards to add</span>
+              <input type="number" min="1" formControlName="maxHazards" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the hazards you want the AI to add and which safety goals they should obstruct."
+            ></textarea>
+          </label>
+
+          @if (addHazardAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addHazardAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button type="button" class="button button--secondary" [disabled]="isAddHazardAiRunning()" (click)="closeAddHazardAiModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddHazardAiRunning()">
+              {{ isAddHazardAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddSafetyTaskAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddSafetyTaskAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Safety Task with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddSafetyTaskAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addSafetyTaskAiForm" (ngSubmit)="submitAddSafetyTaskAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of safety tasks to add</span>
+              <input type="number" min="1" formControlName="minSafetyTasks" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of safety tasks to add</span>
+              <input type="number" min="1" formControlName="maxSafetyTasks" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the new safety tasks you want the AI to add and which hazards or responsibilities they should mitigate or operationalize."
+            ></textarea>
+          </label>
+
+          @if (addSafetyTaskAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addSafetyTaskAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button
+              type="button"
+              class="button button--secondary"
+              [disabled]="isAddSafetyTaskAiRunning()"
+              (click)="closeAddSafetyTaskAiModal()"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddSafetyTaskAiRunning()">
+              {{ isAddSafetyTaskAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isAddSafetyResourceAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeAddSafetyResourceAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Add Safety Resource with AI</h4>
+          <button type="button" class="modal__close" (click)="closeAddSafetyResourceAiModal()">×</button>
+        </header>
+
+        <form class="ai-modal__form" [formGroup]="addSafetyResourceAiForm" (ngSubmit)="submitAddSafetyResourceAiRequest()">
+          <div class="ai-modal__grid">
+            <label class="ai-modal__field">
+              <span>Minimum number of safety resources to add</span>
+              <input type="number" min="1" formControlName="minSafetyResources" />
+            </label>
+
+            <label class="ai-modal__field">
+              <span>Maximum number of safety resources to add</span>
+              <input type="number" min="1" formControlName="maxSafetyResources" />
+            </label>
+          </div>
+
+          <label class="ai-modal__field">
+            <span>Prompt instructions</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe the new safety resources you want the AI to add and which safety goals, hazards, or safety tasks they should support."
+            ></textarea>
+          </label>
+
+          @if (addSafetyResourceAiError()) {
+            <div class="save-feedback save-feedback--error">
+              {{ addSafetyResourceAiError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions">
+            <button
+              type="button"
+              class="button button--secondary"
+              [disabled]="isAddSafetyResourceAiRunning()"
+              (click)="closeAddSafetyResourceAiModal()"
+            >
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isAddSafetyResourceAiRunning()">
+              {{ isAddSafetyResourceAiRunning() ? 'Running...' : 'Continue' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <div class="page-actions page-actions--bottom">
+    <button type="button" class="button button--secondary" [disabled]="isSavingStepTwo()" (click)="saveStepTwo()">
+      {{ isSavingStepTwo() ? 'Saving...' : 'Save' }}
+    </button>
+    <button type="button" class="button" [disabled]="isSavingStepTwo()" (click)="saveStepTwo(true)">
+      {{ isSavingStepTwo() ? 'Saving...' : 'Save and Continue' }}
+    </button>
+  </div>
 </section>

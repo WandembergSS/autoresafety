@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<!-- saved from url=(0046)https://www.cin.ufpe.br/~jhcp/pistar/4safety/# -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The 3 meta tags above *must* come first in the head; any other head content must come *after* these tags -->
+    <title>iStar4Safety</title>
+    <meta name="description" content="piStar is an online Goal Modeling tool, compliant with iStar 2.0. Useful for creating diagrams
+        for requirements documents.">
+    <meta name="author" content="João Pimentel">
+    <link rel="icon" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/app/ui/images/favicon.ico">
+
+    <!-- bootstrap styles -->
+    <link href="./iStar4Safety_files/bootstrap.min.css" rel="stylesheet">  <!-- Bootstrap core CSS -->
+    <!-- library-specific styles -->
+    <link href="./iStar4Safety_files/joint.min.css" rel="stylesheet"> <!-- joint js -->
+    <link href="./iStar4Safety_files/bootstrap-editable.css" rel="stylesheet"> <!-- x-editable -->
+    <!-- tool styles -->
+    <link href="./iStar4Safety_files/pistar.css" rel="stylesheet">
+</head>
+
+<body>
+<div id="tool">
+    <div class="menu-bar">
+        <div id="logo">
+            <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/index.html" target="_blank" title="Open a instance of the tool in a new tab">piStar4Safety</a>
+        </div>
+        <nav class="menu-items">
+            <a class="menu-item" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="menu-item-file" data-toggle="menu-file">File</a>
+            <a class="menu-item active" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="menu-item-add" data-toggle="menu-add">Add</a>
+            <a class="menu-item" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="menu-item-diagram" data-toggle="menu-diagram">Options</a>
+            <a class="menu-item" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="menu-item-help" data-toggle="menu-help">Help</a>
+            <a class="menu-item" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="menu-item-plugin" data-toggle="menu-plugin">Plugins</a>
+        </nav>
+    </div>
+
+    <div id="menu-bodies">
+        <div id="menu-file" class="menu-body hidden">
+            <div class="menu-group">
+                <div class="menu-line">
+                    <a class="btn btn-default button-vertical" id="menu-button-new-model" title="Create a new model in the same window">
+                        <!--data-toggle="modal" data-target="#modal-new-model"-->
+                        <span class="glyphicon glyphicon-file" aria-hidden="true"></span><br>
+                        New Model
+                    </a>
+
+                    <a class="btn btn-default button-vertical" id="menu-button-save-model" title="Save (download) the model to your computer">
+                        <span class="glyphicon glyphicon-floppy-save" aria-hidden="true"></span><br>
+                        Save Model
+                    </a>
+
+                    <a class="btn btn-default button-vertical" id="menu-button-load-model" data-toggle="modal" data-target="#modal-load-model" title="Load a previously saved model">
+                        <span class="glyphicon glyphicon-floppy-open" aria-hidden="true"></span><br>
+                        Load Model
+                    </a>
+
+                </div>
+            </div>
+            <div class="menu-group">
+                <div class="menu-line">
+
+                    <a class="btn btn-default button-vertical" id="menu-button-save-image" title="Save (download) model as a SVG or PNG image file" data-toggle="modal" data-target="#modal-save-image">
+                        <span class="glyphicon glyphicon-picture" aria-hidden="true"></span><br>
+                        Save Image
+                    </a>
+
+                </div>
+            </div>
+        </div>
+        <div id="menu-add" class="menu-body">
+            <div class="menu-group">
+                <div class="menu-line">
+
+                    <div class="add-dropdown-button dropdown">
+                        <button class="btn add-button btn-default dropdown-toggle" type="button" id="menu-dropdown-actors" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="Add some kind of Actor">
+                            <img src="./iStar4Safety_files/Actor.svg" height="25" alt=""><br>
+                            Actor...
+                            <span class="caret"></span>
+                        </button>
+                        <ul id="add-actor-dropdown" class="dropdown-menu" aria-labelledby="menu-dropdown-actors"><li parent="#add-actor-dropdown">
+    <a id="d-add-Actor" title="Add Actor" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-Actor-img" src="./iStar4Safety_files/Actor.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainer.svg&#39;;">
+        Actor
+    </a>
+</li><li parent="#add-actor-dropdown">
+    <a id="d-add-Agent" title="Add Agent" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-Agent-img" src="./iStar4Safety_files/Agent.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainer.svg&#39;;">
+        Agent
+    </a>
+</li><li parent="#add-actor-dropdown">
+    <a id="d-add-Role" title="Add Role" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-Role-img" src="./iStar4Safety_files/Role.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainer.svg&#39;;">
+        Role
+    </a>
+</li></ul>
+                    </div>
+
+                    <div class="add-dropdown-button dropdown">
+                        <button class="btn add-button btn-default dropdown-toggle" type="button" id="menu-dropdown-actor-links" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="Add links between actors">
+                            <img src="./iStar4Safety_files/IsALink.svg" height="25" alt=""><br>
+                            Actor links...
+                            <span class="caret"></span>
+                        </button>
+                        <ul id="add-actor-link-dropdown" class="dropdown-menu" aria-labelledby="menu-dropdown-actor-links"><li parent="#add-actor-link-dropdown">
+    <a id="d-add-IsALink" title="Add an Is-A link between an Actor and another Actor, or between a Role and another Role" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-IsALink-img" src="./iStar4Safety_files/IsALink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        Is A Link
+    </a>
+</li><li parent="#add-actor-link-dropdown">
+    <a id="d-add-ParticipatesInLink" title="Add a Participates-In link between any Actors, Roles, or Agents" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ParticipatesInLink-img" src="./iStar4Safety_files/ParticipatesInLink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        Participates-In link
+    </a>
+</li></ul>
+                    </div>
+
+                    <div class="add-dropdown-button dropdown">
+                        <button class="btn add-button btn-default dropdown-toggle" type="button" id="menu-dropdown-dependency-links" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="Add dependency link">
+                            <img src="./iStar4Safety_files/DependencyLink.svg" height="25" alt=""><br>
+                            Dependency...
+                            <span class="caret"></span>
+                        </button>
+                        <ul id="add-dependency-dropdown" class="dropdown-menu" aria-labelledby="menu-dropdown-dependency-links"><li parent="#add-dependency-dropdown">
+    <a id="d-add-GoalDependencyLink" title="Add a Goal Dependency link (including its dependum)" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-GoalDependencyLink-img" src="./iStar4Safety_files/GoalDependencyLink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultDependencyLink.svg&#39;;">
+        Goal dependency
+    </a>
+</li><li parent="#add-dependency-dropdown">
+    <a id="d-add-QualityDependencyLink" title="Add a Quality Dependency link (including its dependum)" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-QualityDependencyLink-img" src="./iStar4Safety_files/QualityDependencyLink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultDependencyLink.svg&#39;;">
+        Quality dependency
+    </a>
+</li><li parent="#add-dependency-dropdown">
+    <a id="d-add-ResourceDependencyLink" title="Add a Resource Dependency link (including its dependum)" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ResourceDependencyLink-img" src="./iStar4Safety_files/ResourceDependencyLink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultDependencyLink.svg&#39;;">
+        Resource dependency
+    </a>
+</li><li parent="#add-dependency-dropdown">
+    <a id="d-add-TaskDependencyLink" title="Add a Task Dependency link (including its dependum)" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-TaskDependencyLink-img" src="./iStar4Safety_files/TaskDependencyLink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultDependencyLink.svg&#39;;">
+        Task dependency
+    </a>
+</li></ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-group">
+                <div class="menu-line">
+                    <span id="add-internal-cells-palette" class="add-button"><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Goal" title="Add Goal">
+        <img src="./iStar4Safety_files/Goal.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>Goal
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Quality" title="Add Quality">
+        <img src="./iStar4Safety_files/Quality.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>Quality
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Resource" title="Add Resource">
+        <img src="./iStar4Safety_files/Resource.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>Resource
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Task" title="Add Task">
+        <img src="./iStar4Safety_files/Task.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>Task
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Hazard" title="Add Hazard">
+        <img src="./iStar4Safety_files/Hazard.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>Hazard
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-SafetyGoal" title="Add SafetyGoal">
+        <img src="./iStar4Safety_files/SafetyGoal.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>SafetyGoal
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-SafetyTask" title="Add SafetyTask">
+        <img src="./iStar4Safety_files/SafetyTask.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>SafetyTask
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-SafetyResource" title="Add SafetyResource">
+        <img src="./iStar4Safety_files/SafetyResource.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultNode.svg&#39;;">
+        <br>SafetyResource
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-And" title="Add And-Refinement link">
+        <img src="./iStar4Safety_files/AndRefinementLink.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        <br>And
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Or" title="Add Or-Refinement link">
+        <img src="./iStar4Safety_files/OrRefinementLink.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        <br>Or
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Needed-By" title="Add Needed-By link">
+        <img src="./iStar4Safety_files/NeededByLink.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        <br>Needed-By
+    </button>
+</span><span class="add-button">
+    <button type="button" class="btn btn-default add-button" id="add-Qualification" title="Add Qualification link">
+        <img src="./iStar4Safety_files/QualificationLink.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        <br>Qualification
+    </button>
+</span><span class="add-dropdown-button">
+    <div class="add-dropdown-button dropdown">
+        <button class="btn add-button btn-default dropdown-toggle" type="button" id="menu-dropdown-ContributionLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="Add ObstructLink">
+            <img src="./iStar4Safety_files/ContributionLink.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;"><br>
+            Contribution...
+            <span class="caret"></span>
+        </button>
+        <ul id="add-ContributionLink-dropdown" class="dropdown-menu" aria-labelledby="menu-dropdown-ContributionLink"><li parent="#add-ContributionLink-dropdown">
+    <a id="d-add-ContributionLink" title="Add a make ContributionLink" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ContributionLink-img" src="./iStar4Safety_files/ContributionLink-make.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        Make (++)
+    </a>
+</li><li parent="#add-ContributionLink-dropdown">
+    <a id="d-add-ContributionLink" title="Add a help ContributionLink" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ContributionLink-img" src="./iStar4Safety_files/ContributionLink-help.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        Help (+)
+    </a>
+</li><li parent="#add-ContributionLink-dropdown">
+    <a id="d-add-ContributionLink" title="Add a hurt ContributionLink" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ContributionLink-img" src="./iStar4Safety_files/ContributionLink-hurt.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        Hurt (-)
+    </a>
+</li><li parent="#add-ContributionLink-dropdown">
+    <a id="d-add-ContributionLink" title="Add a break ContributionLink" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ContributionLink-img" src="./iStar4Safety_files/ContributionLink-break.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        Break (--)
+    </a>
+</li></ul>
+    </div>
+</span><span class="add-dropdown-button">
+    <div class="add-dropdown-button dropdown">
+        <button class="btn add-button btn-default dropdown-toggle" type="button" id="menu-dropdown-ObstructLink" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true" title="Add ObstructLink">
+            <img src="./iStar4Safety_files/ObstructLink.svg" height="25" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;"><br>
+            Obstruct...
+            <span class="caret"></span>
+        </button>
+        <ul id="add-ObstructLink-dropdown" class="dropdown-menu" aria-labelledby="menu-dropdown-ObstructLink"><li parent="#add-ObstructLink-dropdown">
+    <a id="d-add-ObstructLink" title="Add a obstruct ObstructLink" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">
+        <img id="d-add-ObstructLink-img" src="./iStar4Safety_files/DefaultContainerLink.svg" height="35" alt="" onerror="this.onerror=null;this.src=&#39;language/images/DefaultContainerLink.svg&#39;;">
+        obstruct
+    </a>
+</li></ul>
+    </div>
+</span></span>
+                </div>
+            </div>
+
+            <div class="line-break"></div>
+            <div id="status-bar">
+                <span id="status"></span>
+            </div>
+        </div>
+
+        <div id="menu-diagram" class="menu-body hidden">
+            <div class="menu-group">
+                <div class="title">Diagram Size</div>
+                <div class="menu-line">
+                    Width:&nbsp; <input id="input-diagram-width" type="text" name="width" value="500" size="4" maxlength="6" title="Set the diagram&#39;s width (in pixels)"> px
+                </div>
+                <div class="menu-line">
+                    Height:&nbsp; <input id="input-diagram-height" type="text" name="height" value="1200" size="4" maxlength="6" title="Set the diagram&#39;s height (in pixels)"> px
+                </div>
+                <!--<span class="menu-line"><a id="fit-to-content-button" class="btn btn-default btn-xs button-horizontal"><i class="glyphicon glyphicon-resize-small"></i> Fit to content</a></span> TODO-->
+            </div>
+            <!--<div class="menu-group">-->
+            <!--<span class="title">colors</span>-->
+            <!--<span class="menu-line">Actor boundary:-->
+            <!--<input id="all-actor-boundary-color-picker" onchange="console.log('change event');" class="jscolor {hash:true}" value="e6e6e6" size="8">-->
+            <!--</span>-->
+            <!--<span class="menu-line">Elements:-->
+            <!--<input id="all-elements-color-picker" class="jscolor {hash:true}" value="ccfacd" size="8">-->
+            <!--</span>-->
+            <!--<span class="menu-line">-->
+            <!--<a id="reset-all-colors-button" class="btn btn-default btn-xs button-horizontal"><i class="glyphicon glyphicon-erase"></i> Reset colors</a>-->
+            <!--</span>-->
+            <!--</div>-->
+            <!--<div class="menu-group">-->
+            <!--<span class="title">text</span>-->
+            <!--<span class="menu-line">Font size: <input type="number" name="fontsize" value="12" min="4" max="999"></span>-->
+            <!--<span class="menu-line"><a class="btn btn-default btn-xs" data-toggle="button"><i class="glyphicon glyphicon-italic"></i></a></span>-->
+            <!--</div>-->
+            <div class="menu-group">
+                <span class="menu-line">
+                    <a id="menu-button-precise-links" class="btn btn-default btn-xs button-horizontal" title="Remove gaps between links and elements; recommended to apply before saving an image. It may take some seconds">
+                      <span class="glyphicon glyphicon-screenshot"></span> Pixel-perfect links
+                    </a>
+                    </span>
+                <span class="menu-line">
+                    <a id="menu-button-toggle-fullscreen" class="btn btn-default btn-xs button-horizontal" title="Fullscreen toggle">
+                      <span class="glyphicon glyphicon-fullscreen"></span> Toggle fullscreen
+                    </a>
+                    </span>
+                <span class="menu-line">
+                    <a id="menu-button-straighten-links" class="btn btn-default btn-xs button-horizontal" title="Straighten all links">
+                      <span class="glyphicon glyphicon-minus"></span> Straighten all links
+                    </a>
+                </span>
+            </div>
+
+            <!--<div class="menu-group">-->
+                <!--<div class="title">View</div>-->
+                <!--<span class="menu-line">-->
+                    <!--<a id="menu-button-toggle-dependencies-display" class="btn btn-default btn-xs button-horizontal"-->
+                       <!--title="Toggle between partially hiding, completely hiding, or displaying dependencies">-->
+                      <!--<span class="glyphicon glyphicon-eye-close"></span> Hide/show dependencies-->
+                    <!--</a>-->
+                <!--</span>-->
+                <!--<span class="menu-line">-->
+                    <!--<a id="menu-button-toggle-contributions-display" class="btn btn-default btn-xs button-horizontal"-->
+                       <!--title="Toggle between partially hiding, completely hiding, or displaying contribution links">-->
+                      <!--<span class="glyphicon glyphicon-eye-close"></span> Hide/show contribution links-->
+                    <!--</a>-->
+                <!--</span>-->
+            <!--</div>-->
+        </div>
+        <div id="menu-help" class="menu-body hidden">
+            <div class="menu-group">
+                <div class="menu-line">
+
+                    <a class="btn btn-default" data-toggle="modal" data-target="#modal-examples">Examples</a>
+                    <a class="btn btn-default" data-toggle="modal" data-target="#modal-instructions">Quick Help</a>
+                    <a class="btn btn-default" href="https://sites.google.com/site/istarlanguage/" target="_blank">
+                        iStar 2.0 Language Guide <span class="glyphicon glyphicon-new-window" aria-hidden="true"></span>
+                    </a>
+                    <a class="btn btn-default" href="https://github.com/jhcp/piStar/blob/master/RESEARCH.md#research" target="_blank">
+                        Research <span class="glyphicon glyphicon-new-window" aria-hidden="true"></span>
+                    </a>
+
+                </div>
+            </div>
+        </div>
+        <div id="menu-plugin" class="menu-body hidden">
+            <div id="appToolbar"></div> <!-- this div is DEPRECATED. Instead, add elements directly to #menu-plugin -->
+        </div>
+
+    </div>
+
+    <div id="workspace">
+        <div id="sidepanel" class="size2">
+            <div id="regular-size-options">
+                <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" class="collapse-sidepanel-button" title="Collapse panel">-</a>
+                <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="uncollapsed-expand-sidepanel-button" class="expand-sidepanel-button" title="Expand panel">+</a>
+            </div>
+            <div id="collapsed-size-options" class="expand-sidepanel-button" title="click to expand this sidepanel">
+                <div id="collapsed-size-options-button">
+                    <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#">+</a>
+                </div>
+                <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" class="collapsed-size-options-area"></a>
+            </div>
+
+
+            <ul class="nav nav-tabs" role="tablist">
+                <li role="presentation" class="active" id="sidepanel-tab-properties"><a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#subpanel-properties" aria-controls="subpanel-properties" role="tab" data-toggle="tab">Properties</a></li>
+                <li role="presentation" id="sidepanel-tab-style" style="display: none;"><a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#subpanel-style" aria-controls="subpanel-style" role="tab" data-toggle="tab">Style</a></li>
+            </ul>
+
+            <div class="sidepanel-content tab-content">
+
+                <div id="subpanel-properties" role="tabpanel" class="tab-pane active">
+                    <table class="table table-hover" id="properties-table">
+                        <tbody>
+    <tr>
+        <th scope="row" class="property-name">Name</th>
+        <td class="property-value">
+            <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="currentName" class="property-value editable editable-click" data-type="text" data-pk="1" data-name="Name" data-title="Enter Name">Welcome Model</a>
+        </td>
+    </tr>
+
+    <tr>
+        <th scope="row" class="property-name">Description</th>
+        <td class="property-value">
+            <a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="currentDescription" class="property-value editable editable-pre-wrapped editable-click" data-type="textarea" data-pk="1" data-name="Description" data-title="Enter Description">Welcome to the piStar tool! This model describe some of the recent improvements in the tool.
+
+For help using this tool, please check the Help menu above</a>
+        </td>
+    </tr>
+</tbody>
+                    </table>
+
+                    <div id="add-property-button-area"><a href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" id="add-property-button" class="property-add" data-type="text" data-pk="1" data-name="name" data-title="Enter description" data-placeholder="ahhhh" title="Add a new property to this element">        <span class="glyphicon glyphicon-plus-sign" aria-hidden="true"></span>        Add Property</a></div>
+
+                    <div id="sidepanel-title-actions" class="sidepanel-title" style="display: none;">Actions:</div>
+                    <div id="cell-actions"></div>
+
+                </div>
+
+                <div id="subpanel-style" role="tabpanel" class="tab-pane">
+
+                    <div class="sidepanel-title">Element:</div>
+                    <div class="group">
+                        Color:&nbsp;
+                        <input id="single-element-color-picker" class="jscolor {hash:true}" value="ccfacd" size="8" autocomplete="off" style="background-image: none; background-color: rgb(204, 250, 205); color: rgb(0, 0, 0);">
+                        <a id="reset-element-color-button" class="btn btn-default btn-xs button-horizontal"><i class="glyphicon glyphicon-erase"></i> Reset color</a>
+                        <!-- <br>Line style:&nbsp;
+                        <select>
+                          <option value="volvo">solid</option>
+                          <option value="saab">dashed</option>
+                          <option value="mercedes">dotted</option>
+                        </select>
+                        <br>Line thickness:&nbsp;
+                        <input type="number" name="quantity" min="1" max="25" value ="2">
+                        <br><input type="checkbox" name="" value=""> shadow
+                        <br><input type="checkbox" name="" value=""> hand-drawn
+                        <br><input type="checkbox" name="" value=""> auto-break lines -->
+                    </div>
+
+
+                    <!-- <div class="sidepanel-title">Text:</div>
+                    <div class="group">
+                      Color: <input id="single-element-color-picker" class="jscolor {hash:true}" value="000" size="8">
+                      <a id="reset-element-color-button" class="btn btn-default btn-xs button-horizontal"><i class="glyphicon glyphicon-erase"></i> Reset color</a>
+                      <br><button style="font-weight:1000;">B</button><button style="font-style: italic;">I</button><button style="text-decoration: underline;">U</button><button style="text-decoration: line-through;">S</button>
+                      <br>Size: <input type="number" name="quantity" min="1" max="25" value ="12">
+                      <br>Top padding: <input type="number" name="quantity" min="1" max="25" value ="2">
+                      <br>Letter spacing: <input type="number" name="quantity" min="-10" max="25" value ="0">
+                      <br>Word spacing: <input type="number" name="quantity" min="-10" max="25" value ="0">
+                      <br>Line height: <input type="number" name="quantity" min="0.1" max="10" value ="1.1" step="0.1">
+                      <br><input type="checkbox" name="" value=""> shadow
+                      <br><input type="checkbox" name="" value=""> uppercase
+                    </div> -->
+
+                </div>
+            </div>
+
+        </div>
+
+        <div id="out">
+            <div class="cell-selection" style="display: none;"></div>
+            <div id="resize-handle" style="display: none;"></div>
+            <div id="diagram" class="joint-paper joint-theme-default" style="width: 2000px; height: 1300px;"><div class="joint-paper-background"></div><div class="joint-paper-grid"></div><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" id="v-2" width="100%" height="100%"><defs id="v-4"><marker id="v-2-479506292" orient="auto" overflow="visible" markerUnits="userSpaceOnUse"><path id="v-163" stroke="black" fill="none" transform="rotate(180)" d="m 10,-6 l 0,12" stroke-width="1.2"></path></marker><marker id="v-21429980022" orient="auto" overflow="visible" markerUnits="userSpaceOnUse"><path id="v-171" stroke="black" fill="none" transform="rotate(180)" d="m 10,-6 l -10,6 10,6" stroke-width="1.2"></path></marker><marker id="v-2-933205445" orient="auto" overflow="visible" markerUnits="userSpaceOnUse"><path id="v-193" stroke="black" fill="black" transform="rotate(180)" d="m 12,-6 l -12,6 12,6 z" stroke-width="1.2"></path></marker></defs><g id="v-3" class="joint-viewport"><g model-id="dbe6cf9f-877d-4600-bac9-8f7bbde93426" id="j_5" class="joint-cell joint-type-container joint-element joint-theme-default" data-type="Container" transform="translate(426,201)"><g id="v-40"><rect class="boundary" id="v-43" fill="rgb(242,242,242)" height="360" rx="100" ry="40" stroke="black" stroke-dasharray="10,5,4,4" stroke-width="2" width="588.609375" style="stroke: rgb(28, 80, 82); stroke-width: 4; fill: rgb(221, 221, 221);"></rect><circle class="element actorSymbol" id="v-41" cx="40" cy="40" fill="rgb(205,254,205)" r="40" stroke="black" stroke-width="2" transform="translate(-20, -20)" style="stroke: rgb(28, 80, 82); stroke-width: 3;"></circle><path class="actorDecorator" id="v-44" d="m -11 -5 62 0" fill="none" stroke="black" stroke-width="1.5" style="stroke: rgb(28, 80, 82); stroke-width: 2;"></path><text class="content" id="v-42" font-size="12" xml:space="preserve" y="0.8em" fill="#000000" font-family="Arial, helvetica, sans-serif" text-anchor="middle" transform="matrix(1,0,0,1,20,8.4)"><tspan dy="0" class="v-line">piStar&nbsp;tool</tspan><tspan dy="1em" x="0" class="v-line">team</tspan></text></g></g><g model-id="3589ee55-603d-41ee-8bf1-2b2a54498def" id="j_1" class="joint-cell joint-type-container joint-element joint-theme-default" data-type="Container" transform="translate(49,41)"><g id="v-6"><rect class="boundary" id="v-9" fill="rgb(242,242,242)" height="166" rx="100" ry="40" stroke="black" stroke-dasharray="10,5,4,4" stroke-width="2" width="300" style=""></rect><circle class="element actorSymbol" id="v-7" cx="40" cy="40" fill="rgb(205,254,205)" r="40" stroke="black" stroke-width="2" transform="translate(-20, -20)" style=""></circle><path></path><text class="content" id="v-8" font-size="12" xml:space="preserve" y="0.8em" fill="#000000" font-family="Arial, helvetica, sans-serif" text-anchor="middle" transform="matrix(1,0,0,1,20,14.4)"><tspan dy="0" class="v-line">Researcher</tspan></text></g></g><g model-id="432817b3-1017-4e48-8f17-373088a95284" id="j_20" class="joint-cell joint-type-dependencylink joint-link joint-theme-default" data-type="DependencyLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-159" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 311.24 277.5 C 320.04977777777776 271.5982222222222 328.8595555555555 265.6964444444444 332 257 C 335.1404444444445 248.3035555555556 332.6115555555556 236.81244444444442 344 231 C 355.3884444444444 225.18755555555558 380.6942222222222 225.05377777777778 406 224.92"></path><path joint-selector="line" id="v-158" fill="none" stroke="black" stroke-width="1" d="M 311.24 277.5 C 320.04977777777776 271.5982222222222 328.8595555555555 265.6964444444444 332 257 C 335.1404444444445 248.3035555555556 332.6115555555556 236.81244444444442 344 231 C 355.3884444444444 225.18755555555558 380.6942222222222 225.05377777777778 406 224.92"></path><path joint-selector="label" id="v-160" d="m 0,-10 l 0,20 4,0 c 10,0, 10 -20, 0,-20 l -4,0" fill="white" stroke="black" stroke-width="2" transform="matrix(0.9180788543265387,-0.3963978017578682,0.3963978017578682,0.9180788543265387,345.4,230.3)"></path></g><g model-id="1c8bd992-dfcd-4cc8-867c-b31604bcbd4e" id="j_19" class="joint-cell joint-type-dependencylink joint-link joint-theme-default" data-type="DependencyLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-156" fill="none" stroke="rgba(190, 190, 190, 0)" stroke-linecap="round" stroke-width="30" d="M 221.18 197 C 220.63333333333338 226.42583333333334 220.0866666666667 255.8516666666667 228 270 C 235.9133333333333 284.1483333333333 252.28666666666666 283.01916666666665 268.66 281.89"></path><path joint-selector="line" id="v-155" fill="none" stroke="black" stroke-width="1" d="M 221.18 197 C 220.63333333333338 226.42583333333334 220.0866666666667 255.8516666666667 228 270 C 235.9133333333333 284.1483333333333 252.28666666666666 283.01916666666665 268.66 281.89"></path><path joint-selector="label" id="v-157" d="m 0,-10 l 0,20 4,0 c 10,0, 10 -20, 0,-20 l -4,0" fill="white" stroke="black" stroke-width="2" transform="matrix(0.193632747807321,0.981074084346634,-0.981074084346634,0.193632747807321,223.4,256.4)"></path></g><g model-id="71c7aeb6-fb99-40a1-bcd1-5a29e5b45252" id="j_2" class="joint-cell joint-type-goal joint-element joint-theme-default" data-type="Goal" fill="#ffffff" stroke="none" transform="translate(249,87)"><g class="scalable" transform="scale(0.6923076923076923,1.1666666666666667)"><rect class="element" id="v-16" fill="rgb(205,254,205)" height="30" rx="20" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></rect></g><text class="content" id="v-17" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" fill="#000000" text-anchor="middle" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,5.9)"><tspan dy="0" class="v-line">i*&nbsp;models</tspan><tspan dy="1em" x="0" class="v-line">created</tspan></text></g><g model-id="8d716a61-1ca4-44f4-934c-26166ea44d11" id="j_3" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(172,161)"><g class="scalable" transform="scale(0.7307692307692307,1)"><polygon class="element" id="v-24" fill="rgb(205,254,205)" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-25" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,47.5,12.4)"><tspan dy="0" class="v-line">Use&nbsp;piStar</tspan></text></g><g model-id="e159ce92-b29d-4fdc-a533-ee1e904f9f57" id="j_4" class="joint-cell joint-type-quality joint-element joint-theme-default" data-type="Quality" fill="#ffffff" stroke="none" transform="translate(126,61)"><g class="scalable" transform="scale(0.7852376964064524,1.0380876717711)"><path class="element" id="v-32" d="m 60.637955,-4.0358 c 17.5174,2.2042 29.9953,-10.69554 41.892705,-4.7858 22.34142,10.8714 11.2203,43.7743 -2.25,47.7322 -8.276505,2.9084 -13.960205,5.1934 -46.142805,-2.1786 -6.7454,-2.2317 -28.2652,6.0799 -35.4643,4.7143 C 9.072156,39.4809 6.491756,33.7693 3.744956,28.482 c -6.3069,-15.1266 -2.5738,-28.0439 7.981099,-34.7856 10.5549,-6.74179 27.9316,-7.30796 48.9119,2.2678 z" fill="rgb(205,254,205)" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" transform="matrix(1,0,0,1,-0.7,11.3)"></path></g><text class="content" id="v-33" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,23.6)"><tspan dy="0" class="v-line">Good&nbsp;Quality</tspan></text></g><g model-id="61eb4e04-b5f0-4a7d-aea1-22651e470867" id="j_6" class="joint-cell joint-type-quality joint-element joint-theme-default" data-type="Quality" fill="#ffffff" stroke="none" transform="translate(638,211)"><g class="scalable" transform="scale(0.7852376964064524,1.0380876717711)"><path class="element" id="v-51" d="m 60.637955,-4.0358 c 17.5174,2.2042 29.9953,-10.69554 41.892705,-4.7858 22.34142,10.8714 11.2203,43.7743 -2.25,47.7322 -8.276505,2.9084 -13.960205,5.1934 -46.142805,-2.1786 -6.7454,-2.2317 -28.2652,6.0799 -35.4643,4.7143 C 9.072156,39.4809 6.491756,33.7693 3.744956,28.482 c -6.3069,-15.1266 -2.5738,-28.0439 7.981099,-34.7856 10.5549,-6.74179 27.9316,-7.30796 48.9119,2.2678 z" fill="rgb(205,254,205)" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" transform="matrix(1,0,0,1,-0.7,11.3)"></path></g><text class="content" id="v-52" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,17.6)"><tspan dy="0" class="v-line">Continuous</tspan><tspan dy="1em" x="0" class="v-line">Improvement</tspan></text></g><g model-id="f69a3c4b-4d40-488d-a54a-a0e38453f077" id="j_7" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(844,311)"><g class="scalable" transform="scale(0.7739182692307692,1.0299479166666667)"><polygon class="element" id="v-59" fill="rgb(205,254,205)" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-60" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,50.3,6.9)"><tspan dy="0" class="v-line">Add&nbsp;properties</tspan><tspan dy="1em" x="0" class="v-line">to&nbsp;the&nbsp;diagram</tspan></text></g><g model-id="1f011a05-50ff-47b4-bdf6-e6c9227eef70" id="j_8" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(433,414)"><g class="scalable" transform="scale(0.8816105769230769,1.0299479166666667)"><polygon class="element" id="v-67" fill="#FAE573" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-68" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,57.3,6.9)"><tspan dy="0" class="v-line">Change&nbsp;the&nbsp;color</tspan><tspan dy="1em" x="0" class="v-line">of&nbsp;elements</tspan></text></g><g model-id="5562be02-998b-4a7b-8bb9-355d84b3c06b" id="j_9" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(427,514)"><g class="scalable" transform="scale(1.3816105769230769,0.86328125)"><polygon class="element" id="v-75" fill="rgb(205,254,205)" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-76" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,89.8,3.9)"><tspan dy="0" class="v-line">Change&nbsp;the&nbsp;size&nbsp;of</tspan><tspan dy="1em" x="0" class="v-line">elements</tspan></text></g><g model-id="17acd322-9d37-496e-b6d5-c69c497502db" id="j_10" class="joint-cell joint-type-resource joint-element joint-theme-default" data-type="Resource" fill="#ffffff" stroke="none" transform="translate(490,305)"><g class="scalable" transform="scale(0.6923076923076923,1.1666666666666667)"><rect class="element" id="v-83" fill="rgb(205,254,205)" height="30" rx="0" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></rect></g><text class="content" id="v-84" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" fill="#000000" text-anchor="middle" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,11.9)"><tspan dy="0" class="v-line">Improved&nbsp;UI</tspan></text></g><g model-id="f9035e8c-0294-44a8-a93e-85a349d2f21a" id="j_11" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(568,465)"><g class="scalable" transform="scale(0.7307692307692307,1)"><polygon class="element" id="v-91" fill="rgb(205,254,205)" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-92" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,47.5,0.4)"><tspan dy="0" class="v-line">Change&nbsp;the</tspan><tspan dy="1em" x="0" class="v-line">type&nbsp;of</tspan><tspan dy="1em" x="0" class="v-line">dependums</tspan></text></g><g model-id="2697c4ac-6868-42ff-9d1d-b819000f909e" id="j_12" class="joint-cell joint-type-resource joint-element joint-theme-default" data-type="Resource" fill="#ffffff" stroke="none" transform="translate(725,490)"><g class="scalable" transform="scale(0.6923076923076923,1.1666666666666667)"><rect class="element" id="v-99" fill="rgb(205,254,205)" height="30" rx="0" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></rect></g><text class="content" id="v-100" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" fill="#000000" text-anchor="middle" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,-0.1)"><tspan dy="0" class="v-line">Improved</tspan><tspan dy="1em" x="0" class="v-line">visuals&nbsp;for</tspan><tspan dy="1em" x="0" class="v-line">links</tspan></text></g><g model-id="d481f512-6836-4e17-ba29-0192cb0c8ad8" id="j_13" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(825,515)"><g class="scalable" transform="scale(0.7307692307692307,1)"><polygon class="element" id="v-107" fill="rgb(205,254,205)" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-108" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,47.5,0.4)"><tspan dy="0" class="v-line">Add</tspan><tspan dy="1em" x="0" class="v-line">properties&nbsp;to</tspan><tspan dy="1em" x="0" class="v-line">links</tspan></text></g><g model-id="63f3b48a-0088-4aa3-9f63-5354efefc78b" id="j_14" class="joint-cell joint-type-task joint-element joint-theme-default" data-type="Task" fill="#ffffff" stroke="none" transform="translate(864,465)"><g class="scalable" transform="scale(1.0816105769230768,0.9466145833333334)"><polygon class="element" id="v-115" fill="rgb(205,254,205)" height="36" points="0,18 15,0 115,0 130,18 115,36 15,36" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></polygon></g><text class="content" id="v-116" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,70.3,5.4)"><tspan dy="0" class="v-line">Change&nbsp;the&nbsp;value&nbsp;of</tspan><tspan dy="1em" x="0" class="v-line">contribution&nbsp;links</tspan></text></g><g model-id="98275a4b-510e-4016-b985-6a25ca69079b" id="j_15" class="joint-cell joint-type-resource joint-element joint-theme-default" data-type="Resource" fill="#ffffff" stroke="none" transform="translate(650,405)"><g class="scalable" transform="scale(0.8585336538461539,1.6359375)"><rect class="element" id="v-123" fill="rgb(205,254,205)" height="30" rx="0" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></rect></g><text class="content" id="v-124" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" fill="#000000" text-anchor="middle" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,55.8,6.9)"><tspan dy="0" class="v-line">Stricter</tspan><tspan dy="1em" x="0" class="v-line">adherence&nbsp;to&nbsp;the</tspan><tspan dy="1em" x="0" class="v-line">language&nbsp;guide</tspan></text></g><g model-id="ab99b45b-ee62-4a1c-9d4d-1312dbfd3d7d" id="j_16" class="joint-cell joint-type-goal joint-element joint-theme-default" data-type="Goal" fill="#ffffff" stroke="none" transform="translate(551,357)"><g class="scalable" transform="scale(0.6923076923076923,1.1666666666666667)"><rect class="element" id="v-131" fill="rgb(205,254,205)" height="30" rx="20" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></rect></g><text class="content" id="v-132" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" fill="#000000" text-anchor="middle" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,5.9)"><tspan dy="0" class="v-line">Elements</tspan><tspan dy="1em" x="0" class="v-line">modifiable</tspan></text></g><g model-id="3696a947-a1cd-42b1-8804-794bd01aa0f9" id="j_17" class="joint-cell joint-type-quality joint-element joint-theme-default" data-type="Quality" fill="#ffffff" stroke="none" transform="translate(752,343)"><g class="scalable" transform="scale(0.7852376964064524,1.0380876717711)"><path class="element" id="v-139" d="m 60.637955,-4.0358 c 17.5174,2.2042 29.9953,-10.69554 41.892705,-4.7858 22.34142,10.8714 11.2203,43.7743 -2.25,47.7322 -8.276505,2.9084 -13.960205,5.1934 -46.142805,-2.1786 -6.7454,-2.2317 -28.2652,6.0799 -35.4643,4.7143 C 9.072156,39.4809 6.491756,33.7693 3.744956,28.482 c -6.3069,-15.1266 -2.5738,-28.0439 7.981099,-34.7856 10.5549,-6.74179 27.9316,-7.30796 48.9119,2.2678 z" fill="rgb(205,254,205)" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" transform="matrix(1,0,0,1,-0.7,11.3)"></path></g><text class="content" id="v-140" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" text-anchor="middle" fill="#000000" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,17.6)"><tspan dy="0" class="v-line">Improved</tspan><tspan dy="1em" x="0" class="v-line">Links</tspan></text></g><g model-id="2083cdfc-21c9-4a25-9a70-e65934cd588d" id="j_18" class="joint-cell joint-type-resource joint-element joint-theme-default" data-type="Resource" fill="#ffffff" stroke="none" transform="translate(253,273)"><g class="scalable" transform="scale(0.6923076923076923,1.1666666666666667)"><rect class="element" id="v-147" fill="rgb(205,254,205)" height="30" rx="0" stroke="black" stroke-width="2" vector-effect="non-scaling-stroke" width="130"></rect></g><text class="content" id="v-148" font-size="12" xml:space="preserve" y="0.8em" font-weight="bold" fill="#000000" text-anchor="middle" font-family="Arial, helvetica, sans-serif" transform="matrix(1,0,0,1,45,5.9)"><tspan dy="0" class="v-line">The&nbsp;piStar</tspan><tspan dy="1em" x="0" class="v-line">tool</tspan></text></g><g model-id="d6900f65-c11e-4314-8f6e-049981ee4cb7" id="j_21" class="joint-cell joint-type-andrefinementlink joint-link joint-theme-default" data-type="AndRefinementLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-162" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 237.5 161 L 276.5 122"></path><path joint-selector="line" id="v-161" fill="none" stroke="black" stroke-width="1" d="M 237.5 161 L 276.5 122" marker-end="url(#v-2-479506292)"></path></g><g model-id="44976911-2457-460f-9d85-ce5da319a584" id="j_22" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-170" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 172.3 161 C 144.99083333333334 153.25083333333333 117.68166666666666 145.50166666666667 112 138 C 106.31833333333334 130.49833333333333 122.26416666666668 123.24416666666667 138.21 115.99"></path><path joint-selector="line" id="v-169" fill="none" stroke="black" stroke-width="1" d="M 172.3 161 C 144.99083333333334 153.25083333333333 117.68166666666666 145.50166666666667 112 138 C 106.31833333333334 130.49833333333333 122.26416666666668 123.24416666666667 138.21 115.99" marker-end="url(#v-21429980022)"></path><g id="v-165" class="labels"><g id="v-166" class="label" label-idx="0" cursor="default" transform="translate(133.0210203075409, 149.0469372844696)"><rect joint-selector="rect" id="v-168" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-167" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="7b248d0f-cbe1-4382-b7e8-67beac726b7a" id="j_23" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-178" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 851.27 311 L 727.97 257.88"></path><path joint-selector="line" id="v-177" fill="none" stroke="black" stroke-width="1" d="M 851.27 311 L 727.97 257.88" marker-end="url(#v-21429980022)"></path><g id="v-173" class="labels"><g id="v-174" class="label" label-idx="0" cursor="default" transform="translate(801.95, 289.752)"><rect joint-selector="rect" id="v-176" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-175" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="2b240378-33ee-4281-9c79-a31b0be3db67" id="j_24" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-184" fill="none" stroke="rgba(190, 190, 190, 0)" stroke-linecap="round" stroke-width="30" d="M 565.82 305 L 637.97 264.04"></path><path joint-selector="line" id="v-183" fill="none" stroke="black" stroke-width="1" d="M 565.82 305 L 637.97 264.04" marker-end="url(#v-21429980022)"></path><g id="v-179" class="labels"><g id="v-180" class="label" label-idx="0" cursor="default" transform="translate(594.6800000000001, 288.616)"><rect joint-selector="rect" id="v-182" fill="rgb(242,242,242)" rx="3" ry="3" width="30.703125" height="14" transform="matrix(1,0,0,1,-15.4,-7)"></rect><text joint-selector="text" id="v-181" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">make</tspan></text></g></g></g><g model-id="6dfa5b06-b178-4630-9955-f070b67482d9" id="j_25" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-190" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 702.87 405 L 686.26 265.99"></path><path joint-selector="line" id="v-189" fill="none" stroke="black" stroke-width="1" d="M 702.87 405 L 686.26 265.99" marker-end="url(#v-21429980022)"></path><g id="v-185" class="labels"><g id="v-186" class="label" label-idx="0" cursor="default" transform="translate(696.226, 349.396)"><rect joint-selector="rect" id="v-188" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-187" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="866f7d45-6c99-431f-a393-b9b335a0f5ab" id="j_26" class="joint-cell joint-type-orrefinementlink joint-link joint-theme-default" data-type="OrRefinementLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-192" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 524.06 414 L 564.13 392"></path><path joint-selector="line" id="v-191" fill="none" stroke="black" stroke-width="1" d="M 524.06 414 L 564.13 392" marker-end="url(#v-2-933205445)"></path></g><g model-id="aa8e7f25-d36e-492a-9c2b-1fb2e0287577" id="j_27" class="joint-cell joint-type-orrefinementlink joint-link joint-theme-default" data-type="OrRefinementLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-196" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 524.74 514 L 587.06 392"></path><path joint-selector="line" id="v-195" fill="none" stroke="black" stroke-width="1" d="M 524.74 514 L 587.06 392" marker-end="url(#v-2-933205445)"></path></g><g model-id="4c0257cd-34b0-4ff9-bfd1-9511d230fe1a" id="j_28" class="joint-cell joint-type-orrefinementlink joint-link joint-theme-default" data-type="OrRefinementLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-198" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 612.09 464 L 599.15 392"></path><path joint-selector="line" id="v-197" fill="none" stroke="black" stroke-width="1" d="M 612.09 464 L 599.15 392" marker-end="url(#v-2-933205445)"></path></g><g model-id="749f28b5-d133-4974-b0fa-59bc56b7ad12" id="j_29" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-204" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 607.19 357 L 665.38 265.99"></path><path joint-selector="line" id="v-203" fill="none" stroke="black" stroke-width="1" d="M 607.19 357 L 665.38 265.99" marker-end="url(#v-21429980022)"></path><g id="v-199" class="labels"><g id="v-200" class="label" label-idx="0" cursor="default" transform="translate(630.466, 320.596)"><rect joint-selector="rect" id="v-202" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-201" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="96e1d0b5-3075-4fdc-8963-97b5f75b4c8a" id="j_30" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-210" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 863.67 514 L 809.75 397.99"></path><path joint-selector="line" id="v-209" fill="none" stroke="black" stroke-width="1" d="M 863.67 514 L 809.75 397.99" marker-end="url(#v-21429980022)"></path><g id="v-205" class="labels"><g id="v-206" class="label" label-idx="0" cursor="default" transform="translate(842.1020000000001, 467.596)"><rect joint-selector="rect" id="v-208" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-207" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="6d15d469-26f5-4bee-80c8-5ea765a4a01f" id="j_31" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-216" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 773.74 488.5 L 791.56 397.99"></path><path joint-selector="line" id="v-215" fill="none" stroke="black" stroke-width="1" d="M 773.74 488.5 L 791.56 397.99" marker-end="url(#v-21429980022)"></path><g id="v-211" class="labels"><g id="v-212" class="label" label-idx="0" cursor="default" transform="translate(780.8679999999999, 452.296)"><rect joint-selector="rect" id="v-214" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-213" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="9912fc08-e0e8-414b-9b7e-1aa5ab7ba8f2" id="j_32" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-222" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 913.32 465 L 830.83 397.99"></path><path joint-selector="line" id="v-221" fill="none" stroke="black" stroke-width="1" d="M 913.32 465 L 830.83 397.99" marker-end="url(#v-21429980022)"></path><g id="v-217" class="labels"><g id="v-218" class="label" label-idx="0" cursor="default" transform="translate(880.3240000000001, 438.196)"><rect joint-selector="rect" id="v-220" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-219" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g><g model-id="ae8caa52-a1ef-4da9-a6ce-b903c4c78854" id="j_33" class="joint-cell joint-type-contributionlink joint-link joint-theme-default" data-type="ContributionLink"><path joint-selector="connection-wrap" class="c-connection-wrap" id="v-228" fill="none" stroke="transparent" stroke-linecap="round" stroke-width="20" d="M 773.22 342.99 L 706.72 265.99"></path><path joint-selector="line" id="v-227" fill="none" stroke="black" stroke-width="1" d="M 773.22 342.99 L 706.72 265.99" marker-end="url(#v-21429980022)"></path><g id="v-223" class="labels"><g id="v-224" class="label" label-idx="0" cursor="default" transform="translate(746.6200000000001, 312.19000000000005)"><rect joint-selector="rect" id="v-226" fill="rgb(242,242,242)" rx="3" ry="3" width="24.671875" height="14" transform="matrix(1,0,0,1,-12.3,-7)"></rect><text joint-selector="text" id="v-225" fill="#000000" font-size="12" text-anchor="middle" pointer-events="none" font-family="sans-serif" font-weight="bold" xml:space="preserve" y="0.8em" transform="matrix(1,0,0,1,0,-5.6)"><tspan dy="0" class="v-line">help</tspan></text></g></g></g></g><g id="v-5" class="joint-tools-container"><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="1c8bd992-dfcd-4cc8-867c-b31604bcbd4e" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 221.18 197 C 220.63333333333338 226.42583333333334 220.0866666666667 255.8516666666667 228 270 C 235.9133333333333 284.1483333333333 252.28666666666666 283.01916666666665 268.66 281.89" class="joint-vertices-path"></path><circle r="6" fill="#33334F" stroke="#FFFFFF" stroke-width="2" cursor="move" class="joint-marker-vertex joint-theme-default" cx="228" cy="270" model-id="1c8bd992-dfcd-4cc8-867c-b31604bcbd4e"></circle></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="432817b3-1017-4e48-8f17-373088a95284" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 325.74 277.5 L 406 239.79" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="d6900f65-c11e-4314-8f6e-049981ee4cb7" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 237.5 161 L 276.5 122" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="44976911-2457-460f-9d85-ce5da319a584" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 209.85 161 L 185.72 115.99" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="7b248d0f-cbe1-4382-b7e8-67beac726b7a" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 851.27 311 L 727.97 257.88" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="2b240378-33ee-4281-9c79-a31b0be3db67" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 565.82 305 L 637.97 264.04" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="6dfa5b06-b178-4630-9955-f070b67482d9" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 702.87 405 L 686.26 265.99" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="866f7d45-6c99-431f-a393-b9b335a0f5ab" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 524.06 414 L 564.13 392" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="aa8e7f25-d36e-492a-9c2b-1fb2e0287577" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 524.74 514 L 587.06 392" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="4c0257cd-34b0-4ff9-bfd1-9511d230fe1a" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 612.09 464 L 599.15 392" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="749f28b5-d133-4974-b0fa-59bc56b7ad12" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 607.19 357 L 665.38 265.99" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="96e1d0b5-3075-4fdc-8963-97b5f75b4c8a" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 863.67 514 L 809.75 397.99" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="6d15d469-26f5-4bee-80c8-5ea765a4a01f" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 773.74 488.5 L 791.56 397.99" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="9912fc08-e0e8-414b-9b7e-1aa5ab7ba8f2" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 913.32 465 L 830.83 397.99" class="joint-vertices-path"></path></g></g><g class="joint-tools joint-theme-default"><g class="joint-tool joint-theme-default" data-tool-name="vertices" model-id="ae8caa52-a1ef-4da9-a6ce-b903c4c78854" style="display: none;"><path fill="none" stroke="transparent" stroke-width="10" cursor="cell" joint-selector="connection" d="M 773.22 342.99 L 706.72 265.99" class="joint-vertices-path"></path></g></g></g></svg></div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- backbone templates -->
+<script type="text/template" id="add-button-template">
+    <button type="button" class="btn btn-default add-button" id="add-<%- label %>" title="<%- tooltip %>">
+        <img
+                src="language/images/<%- name %>.svg" height="25" alt="" onError="this.onerror=null;this.src='language/images/<%- defaultButtonImage %>';"/>
+        <br><%- label %>
+    </button>
+</script>
+
+<script type="text/template" id="add-dropdown-button-template">
+    <div class="add-dropdown-button dropdown">
+        <button class="btn add-button btn-default dropdown-toggle" type="button" id="menu-dropdown-<%- name %>"
+                data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"
+                title="<%- tooltip %>">
+            <img src="language/images/<%- name %>.svg" height="25" alt="" onError="this.onerror=null;this.src='language/images/<%- defaultButtonImage %>';"/><br>
+            <%- label %>...
+            <span class="caret"></span>
+        </button>
+        <ul id="add-<%- name %>-dropdown" class="dropdown-menu" aria-labelledby="menu-dropdown-<%- name %>"></ul>
+    </div>
+</script>
+
+<script type="text/template" id="add-dropdown-item-template">
+    <a id="d-add-<%- name %>" title="<%- tooltip %>" href="#">
+        <img id="d-add-<%- name %>-img" src="language/images/<%- buttonImage %>.svg" height="35" alt=""
+             onError="this.onerror=null;this.src='language/images/<%- defaultButtonImage %>';"/>
+        <%- label %>
+    </a>
+</script>
+
+
+<script type="text/template" id="property-template">
+    <tr>
+        <th scope="row" class="property-name"><%- propertyName %></th>
+        <td class="property-value">
+            <a href="#" id="current<%- propertyName %>" class="property-value" data-type="<%- dataType %>" data-pk="1"
+               data-name="<%- propertyName %>" data-title="Enter <%- propertyName %>"><%- propertyValue %></a>
+        </td>
+    </tr>
+</script>
+
+<div id="modals">
+
+    <div class="modal fade" id="modal-save-image" tabindex="-1" role="dialog" aria-labelledby="label-save-image-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+                    <h4 class="modal-title" id="label-save-image-modal">Save model as image</h4>
+                </div>
+                <div class="modal-body">
+                    <form id="modal-save-image-form" class="form-horizontal">
+                        <div class="form-group">
+                            <label for="input-filename" class="col-sm-2 control-label">File name: </label>
+                            <div class="col-sm-4">
+                                <input type="text" class="form-control" id="input-filename" value="goalDiagram" placeholder="goalDiagram">
+                            </div>
+                            <div class="col-sm-10">
+                                <div class="checkbox">
+                                    <label>
+                                        <input id="modal-input-precise-links" type="checkbox"> Pixel-perfect links (it may take some seconds longer)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="col-sm-3">
+                                <select id="input-file-format" class="form-control" title="Select file format">
+                                    <option>SVG</option>
+                                    <option>PNG</option>
+                                </select>
+
+                            </div>
+                            <div id="save-png-options" class="col-sm-6 hidden">
+                                <div class="checkbox">
+                                    <label title="If you&#39;re having trouble downloading large models, try to uncheck this">
+                                        <input id="modal-input-hi-res" type="checkbox" checked=""> High resolution
+                                    </label>
+                                </div>
+                                <div class="checkbox">
+                                    <label title="Transparent background">
+                                        <input id="modal-input-transparent-background" type="checkbox" checked=""> Transparent background
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal-button-save-image" type="button" class="btn btn-primary" data-save-text="Saving..." data-preparing-text="Preparing image... (please wait)">Save image
+                    </button>
+                    <button type="button" class="btn" data-dismiss="modal">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-load-model" tabindex="-1" role="dialog" aria-labelledby="label-load-model-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+                    <h4 class="modal-title" id="label-load-model-modal">Load i* model from file</h4>
+                </div>
+                <div class="modal-body">
+                    <input type="file" id="input-file-to-load" name="file">
+                    <br>
+                </div>
+                <div class="modal-footer">
+                    <button id="modal-button-load-model" type="button" class="btn btn-primary" data-loading-text="Loading...">Load
+                        model
+                    </button>
+                    <button type="button" class="btn" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-examples" tabindex="-1" role="dialog" aria-labelledby="label-examples-modal">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+                    <h4 class="modal-title" id="label-examples-modal">Load Examples</h4>
+                </div>
+                <div class="modal-body">
+                    <em>Loading may take a while, please wait a few seconds after clicking on an example below.</em><br><br>
+                    <div class="alert alert-danger" role="alert">WARNING! If you click on an example below, your current model will be erased.</div>
+                    <ul>
+                        <li>
+                            <a class="modal-button-load-example" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" data-model="everyElementAndLink">
+                                Example with every iStar 2.0 element and link, along with its definitions
+                            </a>
+                        </li>
+                        <li><a class="modal-button-load-example" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" data-model="travelReimbursement">University Travel Reimbursement (iStar 2.0 guide example)</a></li>
+                        <li><a class="modal-button-load-example" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" data-model="smartHome">Contextual Smart Home (105 elements)</a></li>
+                        <li><a class="modal-button-load-example" href="https://www.cin.ufpe.br/~jhcp/pistar/4safety/#" data-model="buyerDrivenECommerce">Buyer Driven e-Commerce</a></li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-instructions" tabindex="-1" role="dialog" aria-labelledby="label-instructions-modal">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">×</span></button>
+                    <h4 class="modal-title" id="label-instructions-modal">Tool Manual</h4>
+                </div>
+                <div class="modal-body">
+                    <h4>Visualization</h4>
+                    <ul>
+                        <li>Use the tool in fullscreen by clicking "Toggle fullscreen" within the <em>Options</em> menu.</li>
+                        <li>Remove the gaps between links and elements by clicking "Pixel-perfect links" within the
+                            <em>Options</em> menu (this operation takes some time).</li>
+                        <li>You can use your regular browser's zoom options to zoom in and out.</li>
+                    </ul>
+                    <h4>Change</h4>
+                    <ul>
+                        <li>To change the name of an element: double-click it.</li>
+                        <li>To collapse/expand an actor/role/agent: press <kbd>alt</kbd> and click it.</li>
+                        <li>To change the diagram size: use the <em>Options</em> menu.</li>
+                    </ul>
+                    <h4>Delete</h4>
+                    <ul>
+                        <li>To delete an element: click on the element, then press the <kbd>delete</kbd> key.</li>
+                        <li>To delete a dependency: click on its dependum, then press the <kbd>delete</kbd> key.</li>
+                        <li>To delete a link: click over the link, then press the <kbd>delete</kbd> key.</li>
+                        <li>To delete a vertex in a link: double-click the vertex.</li>
+                    </ul>
+                    <h4>Add</h4>
+                    <ul>
+                        <li>To add a property to an element or link: click on the element or link, then click on the <em>Add Property</em> button in
+                            the sidepanel.
+                        </li>
+                        <li>To add an actor/role/agent in the diagram: click on the ACTOR... button, select the respective option,
+                            and then click on the diagram.
+                        </li>
+                        <li>To add a goal/task/resource/quality in the diagram: click on the respective button and then click on the
+                            actor that will contain the element. (OBS: all elements must be inside an actor/role/agent)
+                        </li>
+                        <li>To add a refinement/qualification/needed-by link: click on the respective link button, then click on the
+                            source element, and lastly click on the target element.
+                        </li>
+                        <li>To add a contribution link: click on the CONTRIBUTION... button, select the respective label, then click
+                            on the source element, and lastly click on the target element.
+                        </li>
+                        <li>To add a dependency link: click on the DEPENDENCY... button, select the respective dependency type, then
+                            click on the source element (in the depender), and lastly click on the target element (on the dependee).
+                        </li>
+                        <li>To add an is-a/participates-in link: click on the ACTOR LINKS... button, select the respective option,
+                            then click on the source, and lastly click on the target.
+                        </li>
+                    </ul>
+
+                    <em>piStar tool version 2.0.0a</em><br>
+                    For more info on this project, please visit the <a href="https://github.com/jhcp/piStar/" target="_blank">
+                    piStar repository <span class="glyphicon glyphicon-new-window" aria-hidden="true"></span></a>.
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+
+<!-- dependencies -->
+<script src="./iStar4Safety_files/jquery.min.js"></script>
+<script src="./iStar4Safety_files/lodash.min.js"></script>
+<script src="./iStar4Safety_files/backbone.min.js"></script>
+<script src="./iStar4Safety_files/joint.min.js"></script>
+
+<script src="./iStar4Safety_files/jscolor.min.js"></script>
+<script src="./iStar4Safety_files/bootstrap.min.js"></script>
+<script src="./iStar4Safety_files/bootstrap-editable.min.js"></script>
+<script src="./iStar4Safety_files/bootbox.min.js"></script>
+
+<!-- istar core -->
+<script src="./iStar4Safety_files/istarFunctions.js"></script>
+<script src="./iStar4Safety_files/metamodelManager.js"></script>
+<script src="./iStar4Safety_files/fileManager.js"></script>
+<script src="./iStar4Safety_files/defaultShapes.js"></script>
+<script src="./iStar4Safety_files/ui.js"></script>
+<script src="./iStar4Safety_files/addButton.js"></script>
+<script src="./iStar4Safety_files/addButton(1).js"></script>
+<script src="./iStar4Safety_files/addButtonDropdown.js"></script>
+<script src="./iStar4Safety_files/addButtonDropdownItem.js"></script>
+<script src="./iStar4Safety_files/addButton(2).js"></script>
+<script src="./iStar4Safety_files/propertiesTable.js"></script>
+<script src="./iStar4Safety_files/istarmodels.js"></script>
+
+<!-- language specific -->
+<script src="./iStar4Safety_files/shapes.js"></script>
+<script src="./iStar4Safety_files/metamodel.js"></script>
+<script src="./iStar4Safety_files/constraints.js"></script>
+<script src="./iStar4Safety_files/ui.metamodel.js"></script>
+
+<!-- insert your plugin(s) here, after this line -->
+
+<!-- end of plugin(s) area -->
+
+<script src="./iStar4Safety_files/main.js"></script>
+
+
+
+</body></html>

@@ -1,80 +1,372 @@
 <section class="page">
   <header class="page__header">
     <p class="step">Step 3</p>
-    <h2>Define the STPA Control Structure</h2>
+    <div class="page__title-row">
+      <h2>Define the STPA Control Structure</h2>
+      <button type="button" class="button button--ai" [disabled]="isGeneratingStepThreeAi()" (click)="generateStepThreeWithAi()" aria-label="Generate with AI">
+        {{ isGeneratingStepThreeAi() ? 'Generating...' : '🤖 Generate with AI' }}
+      </button>
+    </div>
     <p>
-      Translate the iStar4Safety responsibilities into controllers, control actions, and feedback loops. The mock data below
-      illustrates how the insulin delivery architecture is captured before analysing UCAs.
+      Following the ReSafety process, translate the social and goal-oriented iStar4Safety model into a functional
+      control structure. First classify the system entities, then define mandatory control actions, and finally add
+      optional feedback or high-resolution structural elements only where the analysis needs them.
     </p>
+    <div class="bpmn-preview-inline">
+      <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+      <button
+        type="button"
+        class="bpmn-preview-thumb"
+        (click)="openBpmnModelModal()"
+        aria-label="Open BPMN model preview"
+      >
+        <img src="/assets/control-structure-bpmn.png" alt="Small preview of the Step 3 BPMN model" />
+      </button>
+    </div>
   </header>
 
-  <section class="card">
-    <h3>Control loop catalogue</h3>
-    <form class="inline-form" [formGroup]="controlActionForm" (ngSubmit)="addControlAction()">
-      <input type="text" placeholder="Controller" formControlName="controller" />
-      <input type="text" placeholder="Control action" formControlName="action" />
-      <input type="text" placeholder="Controlled process" formControlName="controlledProcess" />
-      <input type="text" placeholder="Feedback signal" formControlName="feedback" />
-      <button type="submit">Add loop</button>
-    </form>
+  <div class="page-actions">
+    <button type="button" class="button button--secondary" [disabled]="isSavingStepThree()" (click)="saveStepThree()">
+      {{ isSavingStepThree() ? 'Saving...' : 'Save' }}
+    </button>
+    <button type="button" class="button" [disabled]="isSavingStepThree()" (click)="saveStepThree(true)">
+      {{ isSavingStepThree() ? 'Saving...' : 'Save and Continue' }}
+    </button>
+  </div>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Controller</th>
-          <th>Action</th>
-          <th>Process</th>
-          <th>Feedback</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (item of controlActions(); track item.id) {
-          <tr>
-            <td>{{ item.controller }}</td>
-            <td>{{ item.action }}</td>
-            <td>{{ item.controlledProcess }}</td>
-            <td>{{ item.feedback }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+  @if (stepThreeSaveMessage()) {
+    <div class="save-feedback save-feedback--success">
+      {{ stepThreeSaveMessage() }}
+    </div>
+  }
+
+  @if (stepThreeSaveError()) {
+    <div class="save-feedback save-feedback--error">
+      {{ stepThreeSaveError() }}
+    </div>
+  }
+
+  <section class="overview-strip" aria-label="Step 3 overview">
+    <article class="overview-card overview-card--primary">
+      <span class="overview-card__label">Defined entities</span>
+      <strong>{{ entityRoleCount() }}</strong>
+      <p>Controllers, controlled processes, and passive entities currently classified during entity definition.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Control actions</span>
+      <strong>{{ controlActions().length }}</strong>
+      <p>Mandatory control actions captured during control action definition.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Passive entities</span>
+      <strong>{{ passiveEntityCount() }}</strong>
+      <p>Targets that must be modeled through optional structure elements instead of as controller-issued actions.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Optional elements</span>
+      <strong>{{ optionalElementsCount() }}</strong>
+      <p>Additional feedback, sensors, actuators, or external inputs captured as optional structure elements.</p>
+    </article>
   </section>
 
   <section class="card">
-    <h3>Feedback channels</h3>
-    <div class="feedback-grid">
-      @for (loop of feedbackLoops(); track loop.id) {
-        <article class="feedback-card">
-          <header>
-            <h4>{{ loop.source }} → {{ loop.destination }}</h4>
-            <span class="badge">{{ loop.latency }}</span>
-          </header>
-          <p>{{ loop.signal }}</p>
-        </article>
+
+    <section class="form-section">
+      <div class="form-section__heading">
+        <span class="form-section__eyebrow">Entity classification · Step 3.1</span>
+        <h4>Define controllers and controlled processes</h4>
+        <p>Select an entity from the Step 1.1.5 system components and the updated SR actors, then classify how it behaves in the control structure.</p>
+      </div>
+
+      <form class="grid" [formGroup]="entityForm" (ngSubmit)="addEntity()">
+        <label class="field field--full">
+          <span>Entity name</span>
+          <select formControlName="entityName">
+            <option value="">Select a system component or actor</option>
+            @for (name of entityCatalog(); track name) {
+              <option [value]="name">{{ name }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="field field--full">
+          <span>Functional role(s)</span>
+          <div class="checkbox-grid">
+            @for (role of entityRoleOptions(); track role.role) {
+              <label class="checkbox-card">
+                <input
+                  type="checkbox"
+                  [formControlName]="role.controlName"
+                  [disabled]="role.controlName === 'controller' && !!entityForm.controls.passiveEntity.value"
+                  (change)="onEntityRoleChange(role.controlName, $any($event.target).checked)"
+                />
+                <div>
+                  <strong>{{ role.title }}</strong>
+                  <small>{{ role.description }}</small>
+                </div>
+              </label>
+            }
+          </div>
+        </div>
+
+        <div class="actions field--full">
+          <button type="submit">Save entity classification</button>
+        </div>
+      </form>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Roles</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (entity of entities(); track entity.id) {
+              <tr>
+                <td>{{ entity.name }}</td>
+                <td>{{ roleLabel(entity) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="form-section">
+      <div class="form-section__heading">
+        <span class="form-section__eyebrow">Control action definition · Step 3.2</span>
+        <h4>Define control actions</h4>
+        <p>Capture the dependum as a mandatory control action, map the depender to the source controller, and map the dependee to the target controlled process.</p>
+      </div>
+
+      <form class="grid" [formGroup]="controlActionForm" (ngSubmit)="addControlAction()">
+        <label class="field">
+          <span>Control Action ID</span>
+          <input type="text" formControlName="ref" readonly />
+        </label>
+
+        <label class="field field--full">
+          <span>Control Action Name (Dependum)</span>
+          <input type="text" formControlName="action" [disabled]="!form2Ready()" placeholder="Derived directly from the SD-model dependum" />
+        </label>
+
+        <label class="field">
+          <span>Source Controller (Depender)</span>
+          <select formControlName="sourceController" [disabled]="!form2Ready()">
+            <option value="">Select a controller</option>
+            @for (entity of controllerEntities(); track entity.id) {
+              <option [value]="entity.name">{{ entity.name }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Target Controlled Process (Dependee)</span>
+          <select formControlName="targetProcess" [disabled]="!form2Ready()">
+            <option value="">Select a controlled process or passive entity</option>
+            @for (entity of controllableEntities(); track entity.id) {
+              <option [value]="entity.name">{{ entity.name }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field field--full">
+          <span>Associated Responsibility</span>
+          <select formControlName="responsibility" [disabled]="!form2Ready()">
+            <option value="">Link to a responsibility when available</option>
+            @for (item of responsibilitiesCatalog(); track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        </label>
+
+        @if (isSelectedTargetPassive()) {
+          <p class="notice-banner field--full">
+            Passive Entity guardrail: the selected target cannot receive a control action. Submitting this entry will redirect the interaction to the optional structure elements stage as Feedback.
+          </p>
+        }
+
+        <div class="actions field--full">
+          <button type="submit" [disabled]="!form2Ready()">
+            {{ editingControlActionId() ? 'Update control action' : 'Save control action' }}
+          </button>
+        </div>
+      </form>
+
+      @if (passiveTargetGuidance()) {
+        <p class="notice-banner">{{ passiveTargetGuidance() }}</p>
       }
-    </div>
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Control Action</th>
+              <th>Source Controller</th>
+              <th>Target Process</th>
+              <th>Responsibility</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of controlActions(); track item.id) {
+              <tr>
+                <td>{{ item.ref }}</td>
+                <td>{{ item.action }}</td>
+                <td>{{ item.sourceController }}</td>
+                <td>{{ item.targetProcess }}</td>
+                <td>{{ item.responsibility }}</td>
+                <td class="table-actions">
+                  @if (editingControlActionId() === item.id) {
+                    <span class="editing-placeholder">editing...</span>
+                  } @else {
+                    <button type="button" class="icon-action" (click)="editControlAction(item)" aria-label="Edit control action" title="Edit">
+                      ✎
+                    </button>
+                    <button type="button" class="icon-action icon-action--danger" (click)="removeControlAction(item.id)" aria-label="Delete control action" title="Delete">
+                      🗑
+                    </button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="form-section">
+      <div class="form-section__heading">
+        <span class="form-section__eyebrow">Optional structure elements · Steps 3.3-3.8</span>
+        <h4>Define optional control structure elements</h4>
+        <p>Add feedback, process models, control algorithms, actuators, sensors, or external inputs only when they improve the fidelity of the later safety analysis.</p>
+      </div>
+
+      <form class="grid" [formGroup]="optionalElementForm" (ngSubmit)="addOptionalElement()">
+        <label class="field">
+          <span>Optional element type</span>
+          <select formControlName="type">
+            @for (item of optionalElementTypes(); track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field field--full">
+          <span>Element name / description</span>
+          <input type="text" formControlName="name" placeholder="Describe the structural element being added" />
+        </label>
+
+        <label class="field">
+          <span>Source / origin</span>
+          <select formControlName="source">
+            <option value="">Select the source</option>
+            @for (item of optionalSourceOptions(); track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Destination / target</span>
+          <select formControlName="destination">
+            <option value="">Select the destination</option>
+            @for (item of optionalDestinationOptions(); track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        </label>
+
+        <label class="field field--full">
+          <span>Associated Responsibility</span>
+          <select formControlName="responsibility">
+            <option value="">Select a traceability link</option>
+            @for (item of responsibilitiesCatalog(); track item) {
+              <option [value]="item">{{ item }}</option>
+            }
+          </select>
+        </label>
+
+        <div class="actions field--full">
+          <button type="submit">Save optional element</button>
+        </div>
+      </form>
+
+      @if (optionalElementError()) {
+        <p class="notice-banner">{{ optionalElementError() }}</p>
+      }
+
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Name</th>
+              <th>Source</th>
+              <th>Destination</th>
+              <th>Responsibility</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of optionalElements(); track item.id) {
+              <tr>
+                <td>{{ item.type }}</td>
+                <td>{{ item.name }}</td>
+                <td>{{ item.source }}</td>
+                <td>{{ item.destination }}</td>
+                <td>{{ item.responsibility }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
   </section>
 
   <section class="card card--diagram">
-    <h3>Control structure mock diagram</h3>
+    <h3>Control structure sketch</h3>
     <div class="diagram">
       <div class="diagram__controller">
-        <h4>Infusion Controller</h4>
-        <p> Executes closed-loop dosing logic based on sensor telemetry. </p>
+        <h4>Controller</h4>
+        <p>Control Application issues commands based on the current therapy state.</p>
       </div>
       <div class="diagram__process">
         <h4>Controlled Process</h4>
-        <p> Insulin Pump Mechanism </p>
+        <p>Insulin Pump reacts to the issued command and changes the therapy state.</p>
       </div>
       <div class="diagram__feedback">
-        <p>Sensor feedback: flow rate, pressure, occlusion status</p>
+        <p>Feedback: Continuous Glucose Monitor provides telemetry back to the controller.</p>
       </div>
       <div class="diagram__actuation">
-        <p>Control action: adjust basal rate</p>
+        <p>Control Action: Release insulin delivery</p>
       </div>
     </div>
     <p class="note">
-      Replace this placeholder with an interactive canvas or imported diagram in future iterations.
+      Treat the sketch as the minimum viable control structure. Add optional structure elements only when they improve the later UCA and loss-scenario analysis.
     </p>
   </section>
+
+  @if (isBpmnModelModalOpen()) {
+    <div class="modal-backdrop" (click)="closeBpmnModelModal()">
+      <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>BPMN model</h4>
+          <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
+        </header>
+        <img class="bpmn-model-image" src="/assets/control-structure-bpmn.png" alt="BPMN model for Step 3 control structure" />
+      </div>
+    </div>
+  }
+
+  <div class="page-actions page-actions--bottom">
+    <button type="button" class="button button--secondary" [disabled]="isSavingStepThree()" (click)="saveStepThree()">
+      {{ isSavingStepThree() ? 'Saving...' : 'Save' }}
+    </button>
+    <button type="button" class="button" [disabled]="isSavingStepThree()" (click)="saveStepThree(true)">
+      {{ isSavingStepThree() ? 'Saving...' : 'Save and Continue' }}
+    </button>
+  </div>
 </section>

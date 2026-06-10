@@ -1,63 +1,156 @@
-<section class="page">
-  <header class="page__header">
-    <p class="step">Step 5</p>
-    <h2>Identify Controller Constraints</h2>
-    <p>
-      1 unsafe control action into a constraint that the controller must enforce. The mock table below mimics the
-      review board used to approve constraints.
-    </p>
-  </header>
+<section class="page" [class.page--embedded]="embedded()">
+  @if (!embedded()) {
+    <header class="page__header">
+      <p class="step">Step 4</p>
+      <div class="page__title-row">
+        <h2>Identify Controller Constraints</h2>
+        <div class="page__header-actions">
+          <button type="button" class="button button--secondary">BPMN model</button>
+          <button type="button" class="button button--ai" aria-label="Generate with AI">🤖 Generate with AI</button>
+        </div>
+      </div>
+      <p>
+        Translate each unsafe control action or hazardous control condition into an explicit constraint that the
+        controller must enforce. Capture the intent, identify how the constraint will be enforced, and prepare it for
+        review.
+      </p>
+    </header>
+  }
+
+  <section class="overview-strip" aria-label="Constraint summary">
+    <article class="overview-card overview-card--primary">
+      <span class="overview-card__label">Recorded constraints</span>
+      <strong>{{ constraints().length }}</strong>
+      <p>Total controller constraints drafted for Step 4.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Approved</span>
+      <strong>{{ approvedCount() }}</strong>
+      <p>Constraints already accepted by the review board.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Pending review</span>
+      <strong>{{ pendingReviewCount() }}</strong>
+      <p>Drafts that still need board confirmation.</p>
+    </article>
+  </section>
 
   <section class="card">
-    <h3>Draft a constraint</h3>
+    <div class="card__heading">
+      <div>
+        <h3>Controller constraint formulation</h3>
+        <p>Complete Step 4.9 first, then turn each analyzed UCA or HC into a prescriptive controller rule in Step 4.10.</p>
+      </div>
+      <span class="status-pill" [class.status-pill--ready]="isAnalysisCompleted()">
+        {{ isAnalysisCompleted() ? '4.10 unlocked' : 'Waiting for 4.9' }}
+      </span>
+    </div>
+
+    <section class="checkpoint" aria-label="Analysis checkpoint">
+      <div>
+        <span class="checkpoint__eyebrow">Workflow gate</span>
+        <h4>Analysis checkpoint for Step 4.9</h4>
+        <p>Review the UCA or HC together with its responsibility, SC, and linked hazard chain before writing the formal controller requirement.</p>
+      </div>
+
+      <label class="checkpoint__toggle">
+        <input type="checkbox" formControlName="analysisCompleted" />
+        <span>
+          I have analyzed the identified UCAs/HCs and extracted the condition that must be constrained.
+        </span>
+      </label>
+    </section>
+
     <form class="grid" [formGroup]="constraintForm" (ngSubmit)="addConstraint()">
       <label class="field">
-        <span>UCA reference</span>
-        <input type="text" formControlName="ucaRef" placeholder="e.g. UCA-04" />
+        <span>Source UCA/HC</span>
+        <select formControlName="sourceRef" (change)="onSourceRefChange($any($event.target).value)">
+          <option value="">Select an analyzed UCA or HC</option>
+          @for (source of analysisSources(); track source.ref) {
+            <option [value]="source.ref">{{ source.ref }}</option>
+          }
+        </select>
+        <small>Each constraint must remain traceable to one Step 4 diagnostic source.</small>
+      </label>
+      <label class="field">
+        <span>Constraint ID</span>
+        <input type="text" formControlName="constraintId" placeholder="e.g. C-04" />
+        <small>Use the C-XX format from the updated Step 4 workflow.</small>
+      </label>
+      <label class="field field--full">
+        <span>Source UCA/HC summary</span>
+        <textarea rows="2" [value]="selectedSourceSummary()" readonly></textarea>
+        <small>The selected source is shown read-only so the constraint remains anchored to the identified unsafe behaviour.</small>
+      </label>
+      <label class="field field--full">
+        <span>Linked hazard(s)</span>
+        <input type="text" formControlName="hazardLinkage" placeholder="Which hazard(s) does this UCA/HC trace back to?" />
+        <small>Step 4.9 confirms the source remains linked to at least one system-level hazard.</small>
+      </label>
+      <label class="field field--full">
+        <span>Responsibility and SC reasoning</span>
+        <textarea rows="2" formControlName="responsibilityChain" placeholder="Summarize the responsibility and Safety Constraint chain that justifies this controller constraint"></textarea>
+        <small>Record the reasoning path: responsibility -> Safety Constraint -> hazard.</small>
       </label>
       <label class="field field--full">
         <span>Constraint statement</span>
-        <textarea rows="3" formControlName="constraint" placeholder="Describe the required controller behaviour"></textarea>
+        <textarea rows="3" formControlName="constraint" [disabled]="!isAnalysisCompleted()" placeholder="Describe the required controller behaviour"></textarea>
+        <small>Write the requirement as a controller obligation or prohibition.</small>
       </label>
       <label class="field field--full">
         <span>Enforcement mechanism</span>
-        <textarea rows="2" formControlName="enforcementMechanism" placeholder="How will the controller ensure this constraint?"></textarea>
+        <textarea rows="2" formControlName="enforcementMechanism" [disabled]="!isAnalysisCompleted()" placeholder="How will the controller ensure this constraint?"></textarea>
+        <small>Example: runtime guard, watchdog, interlock, or state machine validation.</small>
       </label>
       <label class="field">
         <span>Status</span>
-        <select formControlName="status">
+        <select formControlName="status" [disabled]="!isAnalysisCompleted()">
           <option value="Draft">Draft</option>
           <option value="Pending Review">Pending Review</option>
           <option value="Approved">Approved</option>
         </select>
       </label>
       <div class="actions field--full">
-        <button type="submit">Record constraint</button>
+        <button type="submit" [disabled]="!isAnalysisCompleted()">Record constraint</button>
       </div>
     </form>
+
+    @if (!isAnalysisCompleted()) {
+      <p class="hint">The drafting fields unlock after the Step 4.9 analysis checkpoint is confirmed.</p>
+    }
   </section>
 
   <section class="card">
-    <h3>Constraint review board</h3>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>UCA</th>
-          <th>Constraint</th>
-          <th>Enforcement</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (item of constraints(); track item.id) {
+    <div class="card__heading">
+      <div>
+        <h3>Constraint review board</h3>
+        <p>Review the current constraint set before promoting items from draft to approved.</p>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
           <tr>
-            <td>{{ item.ucaRef }}</td>
-            <td>{{ item.constraint }}</td>
-            <td>{{ item.enforcementMechanism }}</td>
-            <td><span class="badge badge--{{ statusClass(item.status) }}">{{ item.status }}</span></td>
+            <th>Constraint ID</th>
+            <th>Source</th>
+            <th>Constraint</th>
+            <th>Enforcement</th>
+            <th>Status</th>
           </tr>
-        }
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          @for (item of constraints(); track item.id) {
+            <tr>
+              <td>{{ item.constraintId }}</td>
+              <td>{{ item.sourceRef }}</td>
+              <td>{{ item.constraint }}</td>
+              <td>{{ item.enforcementMechanism }}</td>
+              <td><span class="badge badge--{{ statusClass(item.status) }}">{{ item.status }}</span></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
   </section>
 </section>

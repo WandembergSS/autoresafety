@@ -1,60 +1,435 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { EMPTY, catchError, finalize, switchMap, tap } from 'rxjs';
+import { AiAssistantService } from '../../services/ai-assistant.service';
+
+import {
+  ConstraintSourceOption,
+  ControllerConstraint,
+  ControllerConstraintsPageComponent
+} from '../controller-constraints-page/controller-constraints-page.component';
+import {
+  ProjectService,
+  StepFourControlActionCatalogItem,
+  StepFourHazardCatalogItem,
+  StepFourProjectInformation,
+  StepFourProjectUpdatePayload,
+  StepFourResponsibilityCatalogItem
+} from '../../services/project.service';
 
 export type UcaCategory = 'Not provided' | 'Provided incorrectly' | 'Incorrect timing' | 'Stopped too soon / applied too long';
 
 interface UnsafeControlAction {
   id: number;
+  ref: string;
+  controlActionRef?: string;
+  sourceActor: string;
+  targetActor: string;
   controller: string;
   controlAction: string;
-  hazard: string;
+  controlledProcess: string;
+  responsibilityId?: string;
+  safetyConstraintId?: string;
+  responsibility: string;
+  safetyConstraint: string;
+  hazard: string[];
   category: UcaCategory;
+  context: string;
+  consequence: string;
+  rationale: string;
+}
+
+interface HazardousCondition {
+  id: number;
+  ref: string;
+  responsibilityId?: string;
+  safetyConstraintId?: string;
+  responsibility: string;
+  safetyConstraint: string;
+  description: string;
+  linkedHazards: string[];
+  coverageGap: string;
+}
+
+interface ControlActionOption {
+  ref: string;
+  sourceActor: string;
+  targetActor: string;
+  controller: string;
+  controlAction: string;
+  controlledProcess: string;
+}
+
+interface ResponsibilityOption {
+  responsibilityId: string;
+  safetyConstraintId: string;
+  responsibility: string;
+  safetyConstraint: string;
+}
+
+interface StepFourAiDraft {
+  unsafeControlActions?: Array<{
+    controlActionRef?: string;
+    category?: string;
+    context?: string;
+    consequence?: string;
+    rationale?: string;
+    hazards?: string[];
+    hazardRefs?: string[];
+    responsibility?: string;
+  }>;
+  hazardousConditions?: Array<{
+    description?: string;
+    linkedHazards?: string[];
+    linkedHazardRefs?: string[];
+    responsibility?: string;
+    coverageGap?: string;
+  }>;
+  controllerConstraints?: Array<{
+    sourceRef?: string;
+    hazardLinkage?: string;
+    responsibilityChain?: string;
+    constraint?: string;
+    enforcementMechanism?: string;
+    status?: string;
+  }>;
 }
 
 @Component({
   selector: 'app-ucas-page',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, ControllerConstraintsPageComponent],
   templateUrl: './ucas-page.component.html',
   styleUrl: './ucas-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class UcasPageComponent {
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly projectService = inject(ProjectService);
+  private readonly aiAssistant = inject(AiAssistantService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly currentProjectId = signal<number | null>(null);
+  readonly isLoading = signal(false);
+  readonly isSavingStepFour = signal(false);
+  readonly isGeneratingStepFourAi = signal(false);
+  readonly loadError = signal<string | null>(null);
+  readonly stepFourSaveMessage = signal<string | null>(null);
+  readonly stepFourSaveError = signal<string | null>(null);
+  readonly isBpmnModelModalOpen = signal(false);
+  readonly controlActionCatalog = signal<ControlActionOption[]>([]);
+  readonly availableHazards = signal<StepFourHazardCatalogItem[]>([]);
+  readonly availableResponsibilities = signal<StepFourResponsibilityCatalogItem[]>([]);
+  readonly controllerConstraints = signal<ControllerConstraint[]>([]);
+  readonly nextUcaRefValue = signal('UCA-01');
+  readonly nextHcRefValue = signal('HC-01');
+  readonly nextConstraintIdValue = signal('C-01');
 
   readonly ucaForm = this.fb.group({
+    controlActionRef: ['', Validators.required],
+    sourceActor: ['', Validators.required],
+    targetActor: ['', Validators.required],
     controller: ['', Validators.required],
     controlAction: ['', Validators.required],
-    hazard: ['', Validators.required],
-    category: ['Not provided' as UcaCategory, Validators.required]
+    controlledProcess: ['', Validators.required],
+    hazardSelections: [[] as string[]],
+    additionalHazard: [''],
+    responsibility: ['', Validators.required],
+    safetyConstraint: ['', Validators.required],
+    category: ['Not provided' as UcaCategory, Validators.required],
+    context: ['', [Validators.required, Validators.minLength(12)]],
+    consequence: ['', [Validators.required, Validators.minLength(12)]],
+    rationale: ['', [Validators.required, Validators.minLength(12)]]
   });
 
-  private sequence = 4;
+  readonly hcForm = this.fb.group({
+    responsibility: [''],
+    safetyConstraint: [''],
+    description: ['', [Validators.required, Validators.minLength(12)]],
+    linkedHazards: [[] as string[]],
+    additionalHazard: [''],
+    coverageGap: ['', [Validators.required, Validators.minLength(12)]]
+  });
 
-  readonly ucas = signal<UnsafeControlAction[]>([
+  private sequence = 0;
+  private hcSequence = 0;
+
+  readonly categoryGuidance: ReadonlyArray<{
+    step: string;
+    category: UcaCategory;
+    prompt: string;
+    effect: string;
+  }> = [
     {
-      id: 1,
-      controller: 'Control Application',
-      controlAction: 'Release insulin delivery',
-      hazard: 'H-2 · Control application releases insulin when glucose level is high',
-      category: 'Provided incorrectly'
+      step: '4.2',
+      category: 'Not provided',
+      prompt: 'What becomes hazardous if the controller does not provide the action when the process needs it?',
+      effect: 'Missing control can leave the process in an unsafe state.'
     },
     {
-      id: 2,
-      controller: 'Continuous Glucose Monitor',
-      controlAction: 'Provide glucose reading',
-      hazard: 'H-5 · CGM does not provide a measure when glucose level is high',
-      category: 'Not provided'
+      step: '4.3',
+      category: 'Provided incorrectly',
+      prompt: 'What becomes hazardous if the controller provides the action in the wrong way or to the wrong target?',
+      effect: 'Incorrect execution can directly trigger a hazardous system state.'
     },
     {
-      id: 3,
-      controller: 'Insulin Pump',
-      controlAction: 'Deliver insulin bolus',
-      hazard: 'H-3 · Pump delivers insulin with a delayed response',
-      category: 'Incorrect timing'
+      step: '4.4',
+      category: 'Incorrect timing',
+      prompt: 'What becomes hazardous if the action is issued too early, too late, or out of sequence?',
+      effect: 'Unsafe timing can defeat assumptions built into the control loop.'
+    },
+    {
+      step: '4.5',
+      category: 'Stopped too soon / applied too long',
+      prompt: 'What becomes hazardous if the action stops early or persists beyond the safe duration?',
+      effect: 'Unsafe duration can accumulate into loss or hazard exposure.'
     }
+  ];
+
+  readonly ucas = signal<UnsafeControlAction[]>([]);
+
+  readonly hazardousConditions = signal<HazardousCondition[]>([]);
+
+  readonly hcDecision = signal<'yes' | 'no'>('no');
+
+  readonly totalUcas = computed(() => this.ucas().length);
+  readonly totalHazardousConditions = computed(() => this.hazardousConditions().length);
+  readonly hazardCatalog = computed(() =>
+    this.uniqueValues([
+      ...this.availableHazards().map((item) => item.label),
+      ...this.ucas().flatMap((item) => item.hazard),
+      ...this.hazardousConditions().flatMap((item) => item.linkedHazards)
+    ])
+  );
+  readonly responsibilityCatalog = computed<ResponsibilityOption[]>(() => {
+    return this.availableResponsibilities().map((item) => ({
+      responsibilityId: item.responsibilityId,
+      safetyConstraintId: item.safetyConstraintId,
+      responsibility: item.responsibilityLabel,
+      safetyConstraint: item.safetyConstraintLabel
+    }));
+  });
+  readonly constraintSources = computed<ConstraintSourceOption[]>(() => [
+    ...this.ucas().map((item) => ({
+      ref: item.ref,
+      summary: `${item.ref}: ${item.controlAction} from ${item.sourceActor} to ${item.targetActor}. ${item.context}`,
+      hazardLinkage: item.hazard.join(', '),
+      responsibilityChain: `${item.responsibility} -> ${item.safetyConstraint} -> ${item.hazard.join(', ')}`
+    })),
+    ...this.hazardousConditions().map((item) => ({
+      ref: item.ref,
+      summary: `${item.ref}: ${item.description}`,
+      hazardLinkage: item.linkedHazards.join(', '),
+      responsibilityChain: item.responsibility
+        ? `${item.responsibility} -> ${item.safetyConstraint || 'Safety Constraint to be defined'} -> ${item.linkedHazards.join(', ')}`
+        : `Hazard-only condition -> ${item.linkedHazards.join(', ')}`
+    }))
   ]);
+
+  readonly selectedCategoryGuidance = computed(() => {
+    const category = (this.ucaForm.controls.category.value ?? 'Not provided') as UcaCategory;
+    return this.categoryGuidance.find((item) => item.category === category) ?? this.categoryGuidance[0];
+  });
+
+  openBpmnModelModal(): void {
+    this.isBpmnModelModalOpen.set(true);
+  }
+
+  closeBpmnModelModal(): void {
+    this.isBpmnModelModalOpen.set(false);
+  }
+
+  generateStepFourWithAi(): void {
+    if (this.isGeneratingStepFourAi()) {
+      return;
+    }
+
+    if (this.controlActionCatalog().length === 0 || this.availableResponsibilities().length === 0) {
+      this.stepFourSaveMessage.set(null);
+      this.stepFourSaveError.set('Load the Step 4 catalogs before generating with AI.');
+      return;
+    }
+
+    const question = this.buildStepFourAiPrompt();
+    const context = JSON.stringify(
+      {
+        controlActions: this.controlActionCatalog(),
+        hazards: this.availableHazards(),
+        responsibilities: this.availableResponsibilities(),
+        currentData: {
+          unsafeControlActions: this.ucas(),
+          hazardousConditions: this.hazardousConditions(),
+          controllerConstraints: this.controllerConstraints()
+        }
+      },
+      null,
+      2
+    );
+
+    this.isGeneratingStepFourAi.set(true);
+    this.stepFourSaveMessage.set(null);
+    this.stepFourSaveError.set(null);
+
+    this.aiAssistant
+      .ask({ question, context })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.isGeneratingStepFourAi.set(false))
+      )
+      .subscribe({
+        next: (response) => {
+          const draft = this.parseStepFourAiDraft(response);
+          if (!draft) {
+            this.stepFourSaveError.set('AI returned an invalid Step 4 payload.');
+            return;
+          }
+
+          this.applyStepFourAiDraft(draft);
+          this.stepFourSaveMessage.set('AI proposal applied to Step 4. Review and save when ready.');
+        },
+        error: (error) => {
+          this.stepFourSaveMessage.set(null);
+          this.stepFourSaveError.set('Failed to generate Step 4 content with AI.');
+          console.error('Failed to generate Step 4 content via /api/ai/ask', error);
+        }
+      });
+  }
+
+  constructor() {
+    this.route.queryParamMap
+      .pipe(
+        tap(() => {
+          this.isLoading.set(true);
+          this.loadError.set(null);
+        }),
+        switchMap((params) => {
+          const projectIdParam = params.get('projectId');
+          const parsedProjectId = projectIdParam ? Number(projectIdParam) : null;
+          const projectId = parsedProjectId && !Number.isNaN(parsedProjectId) ? parsedProjectId : null;
+
+          this.currentProjectId.set(projectId);
+
+          if (!projectId) {
+            this.resetStepFourState();
+            this.isLoading.set(false);
+            return EMPTY;
+          }
+
+          return this.projectService.getStepFourInformation(projectId).pipe(
+            tap((response) => this.hydrateFromStepFourInformation(response)),
+            catchError((error) => {
+              console.error(
+                'Failed to fetch Step 4 information via GET /api/projects/step_four_project_information/{id}',
+                error
+              );
+              this.loadError.set('Failed to load Step 4 information for the selected project.');
+              this.resetStepFourState();
+              return EMPTY;
+            }),
+            tap(() => this.isLoading.set(false))
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe();
+  }
+
+  selectedControlActionDetails(): ControlActionOption | undefined {
+    const controlActionRef = this.ucaForm.controls.controlActionRef.value ?? '';
+    return this.controlActionCatalog().find((item) => item.ref === controlActionRef);
+  }
+
+  isControlActionSelected(): boolean {
+    const sourceActor = (this.ucaForm.get('sourceActor')?.value ?? '').trim();
+    const targetActor = (this.ucaForm.get('targetActor')?.value ?? '').trim();
+    const controller = (this.ucaForm.get('controller')?.value ?? '').trim();
+    const controlAction = (this.ucaForm.get('controlAction')?.value ?? '').trim();
+    const controlledProcess = (this.ucaForm.get('controlledProcess')?.value ?? '').trim();
+    return (
+      sourceActor.length > 0 &&
+      targetActor.length > 0 &&
+      controller.length > 0 &&
+      controlAction.length > 0 &&
+      controlledProcess.length > 0
+    );
+  }
+
+  readyForRecording(): boolean {
+    return (
+      this.isControlActionSelected() &&
+      this.collectHazards(
+        this.ucaForm.controls.hazardSelections.value,
+        this.ucaForm.controls.additionalHazard.value
+      ).length > 0 &&
+      !!(this.ucaForm.get('responsibility')?.value ?? '').trim() &&
+      !!(this.ucaForm.get('safetyConstraint')?.value ?? '').trim()
+    );
+  }
+
+  nextUcaRef(): string {
+    return this.nextUcaRefValue();
+  }
+
+  nextHcRef(): string {
+    return this.nextHcRefValue();
+  }
+
+  onControlActionSelected(controlActionRef: string): void {
+    const selectedControlAction = this.controlActionCatalog().find((item) => item.ref === controlActionRef);
+    if (!selectedControlAction) {
+      return;
+    }
+
+    this.ucaForm.patchValue({
+      controlActionRef,
+      sourceActor: selectedControlAction.sourceActor,
+      targetActor: selectedControlAction.targetActor,
+      controller: selectedControlAction.controller,
+      controlAction: selectedControlAction.controlAction,
+      controlledProcess: selectedControlAction.controlledProcess
+    });
+  }
+
+  onResponsibilitySelected(responsibility: string): void {
+    const match = this.responsibilityCatalog().find((item) => item.responsibility === responsibility);
+    this.ucaForm.patchValue({ safetyConstraint: match?.safetyConstraint ?? '' });
+  }
+
+  onHcResponsibilitySelected(responsibility: string): void {
+    const match = this.responsibilityCatalog().find((item) => item.responsibility === responsibility);
+    this.hcForm.patchValue({ safetyConstraint: match?.safetyConstraint ?? '' });
+  }
+
+  setHazardousConditionDecision(decision: 'yes' | 'no'): void {
+    this.hcDecision.set(decision);
+  }
+
+  categoryCount(category: UcaCategory): number {
+    return this.ucas().filter((item) => item.category === category).length;
+  }
+
+  previewStatement(): string {
+    if (!this.readyForRecording()) {
+      return 'Complete the control action definition and hazard traceability to generate the Step 4.6 UCA statement.';
+    }
+
+    const value = this.ucaForm.getRawValue();
+    const ref = this.nextUcaRefValue();
+    const sourceActor = (value.sourceActor ?? 'Source actor').trim();
+    const targetActor = (value.targetActor ?? 'Target actor').trim();
+    const controller = (value.controller ?? 'The controller').trim();
+    const controlAction = (value.controlAction ?? 'the control action').trim();
+    const context = (value.context ?? 'the identified context').trim();
+    const consequence = (value.consequence ?? 'the associated hazard').trim();
+    const category = (value.category ?? 'Not provided') as UcaCategory;
+
+    return `${ref}: ${sourceActor} -> ${targetActor}. ${controller} ${this.categoryVerb(category)} ${controlAction} when ${context}. This can lead to ${consequence}.`;
+  }
 
   addUca(): void {
     if (this.ucaForm.invalid) {
@@ -63,21 +438,649 @@ export class UcasPageComponent {
     }
 
     const value = this.ucaForm.getRawValue();
+    const nextRef = this.nextUcaRefValue();
     this.ucas.update((current) => [
       {
         id: ++this.sequence,
+        ref: nextRef,
+        controlActionRef: value.controlActionRef ?? '',
+        sourceActor: value.sourceActor ?? 'Source actor',
+        targetActor: value.targetActor ?? 'Target actor',
         controller: value.controller ?? 'Controller',
         controlAction: value.controlAction ?? 'Control action',
-        hazard: value.hazard ?? 'Hazard',
-        category: (value.category as UcaCategory) ?? 'Not provided'
+        controlledProcess: value.controlledProcess ?? 'Controlled process',
+        responsibilityId: this.findResponsibilityOption(value.responsibility ?? '')?.responsibilityId,
+        safetyConstraintId: this.findResponsibilityOption(value.responsibility ?? '')?.safetyConstraintId,
+        responsibility: value.responsibility ?? 'Responsibility pending refinement',
+        safetyConstraint: value.safetyConstraint ?? 'Safety constraint pending refinement',
+        hazard: this.collectHazards(value.hazardSelections, value.additionalHazard),
+        category: (value.category as UcaCategory) ?? 'Not provided',
+        context: value.context ?? 'Context pending refinement',
+        consequence: value.consequence ?? 'Consequence pending refinement',
+        rationale: value.rationale ?? 'Rationale pending refinement'
       },
       ...current
     ]);
 
-    this.ucaForm.reset({ category: 'Not provided' });
+    this.nextUcaRefValue.set(this.incrementPrefixedRef(nextRef, 'UCA'));
+
+    this.ucaForm.reset({
+      controlActionRef: '',
+      sourceActor: '',
+      targetActor: '',
+      controller: '',
+      controlAction: '',
+      controlledProcess: '',
+      hazardSelections: [],
+      additionalHazard: '',
+      responsibility: '',
+      safetyConstraint: '',
+      category: 'Not provided',
+      context: '',
+      consequence: '',
+      rationale: ''
+    });
+  }
+
+  addHazardousCondition(): void {
+    const linkedHazards = this.collectHazards(
+      this.hcForm.controls.linkedHazards.value,
+      this.hcForm.controls.additionalHazard.value
+    );
+
+    if (this.hcForm.invalid || linkedHazards.length === 0) {
+      this.hcForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.hcForm.getRawValue();
+    const nextRef = this.nextHcRefValue();
+    this.hazardousConditions.update((current) => [
+      {
+        id: ++this.hcSequence,
+        ref: nextRef,
+        responsibilityId: this.findResponsibilityOption(value.responsibility ?? '')?.responsibilityId,
+        safetyConstraintId: this.findResponsibilityOption(value.responsibility ?? '')?.safetyConstraintId,
+        responsibility: value.responsibility ?? 'Responsibility pending refinement',
+        safetyConstraint: value.safetyConstraint ?? 'Safety constraint pending refinement',
+        description: value.description ?? 'Hazardous condition pending refinement',
+        linkedHazards,
+        coverageGap: value.coverageGap ?? 'Coverage gap pending refinement'
+      },
+      ...current
+    ]);
+
+    this.nextHcRefValue.set(this.incrementPrefixedRef(nextRef, 'HC'));
+
+    this.hcForm.reset({
+      responsibility: '',
+      safetyConstraint: '',
+      description: '',
+      linkedHazards: [],
+      additionalHazard: '',
+      coverageGap: ''
+    });
+  }
+
+  onControllerConstraintsChange(constraints: ControllerConstraint[]): void {
+    this.controllerConstraints.set(constraints);
+  }
+
+  saveStepFour(continueAfterSave = false): void {
+    const projectId = this.currentProjectId();
+
+    if (!projectId || projectId <= 0) {
+      this.stepFourSaveMessage.set(null);
+      this.stepFourSaveError.set('Missing valid project id. Step 4 cannot be saved.');
+      console.warn('Missing projectId; cannot save Step 4 information.');
+      return;
+    }
+
+    if (this.isSavingStepFour()) {
+      return;
+    }
+
+    this.stepFourSaveMessage.set(null);
+    this.stepFourSaveError.set(null);
+
+    const payload: StepFourProjectUpdatePayload = {
+      id: projectId,
+      step4Information: {
+        unsafeControlActions: this.buildStepFourUcasPayload(),
+        hazardousConditions: this.buildStepFourHazardousConditionsPayload(),
+        controllerConstraints: this.buildStepFourControllerConstraintsPayload()
+      }
+    };
+
+    this.isSavingStepFour.set(true);
+
+    this.projectService
+      .updateStepFourInformation(payload)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.isSavingStepFour.set(false))
+      )
+      .subscribe({
+        next: (response) => {
+          this.hydrateFromStepFourInformation(response);
+          this.stepFourSaveError.set(null);
+          this.stepFourSaveMessage.set(
+            continueAfterSave ? 'Step 4 saved. Opening the next step.' : 'Step 4 saved successfully.'
+          );
+
+          if (continueAfterSave) {
+            this.router.navigate(['/loss-scenarios'], { queryParams: { projectId } });
+          }
+        },
+        error: (error) => {
+          this.stepFourSaveMessage.set(null);
+          this.stepFourSaveError.set(this.getStepFourSaveErrorMessage(error));
+          console.error(
+            'Failed to update Step 4 information via POST /api/projects/step_four_project_update',
+            error
+          );
+        }
+      });
   }
 
   categoryClass(category: UcaCategory): string {
     return category.replace(/\s+|\//g, '-').toLowerCase();
+  }
+
+  private formatUcaRef(id: number): string {
+    return `UCA-${String(id).padStart(2, '0')}`;
+  }
+
+  private formatHcRef(id: number): string {
+    return `HC-${String(id).padStart(2, '0')}`;
+  }
+
+  private collectHazards(selectedHazards: string[] | null | undefined, additionalHazard: string | null | undefined): string[] {
+    const merged = [
+      ...(selectedHazards ?? []).filter((item) => item.trim().length > 0),
+      ...(additionalHazard?.trim() ? [additionalHazard.trim()] : [])
+    ];
+
+    return this.uniqueValues(merged);
+  }
+
+  private uniqueValues(values: string[]): string[] {
+    return Array.from(new Set(values.filter((item) => item.trim().length > 0)));
+  }
+
+  private categoryVerb(category: UcaCategory): string {
+    switch (category) {
+      case 'Not provided':
+        return 'does not provide';
+      case 'Provided incorrectly':
+        return 'provides';
+      case 'Incorrect timing':
+        return 'provides';
+      case 'Stopped too soon / applied too long':
+        return 'stops or sustains';
+      default:
+        return 'provides';
+    }
+  }
+
+  private hydrateFromStepFourInformation(response: StepFourProjectInformation): void {
+    const hazardLabelMap = new Map(response.catalogs.hazards.map((item) => [item.code, item.label]));
+    const responsibilityMap = new Map(
+      response.catalogs.responsibilities.map((item) => [
+        item.responsibilityId,
+        {
+          responsibility: item.responsibilityLabel,
+          safetyConstraint: item.safetyConstraintLabel,
+          safetyConstraintId: item.safetyConstraintId
+        }
+      ])
+    );
+
+    this.controlActionCatalog.set(response.catalogs.controlActions ?? []);
+    this.availableHazards.set(response.catalogs.hazards ?? []);
+    this.availableResponsibilities.set(response.catalogs.responsibilities ?? []);
+    this.controllerConstraints.set(response.currentData.controllerConstraints ?? []);
+
+    this.ucas.set(
+      (response.currentData.unsafeControlActions ?? []).map((item) => ({
+        id: item.id,
+        ref: item.ref,
+        controlActionRef: item.controlActionRef,
+        sourceActor: item.sourceActor,
+        targetActor: item.targetActor,
+        controller: item.controller,
+        controlAction: item.controlAction,
+        controlledProcess: item.controlledProcess,
+        responsibilityId: item.responsibilityId,
+        safetyConstraintId: item.safetyConstraintId,
+        responsibility: responsibilityMap.get(item.responsibilityId)?.responsibility || 'Responsibility pending refinement',
+        safetyConstraint: responsibilityMap.get(item.responsibilityId)?.safetyConstraint || 'Safety constraint pending refinement',
+        hazard: (item.hazardRefs ?? []).map((hazardRef) => hazardLabelMap.get(hazardRef) || hazardRef),
+        category: item.category,
+        context: item.context,
+        consequence: item.consequence,
+        rationale: item.rationale
+      }))
+    );
+
+    this.hazardousConditions.set(
+      (response.currentData.hazardousConditions ?? []).map((item) => ({
+        id: item.id,
+        ref: item.ref,
+        responsibilityId: item.responsibilityId,
+        safetyConstraintId: item.safetyConstraintId,
+        responsibility: responsibilityMap.get(item.responsibilityId)?.responsibility || '',
+        safetyConstraint: responsibilityMap.get(item.responsibilityId)?.safetyConstraint || '',
+        description: item.description,
+        linkedHazards: (item.linkedHazardRefs ?? []).map((hazardRef) => hazardLabelMap.get(hazardRef) || hazardRef),
+        coverageGap: item.coverageGap
+      }))
+    );
+
+    this.sequence = this.ucas().reduce((maxId, item) => Math.max(maxId, item.id), 0);
+    this.hcSequence = this.hazardousConditions().reduce((maxId, item) => Math.max(maxId, item.id), 0);
+    this.nextUcaRefValue.set(response.defaults.nextUcaRef || 'UCA-01');
+    this.nextHcRefValue.set(response.defaults.nextHcRef || 'HC-01');
+    this.nextConstraintIdValue.set(response.defaults.nextConstraintId || 'C-01');
+    this.hcDecision.set(this.hazardousConditions().length > 0 ? 'yes' : 'no');
+  }
+
+  private resetStepFourState(): void {
+    this.currentProjectId.set(null);
+    this.controlActionCatalog.set([]);
+    this.availableHazards.set([]);
+    this.availableResponsibilities.set([]);
+    this.controllerConstraints.set([]);
+    this.ucas.set([]);
+    this.hazardousConditions.set([]);
+    this.sequence = 0;
+    this.hcSequence = 0;
+    this.hcDecision.set('no');
+    this.nextUcaRefValue.set('UCA-01');
+    this.nextHcRefValue.set('HC-01');
+    this.nextConstraintIdValue.set('C-01');
+    this.stepFourSaveMessage.set(null);
+    this.stepFourSaveError.set(null);
+    this.ucaForm.reset({
+      controlActionRef: '',
+      sourceActor: '',
+      targetActor: '',
+      controller: '',
+      controlAction: '',
+      controlledProcess: '',
+      hazardSelections: [],
+      additionalHazard: '',
+      responsibility: '',
+      safetyConstraint: '',
+      category: 'Not provided',
+      context: '',
+      consequence: '',
+      rationale: ''
+    });
+    this.hcForm.reset({
+      responsibility: '',
+      safetyConstraint: '',
+      description: '',
+      linkedHazards: [],
+      additionalHazard: '',
+      coverageGap: ''
+    });
+  }
+
+  private findResponsibilityOption(responsibility: string): ResponsibilityOption | undefined {
+    return this.responsibilityCatalog().find((item) => item.responsibility === responsibility);
+  }
+
+  private incrementPrefixedRef(ref: string, prefix: string): string {
+    const match = ref.match(new RegExp(`${prefix}-(\\d+)`, 'i'));
+    const value = match ? Number(match[1]) + 1 : 1;
+    return `${prefix}-${String(value).padStart(2, '0')}`;
+  }
+
+  private buildStepFourUcasPayload() {
+    const hazardCodeByLabel = new Map(this.availableHazards().map((item) => [item.label, item.code]));
+
+    return this.ucas().map((item) => ({
+      id: item.id,
+      ref: item.ref,
+      controlActionRef: item.controlActionRef ?? '',
+      sourceActor: item.sourceActor,
+      targetActor: item.targetActor,
+      controller: item.controller,
+      controlAction: item.controlAction,
+      controlledProcess: item.controlledProcess,
+      category: item.category,
+      context: item.context,
+      consequence: item.consequence,
+      rationale: item.rationale,
+      hazardRefs: item.hazard.map((hazard) => hazardCodeByLabel.get(hazard) ?? hazard),
+      responsibilityId: item.responsibilityId ?? '',
+      safetyConstraintId: item.safetyConstraintId ?? ''
+    }));
+  }
+
+  private buildStepFourHazardousConditionsPayload() {
+    const hazardCodeByLabel = new Map(this.availableHazards().map((item) => [item.label, item.code]));
+
+    return this.hazardousConditions().map((item) => ({
+      id: item.id,
+      ref: item.ref,
+      description: item.description,
+      linkedHazardRefs: item.linkedHazards.map((hazard) => hazardCodeByLabel.get(hazard) ?? hazard),
+      responsibilityId: item.responsibilityId ?? '',
+      safetyConstraintId: item.safetyConstraintId ?? '',
+      coverageGap: item.coverageGap
+    }));
+  }
+
+  private buildStepFourControllerConstraintsPayload() {
+    return this.controllerConstraints().map((item) => ({
+      id: item.id,
+      constraintId: item.constraintId,
+      sourceRef: item.sourceRef,
+      hazardLinkage: item.hazardLinkage,
+      responsibilityChain: item.responsibilityChain,
+      constraint: item.constraint,
+      enforcementMechanism: item.enforcementMechanism,
+      status: item.status
+    }));
+  }
+
+  private getStepFourSaveErrorMessage(error: unknown): string {
+    const status = typeof error === 'object' && error !== null && 'status' in error ? Number(error['status']) : undefined;
+
+    if (status === 404) {
+      return 'Project not found. The backend returned 404 while saving Step 4.';
+    }
+
+    if (status === 400) {
+      return 'Failed to save Step 4. The backend rejected the step4Information payload.';
+    }
+
+    if (status && status >= 400) {
+      return `Failed to save Step 4. The backend returned status ${status}.`;
+    }
+
+    return 'Failed to save Step 4 due to an unexpected error.';
+  }
+
+  private buildStepFourAiPrompt(): string {
+    return `You are generating a complete Step 4 STPA analysis draft.
+
+Return JSON only. Do not include markdown fences or commentary.
+
+Return an object with this exact shape:
+{
+  "unsafeControlActions": [{
+    "controlActionRef": "CA-01",
+    "category": "Not provided",
+    "context": "",
+    "consequence": "",
+    "rationale": "",
+    "hazards": ["H1 - label"],
+    "responsibility": "R1 - label"
+  }],
+  "hazardousConditions": [{
+    "description": "",
+    "linkedHazards": ["H1 - label"],
+    "responsibility": "R1 - label",
+    "coverageGap": ""
+  }],
+  "controllerConstraints": [{
+    "sourceRef": "UCA-01",
+    "constraint": "",
+    "enforcementMechanism": "",
+    "status": "Draft"
+  }]
+}
+
+Rules:
+- Use only controlActionRef values from the provided controlActions catalog.
+- Use only hazards from the provided hazards catalog, either by label or code.
+- Use only responsibility labels from the provided responsibilities catalog.
+- Categories must be one of: Not provided, Provided incorrectly, Incorrect timing, Stopped too soon / applied too long.
+- Generate a concise but complete set of UCAs, hazardous conditions, and controller constraints.
+- Preserve valid existing currentData when possible and fill missing analysis data.
+- Avoid duplicates.`;
+  }
+
+  private parseStepFourAiDraft(response: unknown): StepFourAiDraft | null {
+    const parsed = this.parseAiJsonResponse(response);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    return parsed as StepFourAiDraft;
+  }
+
+  private applyStepFourAiDraft(draft: StepFourAiDraft): void {
+    const controlActionMap = new Map(this.controlActionCatalog().map((item) => [item.ref, item]));
+    const hazardLabelByCode = new Map(this.availableHazards().map((item) => [item.code, item.label]));
+    const hazardLabelSet = new Set(this.availableHazards().map((item) => item.label));
+    const responsibilityByLabel = new Map(this.responsibilityCatalog().map((item) => [item.responsibility, item]));
+    const allowedCategories = new Set<UcaCategory>([
+      'Not provided',
+      'Provided incorrectly',
+      'Incorrect timing',
+      'Stopped too soon / applied too long'
+    ]);
+
+    let nextUcaId = 0;
+    const normalizedUcas = (draft.unsafeControlActions ?? [])
+      .map((item) => {
+        const controlActionRef = (item.controlActionRef ?? '').trim();
+        const controlAction = controlActionMap.get(controlActionRef);
+        const responsibility = responsibilityByLabel.get((item.responsibility ?? '').trim());
+        const hazards = this.uniqueValues(
+          [...(item.hazards ?? []), ...(item.hazardRefs ?? [])].map((hazard) => hazardLabelByCode.get(hazard) ?? hazard)
+        ).filter((hazard) => hazardLabelSet.has(hazard));
+
+        if (!controlAction || !responsibility || hazards.length === 0) {
+          return null;
+        }
+
+        const category = allowedCategories.has(item.category as UcaCategory)
+          ? (item.category as UcaCategory)
+          : 'Not provided';
+
+        nextUcaId += 1;
+        return {
+          id: nextUcaId,
+          ref: this.formatUcaRef(nextUcaId),
+          controlActionRef,
+          sourceActor: controlAction.sourceActor,
+          targetActor: controlAction.targetActor,
+          controller: controlAction.controller,
+          controlAction: controlAction.controlAction,
+          controlledProcess: controlAction.controlledProcess,
+          responsibilityId: responsibility.responsibilityId,
+          safetyConstraintId: responsibility.safetyConstraintId,
+          responsibility: responsibility.responsibility,
+          safetyConstraint: responsibility.safetyConstraint,
+          hazard: hazards,
+          category,
+          context: (item.context ?? '').trim(),
+          consequence: (item.consequence ?? '').trim(),
+          rationale: (item.rationale ?? '').trim()
+        } as UnsafeControlAction;
+      })
+      .filter((item): item is UnsafeControlAction => !!item)
+      .filter((item, index, items) => items.findIndex((candidate) => candidate.controlActionRef === item.controlActionRef && candidate.category === item.category) === index);
+
+    let nextHcId = 0;
+    const normalizedHazardousConditions = (draft.hazardousConditions ?? [])
+      .map((item) => {
+        const responsibility = responsibilityByLabel.get((item.responsibility ?? '').trim());
+        const linkedHazards = this.uniqueValues(
+          [...(item.linkedHazards ?? []), ...(item.linkedHazardRefs ?? [])].map((hazard) => hazardLabelByCode.get(hazard) ?? hazard)
+        ).filter((hazard) => hazardLabelSet.has(hazard));
+
+        if (!responsibility || linkedHazards.length === 0 || !(item.description ?? '').trim()) {
+          return null;
+        }
+
+        nextHcId += 1;
+        return {
+          id: nextHcId,
+          ref: this.formatHcRef(nextHcId),
+          responsibilityId: responsibility.responsibilityId,
+          safetyConstraintId: responsibility.safetyConstraintId,
+          responsibility: responsibility.responsibility,
+          safetyConstraint: responsibility.safetyConstraint,
+          description: (item.description ?? '').trim(),
+          linkedHazards,
+          coverageGap: (item.coverageGap ?? '').trim()
+        } as HazardousCondition;
+      })
+      .filter((item): item is HazardousCondition => !!item);
+
+    const sourceEntries: Array<[string, ConstraintSourceOption]> = [
+      ...normalizedUcas.map(
+        (item): [string, ConstraintSourceOption] => [
+          item.ref,
+          {
+            ref: item.ref,
+            summary: `${item.ref}: ${item.controlAction} from ${item.sourceActor} to ${item.targetActor}. ${item.context}`,
+            hazardLinkage: item.hazard.join(', '),
+            responsibilityChain: `${item.responsibility} -> ${item.safetyConstraint} -> ${item.hazard.join(', ')}`
+          }
+        ]
+      ),
+      ...normalizedHazardousConditions.map(
+        (item): [string, ConstraintSourceOption] => [
+          item.ref,
+          {
+            ref: item.ref,
+            summary: `${item.ref}: ${item.description}`,
+            hazardLinkage: item.linkedHazards.join(', '),
+            responsibilityChain: `${item.responsibility} -> ${item.safetyConstraint} -> ${item.linkedHazards.join(', ')}`
+          }
+        ]
+      )
+    ];
+    const sourceMap = new Map<string, ConstraintSourceOption>(sourceEntries);
+
+    const allowedStatuses = new Set<ControllerConstraint['status']>(['Draft', 'Approved', 'Pending Review']);
+    let nextConstraintId = 0;
+    let normalizedConstraints = (draft.controllerConstraints ?? [])
+      .map((item) => {
+        const sourceRef = (item.sourceRef ?? '').trim();
+        const source = sourceMap.get(sourceRef);
+        const constraint = (item.constraint ?? '').trim();
+        const enforcementMechanism = (item.enforcementMechanism ?? '').trim();
+        if (!source || !constraint || !enforcementMechanism) {
+          return null;
+        }
+
+        nextConstraintId += 1;
+        return {
+          id: nextConstraintId,
+          constraintId: `C-${String(nextConstraintId).padStart(2, '0')}`,
+          sourceRef,
+          hazardLinkage: (item.hazardLinkage ?? '').trim() || source.hazardLinkage,
+          responsibilityChain: (item.responsibilityChain ?? '').trim() || source.responsibilityChain,
+          constraint,
+          enforcementMechanism,
+          status: allowedStatuses.has(item.status as ControllerConstraint['status'])
+            ? (item.status as ControllerConstraint['status'])
+            : 'Draft'
+        } as ControllerConstraint;
+      })
+      .filter((item): item is ControllerConstraint => !!item);
+
+    if (normalizedConstraints.length === 0) {
+      normalizedConstraints = Array.from(sourceMap.values()).map((source, index) => ({
+        id: index + 1,
+        constraintId: `C-${String(index + 1).padStart(2, '0')}`,
+        sourceRef: source.ref,
+        hazardLinkage: source.hazardLinkage,
+        responsibilityChain: source.responsibilityChain,
+        constraint: `Ensure ${source.ref} is constrained so the associated hazards are prevented or mitigated.`,
+        enforcementMechanism: 'Controller logic, monitoring, and review workflow.',
+        status: 'Draft' as const
+      }));
+    }
+
+    this.ucas.set(normalizedUcas);
+    this.hazardousConditions.set(normalizedHazardousConditions);
+    this.controllerConstraints.set(normalizedConstraints);
+    this.sequence = normalizedUcas.length;
+    this.hcSequence = normalizedHazardousConditions.length;
+    this.nextUcaRefValue.set(this.formatUcaRef(normalizedUcas.length + 1));
+    this.nextHcRefValue.set(this.formatHcRef(normalizedHazardousConditions.length + 1));
+    this.nextConstraintIdValue.set(`C-${String(normalizedConstraints.length + 1).padStart(2, '0')}`);
+    this.hcDecision.set(normalizedHazardousConditions.length > 0 ? 'yes' : 'no');
+  }
+
+  private parseAiJsonResponse(response: unknown): unknown {
+    if (response && typeof response === 'object' && !Array.isArray(response)) {
+      return response;
+    }
+
+    const text = this.extractAiResponseText(response);
+    if (!text) {
+      return null;
+    }
+
+    const normalized = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+
+    const candidates = [normalized];
+    const objectMatch = normalized.match(/\{[\s\S]*\}/);
+    if (objectMatch) {
+      candidates.push(objectMatch[0]);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        return JSON.parse(candidate) as unknown;
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  private extractAiResponseText(response: unknown): string {
+    if (typeof response === 'string') {
+      return response.trim();
+    }
+
+    if (!response || typeof response !== 'object') {
+      return '';
+    }
+
+    const anyResponse = response as Record<string, unknown>;
+    const directFields = ['answer', 'response', 'text', 'content', 'message', 'result'];
+
+    for (const key of directFields) {
+      const value = anyResponse[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value.trim();
+      }
+    }
+
+    const choices = anyResponse['choices'];
+    if (Array.isArray(choices) && choices.length > 0) {
+      const first = choices[0] as Record<string, unknown> | undefined;
+      if (first) {
+        const message = first['message'] as Record<string, unknown> | undefined;
+        const messageContent = message?.['content'];
+        if (typeof messageContent === 'string' && messageContent.trim()) {
+          return messageContent.trim();
+        }
+
+        const text = first['text'];
+        if (typeof text === 'string' && text.trim()) {
+          return text.trim();
+        }
+      }
+    }
+
+    return '';
   }
 }

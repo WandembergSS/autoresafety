@@ -23,7 +23,7 @@ import { AuthService } from './services/auth.service';
 })
 export class AppComponent {
   readonly appTitle = 'AutoReSafety';
-  readonly appSubtitle = '7-Step ReSafety Workflow';
+  readonly appSubtitle = '6-Step ReSafety Workflow';
   readonly navOpen = signal(false);
   readonly isNavigating = signal(false);
   readonly currentUrl = signal('');
@@ -66,23 +66,23 @@ export class AppComponent {
         },
         {
           path: '/ucas',
-          label: 'Step 4 · Unsafe Control Actions',
-          description: 'Evaluate STPA contexts for each control action'
-        },
-        {
-          path: '/controller-constraints',
-          label: 'Step 5 · Controller Constraints',
-          description: 'Invert UCAs into enforceable controller behaviour'
+          label: 'Step 4 · Unsafe Control Actions & Hazardous Conditions',
+          description: 'Evaluate STPA contexts and map unsafe conditions to hazards'
         },
         {
           path: '/loss-scenarios',
-          label: 'Step 6 · Loss Scenarios & Safety Requirements',
+          label: 'Step 5 · Loss Scenarios & Safety Requirements',
           description: 'Assess causal scenarios and derive mitigations'
         },
         {
           path: '/model-update',
-          label: 'Step 7 · Update iStar4Safety Models',
+          label: 'Step 6 · Update iStar4Safety Models',
           description: 'Close the loop by syncing models and evidence'
+        },
+        {
+          path: '/resafety-artifacts',
+          label: 'Artifacts',
+          description: 'Download ReSafety artifacts from the full project payload'
         }
       ]
     }

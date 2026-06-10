@@ -1,10 +1,20 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
-interface ControllerConstraint {
+export interface ConstraintSourceOption {
+  ref: string;
+  summary: string;
+  hazardLinkage: string;
+  responsibilityChain: string;
+}
+
+export interface ControllerConstraint {
   id: number;
-  ucaRef: string;
+  constraintId: string;
+  sourceRef: string;
+  hazardLinkage: string;
+  responsibilityChain: string;
   constraint: string;
   enforcementMechanism: string;
   status: 'Draft' | 'Approved' | 'Pending Review';
@@ -20,42 +30,79 @@ interface ControllerConstraint {
 })
 export class ControllerConstraintsPageComponent {
   private readonly fb = inject(FormBuilder);
+  readonly embedded = input(false);
+  readonly analysisSources = input<ReadonlyArray<ConstraintSourceOption>>([]);
+  readonly initialConstraints = input<ReadonlyArray<ControllerConstraint>>([]);
+  readonly initialNextConstraintId = input('C-01');
+  readonly constraintsChange = output<ControllerConstraint[]>();
+
+  private sequence = 0;
 
   readonly constraintForm = this.fb.group({
-    ucaRef: ['', Validators.required],
+    analysisCompleted: [false, Validators.requiredTrue],
+    sourceRef: ['', Validators.required],
+    constraintId: ['C-01', Validators.required],
+    hazardLinkage: ['', Validators.required],
+    responsibilityChain: ['', [Validators.required, Validators.minLength(12)]],
     constraint: ['', [Validators.required, Validators.minLength(10)]],
     enforcementMechanism: ['', Validators.required],
     status: ['Draft' as ControllerConstraint['status'], Validators.required]
   });
 
-  private sequence = 3;
+  readonly constraints = signal<ControllerConstraint[]>([]);
 
-  readonly constraints = signal<ControllerConstraint[]>([
-    {
-      id: 1,
-      ucaRef: 'UCA-Saf-1',
-      constraint:
-        'The control application shall not release insulin when the CGM reports glucose above the high threshold.',
-      enforcementMechanism: 'Runtime guard within dosing supervisor',
-      status: 'Approved'
-    },
-    {
-      id: 2,
-      ucaRef: 'UCA-Saf-5',
-      constraint:
-        'The CGM shall provide a validated glucose sample to the control application within 5 seconds of each reading.',
-      enforcementMechanism: 'Sensor firmware timing watchdog',
-      status: 'Pending Review'
-    },
-    {
-      id: 3,
-      ucaRef: 'UCA-Saf-9',
-      constraint:
-        'The insulin pump shall complete a commanded infusion before accepting a stop signal from the control application.',
-      enforcementMechanism: 'Pump firmware state machine guard',
-      status: 'Draft'
+  constructor() {
+    effect(() => {
+      const initialConstraints = [...this.initialConstraints()];
+      const nextConstraintId = this.initialNextConstraintId() || 'C-01';
+
+      this.constraints.set(initialConstraints);
+      this.sequence = initialConstraints.reduce((maxId, item) => Math.max(maxId, item.id), 0);
+
+      this.constraintForm.patchValue({
+        constraintId: nextConstraintId
+      });
+    });
+
+    effect(() => {
+      this.constraintsChange.emit(this.constraints());
+    });
+  }
+
+  isAnalysisCompleted(): boolean {
+    return this.constraintForm.controls.analysisCompleted.value ?? false;
+  }
+
+  approvedCount(): number {
+    return this.constraints().filter((item) => item.status === 'Approved').length;
+  }
+
+  pendingReviewCount(): number {
+    return this.constraints().filter((item) => item.status === 'Pending Review').length;
+  }
+
+  nextConstraintId(): string {
+    return this.constraintForm.controls.constraintId.value || this.initialNextConstraintId() || this.formatConstraintId(this.sequence + 1);
+  }
+
+  selectedSourceSummary(): string {
+    const ref = this.constraintForm.controls.sourceRef.value ?? '';
+    return this.analysisSources().find((item) => item.ref === ref)?.summary ?? 'Select a UCA or HC to load its diagnostic summary.';
+  }
+
+  onSourceRefChange(sourceRef: string): void {
+    const selectedSource = this.analysisSources().find((item) => item.ref === sourceRef);
+    if (!selectedSource) {
+      return;
     }
-  ]);
+
+    this.constraintForm.patchValue({
+      sourceRef,
+      hazardLinkage: selectedSource.hazardLinkage,
+      responsibilityChain: selectedSource.responsibilityChain,
+      constraintId: this.constraintForm.controls.constraintId.value || this.nextConstraintId()
+    });
+  }
 
   addConstraint(): void {
     if (this.constraintForm.invalid) {
@@ -67,7 +114,10 @@ export class ControllerConstraintsPageComponent {
     this.constraints.update((current) => [
       {
         id: ++this.sequence,
-        ucaRef: value.ucaRef ?? 'UCA-XX',
+        constraintId: value.constraintId ?? this.formatConstraintId(this.sequence),
+        sourceRef: value.sourceRef ?? 'UCA-XX',
+        hazardLinkage: value.hazardLinkage ?? 'Hazard linkage pending refinement',
+        responsibilityChain: value.responsibilityChain ?? 'Responsibility chain pending refinement',
         constraint: value.constraint ?? 'Constraint pending refinement',
         enforcementMechanism: value.enforcementMechanism ?? 'Mechanism TBD',
         status: (value.status as ControllerConstraint['status']) ?? 'Draft'
@@ -75,10 +125,23 @@ export class ControllerConstraintsPageComponent {
       ...current
     ]);
 
-    this.constraintForm.reset({ status: 'Draft' });
+    this.constraintForm.reset({
+      analysisCompleted: false,
+      sourceRef: '',
+      constraintId: this.formatConstraintId(this.sequence + 1),
+      hazardLinkage: '',
+      responsibilityChain: '',
+      constraint: '',
+      enforcementMechanism: '',
+      status: 'Draft'
+    });
   }
 
   statusClass(status: ControllerConstraint['status']): string {
     return status.toLowerCase().replace(/\s+/g, '-');
+  }
+
+  private formatConstraintId(id: number): string {
+    return `C-${String(id).padStart(2, '0')}`;
   }
 }

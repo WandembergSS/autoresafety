@@ -1,162 +1,441 @@
 <section class="page-header">
-  <p class="step">Step 7</p>
-  <h2>Update iStar4Safety Models</h2>
-  <p>Synchronise model changes with validation artefacts and keep stakeholders aligned on delivery.</p>
-</section>
-
-<section class="dashboard">
-  <div class="stat-grid">
-    @for (card of changeBreakdown(); track card.label) {
-      <article class="stat-card stat-card--{{ card.tone }}">
-        <h3>{{ card.label }}</h3>
-        <p class="stat-card__value">{{ card.value }}</p>
-      </article>
-    }
+  <p class="step">Step 6</p>
+  <div class="page-header__title-row">
+    <h2>Update iStar4Safety Models</h2>
+    <button type="button" class="button button--ai" [disabled]="isGeneratingStepSixAi()" (click)="generateStepSixWithAi()">
+      {{ isGeneratingStepSixAi() ? 'Generating...' : '🤖 Generate with AI' }}
+    </button>
   </div>
-  <article class="gauge">
-    <h3>Validation readiness</h3>
-    <p>{{ readinessScore() }}% tasks completed</p>
-    <div class="gauge__bar">
-      <div class="gauge__fill" [style.width.%]="readinessScore()"></div>
-    </div>
-    <span class="gauge__hint">Close tasks to unlock the next release gate.</span>
-  </article>
-</section>
-
-<section class="change-form">
-  <h3>Log a model update</h3>
-  <form [formGroup]="changeForm" (ngSubmit)="addChange()">
-    <div class="form-grid">
-      <label>
-        Model area
-        <input type="text" formControlName="area" placeholder="Subsystem or diagram" />
-      </label>
-      <label>
-        Driver
-        <input type="text" formControlName="driver" placeholder="Link to UCA, scenario or requirement" />
-      </label>
-      <label class="full">
-        Description
-        <textarea formControlName="change" rows="2" placeholder="Summarise the change"></textarea>
-      </label>
-      <label class="full">
-        Impact analysis
-        <textarea formControlName="impact" rows="2" placeholder="How does this affect stakeholders?"></textarea>
-      </label>
-      <label class="full">
-        Evidence references
-        <input type="text" formControlName="evidence" placeholder="Comma-separated artefacts" />
-      </label>
-    </div>
-    <button type="submit" class="primary">Add update</button>
-  </form>
-</section>
-
-<section>
-  <div class="section-heading">
-    <h3>Model change log</h3>
-    <p>Keep an auditable record of model revisions linked back to safety insights.</p>
+  <p>
+    Inject the Step 4 and Step 5 safety reasoning into the SR model, switch between SR and SD views, and run the
+    final structural verification before releasing the model set.
+  </p>
+  <div class="bpmn-preview-inline">
+    <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+    <button
+      type="button"
+      class="bpmn-preview-thumb"
+      (click)="openBpmnModelModal()"
+      aria-label="Open BPMN model preview"
+    >
+      <img src="/assets/step-6-bpmn.png" alt="Small preview of the Step 6 BPMN model" />
+    </button>
   </div>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Area</th>
-        <th>Change</th>
-        <th>Driver</th>
-        <th>Impact</th>
-        <th>Evidence</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (change of modelChanges(); track change.id) {
-        <tr>
-          <td>{{ change.id }}</td>
-          <td>{{ change.area }}</td>
-          <td>{{ change.change }}</td>
-          <td>{{ change.driver }}</td>
-          <td>{{ change.impact }}</td>
-          <td>
-            @if (change.evidence.length) {
-              <ul class="inline-list">
-                @for (item of change.evidence; track item) {
-                  <li>{{ item }}</li>
-                }
-              </ul>
-            } @else {
-              <span class="muted">Pending upload</span>
-            }
-          </td>
-          <td class="status-cell">
-            <span class="badge badge--{{ statusClass(change.status) }}">{{ change.status }}</span>
-            <select (change)="updateChangeStatus(change.id, $event)" [value]="change.status">
-              <option value="planned">Planned</option>
-              <option value="in-progress">In progress</option>
-              <option value="deployed">Deployed</option>
-            </select>
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
 </section>
 
-<section class="tasks-layout">
+<div class="page-actions">
+  <button type="button" class="button button--secondary" [disabled]="isSavingStepSix()" (click)="saveStepSix()">
+    {{ isSavingStepSix() ? 'Saving...' : 'Save' }}
+  </button>
+  <button type="button" class="button" [disabled]="isSavingStepSix()" (click)="saveStepSix(true)">
+    {{ isSavingStepSix() ? 'Saving...' : 'Save and Finish' }}
+  </button>
+</div>
+<br>
+
+@if (stepSixSaveMessage()) {
+  <div class="save-feedback save-feedback--success">
+    {{ stepSixSaveMessage() }}
+  </div>
+}
+
+@if (stepSixSaveError()) {
+  <div class="save-feedback save-feedback--error">
+    {{ stepSixSaveError() }}
+  </div>
+}
+
+<section class="summary-strip" aria-label="Step 6 summary">
+  @for (card of summaryCards(); track card.label) {
+    <article class="summary-card">
+      <span>{{ card.label }}</span>
+      <strong>{{ card.value }}</strong>
+    </article>
+  }
+</section>
+
+@if (isLoading()) {
+  <section class="card">
+    <p class="muted">Loading Step 6 project information...</p>
+  </section>
+}
+
+@if (loadError(); as errorMessage) {
+  <section class="card">
+    <p class="field-error field-error--block">{{ errorMessage }}</p>
+  </section>
+}
+
+<section class="workflow-card">
   <div>
-    <div class="section-heading">
-      <h3>Validation &amp; release tasks</h3>
-      <p>Ensure evidence lands in the safety case before release.</p>
+    <p class="workflow-card__eyebrow">Step 6 workflow chain</p>
+    <h3>Required model structure</h3>
+    <p>
+      Safety Requirement as Safety Task to mitigates to Loss Scenario as Hazard to triggers to UCA / HC as Safety Task
+      to obstructs to Responsibility as Safety Goal.
+    </p>
+  </div>
+  <div class="workflow-status">
+    <span class="badge" [class.badge--ready]="fullChainReady()">
+      {{ fullChainReady() ? 'Model chain complete' : 'Model chain still incomplete' }}
+    </span>
+    <p>Current view: {{ currentView() }}</p>
+    <p>{{ viewStatusMessage() }}</p>
+  </div>
+</section>
+
+<section class="forms-layout">
+  <section class="card">
+    <div class="card__heading">
+      <div>
+        <p class="card__eyebrow">Unsafe behavior injection: Steps 6.1 and 6.3</p>
+        <h3>Inject UCAs and HCs into the SR Model</h3>
+        <p>Introduce each unsafe behavior into the actor's internal reasoning and link it to the responsibility it endangers.</p>
+      </div>
     </div>
+
+    <form class="form-grid" [formGroup]="injectUnsafeBehaviorForm" (ngSubmit)="addInjectedUnsafeBehavior()">
+      <label class="field">
+        <span>Select Responsibility</span>
+        <select formControlName="responsibilityId" (change)="onResponsibilityChange()">
+          <option value="">Choose a responsibility</option>
+          @for (responsibility of responsibilities(); track responsibility.id) {
+            <option [value]="responsibility.id">{{ responsibility.id }} - {{ responsibility.name }}</option>
+          }
+        </select>
+        @if (controlInvalid('injectUnsafeBehaviorForm', 'responsibilityId')) {
+          <span class="field-error">Select a responsibility from Step 2.2.</span>
+        }
+      </label>
+
+      <label class="field">
+        <span>Select Associated UCA / HC</span>
+        <select formControlName="unsafeBehaviorId">
+          <option value="">Choose a UCA or HC</option>
+          @for (unsafeBehavior of filteredUnsafeBehaviors(); track unsafeBehavior.id) {
+            <option [value]="unsafeBehavior.id">{{ unsafeBehavior.id }} ({{ unsafeBehavior.type }})</option>
+          }
+        </select>
+        <small>Only Step 4 unsafe behaviors linked to the selected responsibility are shown.</small>
+        @if (controlInvalid('injectUnsafeBehaviorForm', 'unsafeBehaviorId')) {
+          <span class="field-error">Select the unsafe behavior to inject.</span>
+        }
+      </label>
+
+      <label class="field">
+        <span>Element Type Assignment</span>
+        <input type="text" formControlName="elementType" readonly />
+        <small>The system forces the selected UCA or HC to be modeled as a Safety Task in the SR model.</small>
+      </label>
+
+      <label class="field field--full checkbox-field">
+        <input type="checkbox" formControlName="establishObstructsLink" />
+        <div>
+          <span>Automatically create an Obstructs link from the selected UCA / HC to the selected Responsibility.</span>
+          <small>This link is mandatory in the framework.</small>
+        </div>
+      </label>
+      @if (controlInvalid('injectUnsafeBehaviorForm', 'establishObstructsLink')) {
+        <p class="field-error field-error--block">The Obstructs link is required.</p>
+      }
+
+      <div class="actions field--full">
+        <button type="submit" class="primary">Inject into SR model</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card__heading">
+      <div>
+        <p class="card__eyebrow">Loss scenario injection: Step 6.2</p>
+        <h3>Inject Loss Scenarios</h3>
+        <p>Model the causal triggers of the unsafe behaviors as Hazard elements linked to the injected UCA / HC targets.</p>
+      </div>
+    </div>
+
+    <form class="form-grid" [formGroup]="injectLossScenarioForm" (ngSubmit)="addInjectedLossScenarios()">
+      <label class="field">
+        <span>Select UCA / HC Target</span>
+        <select formControlName="targetUnsafeBehaviorId" (change)="onUnsafeBehaviorTargetChange()">
+          <option value="">Choose an injected UCA or HC</option>
+          @for (target of availableUnsafeBehaviorTargets(); track target.id) {
+            <option [value]="target.id">{{ target.id }} ({{ target.type }})</option>
+          }
+        </select>
+        @if (controlInvalid('injectLossScenarioForm', 'targetUnsafeBehaviorId')) {
+          <span class="field-error">Select an injected UCA or HC target.</span>
+        }
+      </label>
+
+      <label class="field field--full">
+        <span>Select Contributing Loss Scenario(s)</span>
+        <select multiple formControlName="contributingLossScenarioIds" size="5">
+          @for (lossScenario of filteredLossScenarios(); track lossScenario.id) {
+            <option [value]="lossScenario.id">{{ lossScenario.id }} - {{ lossScenario.description }}</option>
+          }
+        </select>
+        <small>Only Step 5 loss scenarios linked to the target UCA or HC are shown.</small>
+        @if (controlInvalid('injectLossScenarioForm', 'contributingLossScenarioIds')) {
+          <span class="field-error">Select at least one contributing loss scenario.</span>
+        }
+      </label>
+
+      <label class="field">
+        <span>Element Type Assignment</span>
+        <input type="text" formControlName="elementType" readonly />
+        <small>Each selected loss scenario is modeled as a Hazard element.</small>
+      </label>
+
+      <label class="field field--full checkbox-field">
+        <input type="checkbox" formControlName="establishTriggerLink" />
+        <div>
+          <span>Link the selected Hazard(s) (Loss Scenarios) to the target UCA / HC.</span>
+          <small>This trigger link is required.</small>
+        </div>
+      </label>
+      @if (controlInvalid('injectLossScenarioForm', 'establishTriggerLink')) {
+        <p class="field-error field-error--block">The trigger link is required.</p>
+      }
+
+      <div class="actions field--full">
+        <button type="submit" class="primary">Inject loss scenarios</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card__heading">
+      <div>
+        <p class="card__eyebrow">Safety requirement injection: Step 6.4</p>
+        <h3>Inject Safety Requirements</h3>
+        <p>Complete the safety reasoning chain by modeling mitigations as Safety Tasks attached to the injected hazards.</p>
+      </div>
+    </div>
+
+    <form class="form-grid" [formGroup]="injectSafetyRequirementForm" (ngSubmit)="addInjectedSafetyRequirements()">
+      <label class="field">
+        <span>Select Target Loss Scenario (Hazard)</span>
+        <select formControlName="targetLossScenarioId" (change)="onLossScenarioTargetChange()">
+          <option value="">Choose an injected loss scenario</option>
+          @for (lossScenario of availableLossScenarioTargets(); track lossScenario.id) {
+            <option [value]="lossScenario.id">{{ lossScenario.id }}</option>
+          }
+        </select>
+        @if (controlInvalid('injectSafetyRequirementForm', 'targetLossScenarioId')) {
+          <span class="field-error">Select the target loss scenario.</span>
+        }
+      </label>
+
+      <label class="field field--full">
+        <span>Select Safety Requirement(s)</span>
+        <select multiple formControlName="safetyRequirementIds" size="5">
+          @for (safetyRequirement of filteredSafetyRequirements(); track safetyRequirement.id) {
+            <option [value]="safetyRequirement.id">{{ safetyRequirement.id }} - {{ safetyRequirement.description }}</option>
+          }
+        </select>
+        <small>Only Step 5.3 safety requirements justified by the selected loss scenario are shown.</small>
+        @if (controlInvalid('injectSafetyRequirementForm', 'safetyRequirementIds')) {
+          <span class="field-error">Select at least one safety requirement.</span>
+        }
+      </label>
+
+      <label class="field">
+        <span>Element Type Assignment</span>
+        <input type="text" formControlName="elementType" readonly />
+        <small>Each selected safety requirement is modeled as a Safety Task.</small>
+      </label>
+
+      <label class="field">
+        <span>Mitigation Relationship Type</span>
+        <select formControlName="relationshipType">
+          <option value="OR">OR</option>
+          <option value="AND">AND</option>
+        </select>
+        <small>If multiple safety requirements are selected, the framework defaults to OR.</small>
+        @if (suggestedRelationshipType() === 'OR') {
+          <span class="field-hint">Recommended relationship: OR.</span>
+        }
+      </label>
+
+      <div class="actions field--full">
+        <button type="submit" class="primary">Inject safety requirements</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card__heading">
+      <div>
+        <p class="card__eyebrow">Model view control and verification: Steps 6.5, 6.6, and 6.7</p>
+        <h3>Model View Control and Final Verification</h3>
+        <p>Switch between SD and SR views, then run the final consistency checks on the full safety reasoning structure.</p>
+      </div>
+    </div>
+
+    <div class="view-controls">
+      <button type="button" class="button" (click)="generateSdView()">Generate Strategic Dependency (SD) View</button>
+      <button type="button" class="button button--secondary" (click)="generateSrView()">Generate Strategic Rationale (SR) View</button>
+      <button type="button" class="primary" (click)="runVerification()">Run Verification</button>
+    </div>
+
+    <div class="guardrail-panel">
+      <h4>SD guardrail check</h4>
+      @if (sdGuardrailIssues().length) {
+        <ul class="issue-list">
+          @for (issue of sdGuardrailIssues(); track issue) {
+            <li>{{ issue }}</li>
+          }
+        </ul>
+      } @else {
+        <p class="muted">No safety elements are exposed as external dependencies. SD generation is allowed.</p>
+      }
+    </div>
+
+    <div class="guardrail-panel">
+      <h4>Current view status</h4>
+      <p>{{ viewStatusMessage() }}</p>
+    </div>
+
+    @if (verificationResult(); as result) {
+      <div class="verification-panel" [class.verification-panel--pass]="result.passed" [class.verification-panel--fail]="!result.passed">
+        <div class="verification-panel__header">
+          <h4>Verification result</h4>
+          <span class="badge" [class.badge--ready]="result.passed">{{ result.passed ? 'Passed' : 'Failed' }}</span>
+        </div>
+        <p>Ran at {{ result.ranAt }}</p>
+        <ul class="check-list">
+          @for (check of result.checks; track check) {
+            <li>{{ check }}</li>
+          }
+        </ul>
+        @if (result.errors.length) {
+          <ul class="issue-list">
+            @for (error of result.errors; track error) {
+              <li>{{ error }}</li>
+            }
+          </ul>
+        } @else {
+          <p class="muted">Every injected safety task, hazard, and obstructs chain is connected correctly.</p>
+        }
+      </div>
+    }
+  </section>
+</section>
+
+<section class="card">
+  <div class="card__heading">
+    <div>
+      <h3>Injected UCA / HC elements</h3>
+      <p>These entries show how unsafe behaviors are bound to responsibilities in the SR model.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>ID</th>
-          <th>Task</th>
-          <th>Owner</th>
-          <th>Channel</th>
-          <th>Due</th>
-          <th>Status</th>
+          <th>Responsibility</th>
+          <th>Injected UCA / HC</th>
+          <th>Element type</th>
+          <th>Obstructs link</th>
         </tr>
       </thead>
       <tbody>
-        @for (task of validationTasks(); track task.id) {
+        @for (entry of injectedUnsafeBehaviors(); track entry.responsibilityId + entry.unsafeBehaviorId) {
           <tr>
-            <td>{{ task.id }}</td>
-            <td>{{ task.name }}</td>
-            <td>{{ task.owner }}</td>
-            <td>{{ task.channel }}</td>
-            <td>{{ task.dueDate }}</td>
-            <td class="status-cell">
-              <span class="badge badge--{{ statusClass(task.status) }}">{{ task.status }}</span>
-              <select (change)="updateTaskStatus(task.id, $event)" [value]="task.status">
-                <option value="todo">To do</option>
-                <option value="doing">In progress</option>
-                <option value="done">Done</option>
-              </select>
-            </td>
+            <td>{{ responsibilityLabel(entry.responsibilityId) }}</td>
+            <td>{{ unsafeBehaviorLabel(entry.unsafeBehaviorId) }}</td>
+            <td>{{ entry.elementType }}</td>
+            <td><span class="badge badge--ready">Required</span></td>
           </tr>
         }
       </tbody>
     </table>
   </div>
-  <aside class="notes">
-    <h3>Integration notes</h3>
-    <ul>
-      @for (note of integrationNotes(); track note.id) {
-        <li>
-          <div class="note-meta">
-            <span class="note-date">{{ note.createdOn }}</span>
-            <span class="note-author">{{ note.author }}</span>
-          </div>
-          <p>{{ note.summary }}</p>
-          <ul class="action-list">
-            @for (item of note.actionItems; track item) {
-              <li>{{ item }}</li>
-            }
-          </ul>
-        </li>
-      }
-    </ul>
-  </aside>
 </section>
+
+<section class="card">
+  <div class="card__heading">
+    <div>
+      <h3>Injected loss scenario hazards</h3>
+      <p>Each selected loss scenario becomes a Hazard element linked back to the target UCA or HC.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Target UCA / HC</th>
+          <th>Injected hazard</th>
+          <th>Element type</th>
+          <th>Trigger link</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of injectedLossScenarios(); track entry.targetUnsafeBehaviorId + entry.lossScenarioId) {
+          <tr>
+            <td>{{ unsafeBehaviorLabel(entry.targetUnsafeBehaviorId) }}</td>
+            <td>{{ lossScenarioLabel(entry.lossScenarioId) }}</td>
+            <td>{{ entry.elementType }}</td>
+            <td><span class="badge badge--ready">Required</span></td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card__heading">
+    <div>
+      <h3>Injected safety requirement tasks</h3>
+      <p>Safety requirements complete the mitigation chain from hazards back into the SR model.</p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Target loss scenario</th>
+          <th>Injected safety requirement</th>
+          <th>Element type</th>
+          <th>Relationship</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (entry of injectedSafetyRequirements(); track entry.targetLossScenarioId + entry.safetyRequirementId) {
+          <tr>
+            <td>{{ lossScenarioLabel(entry.targetLossScenarioId) }}</td>
+            <td>{{ safetyRequirementLabel(entry.safetyRequirementId) }}</td>
+            <td>{{ entry.elementType }}</td>
+            <td>{{ entry.relationshipType }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="page-actions page-actions--bottom">
+  <button type="button" class="button button--secondary" [disabled]="isSavingStepSix()" (click)="saveStepSix()">
+    {{ isSavingStepSix() ? 'Saving...' : 'Save' }}
+  </button>
+  <button type="button" class="button" [disabled]="isSavingStepSix()" (click)="saveStepSix(true)">
+    {{ isSavingStepSix() ? 'Saving...' : 'Save and Finish' }}
+  </button>
+</div>
+
+@if (isBpmnModelModalOpen()) {
+  <div class="modal-backdrop" (click)="closeBpmnModelModal()">
+    <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <header class="modal__header">
+        <h4>BPMN model</h4>
+        <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
+      </header>
+      <img class="bpmn-model-image" src="/assets/step-6-bpmn.png" alt="BPMN model for Step 6 model updates" />
+    </div>
+  </div>
+}

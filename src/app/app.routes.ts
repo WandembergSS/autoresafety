@@ -46,11 +46,8 @@ export const routes: Routes = [
 	},
 	{
 		path: 'controller-constraints',
-		canActivate: [authGuard],
-		loadComponent: () =>
-			import('./pages/controller-constraints-page/controller-constraints-page.component').then(
-				(m) => m.ControllerConstraintsPageComponent
-			)
+		redirectTo: 'ucas',
+		pathMatch: 'full'
 	},
 	{
 		path: 'loss-scenarios',
@@ -66,6 +63,14 @@ export const routes: Routes = [
 		loadComponent: () =>
 			import('./pages/model-update-page/model-update-page.component').then(
 				(m) => m.ModelUpdatePageComponent
+			)
+	},
+	{
+		path: 'resafety-artifacts',
+		canActivate: [authGuard],
+		loadComponent: () =>
+			import('./pages/resafety-artifacts-page/resafety-artifacts-page.component').then(
+				(m) => m.ResafetyArtifactsPageComponent
 			)
 	},
 	{

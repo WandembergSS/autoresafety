@@ -20,11 +20,13 @@ export class AuthInterceptor implements HttpInterceptor {
     // Some backends will reject requests if an unexpected/invalid Bearer token is present,
     // even when the endpoint itself is permit-all.
     const requestPath = this.getRequestPath(req.url);
+    const isFullProjectPublicEndpoint = /^\/api\/projects\/\d+\/full$/.test(requestPath);
     const isPublicEndpoint =
       requestPath === '/api/project-resume' ||
       requestPath.startsWith('/api/project-resume/') ||
       requestPath === '/api/projects/minimal-project-creation' ||
-      requestPath === '/api/projects/minimal-project-update';
+      requestPath === '/api/projects/minimal-project-update' ||
+      isFullProjectPublicEndpoint;
     if (isPublicEndpoint) {
       return next.handle(req);
     }

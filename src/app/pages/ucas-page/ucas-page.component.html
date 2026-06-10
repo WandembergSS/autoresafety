@@ -1,59 +1,411 @@
 <section class="page">
   <header class="page__header">
     <p class="step">Step 4</p>
-    <h2>Identify Unsafe Control Actions (UCAs)</h2>
+    <div class="page__title-row">
+      <h2>Identify Unsafe Control Actions (UCAs)</h2>
+      <div class="page__header-actions">
+        <button type="button" class="button button--ai" [disabled]="isGeneratingStepFourAi()" (click)="generateStepFourWithAi()" aria-label="Generate with AI">
+          {{ isGeneratingStepFourAi() ? 'Generating...' : '🤖 Generate with AI' }}
+        </button>
+      </div>
+    </div>
     <p>
-      Evaluate each control action from the STPA control structure across the four STPA contexts—Not Provided, Provided,
-      Incorrect Timing, and Stopped Too Soon/Applied Too Long. Each UCA should remain traceable back to the source
-      controller and the hazard identifiers from Step 1.
+      Systematically evaluate each control action from the STPA control structure across the four unsafe contexts. The
+      goal of Step 4 is to turn a controller-action pair into a traceable UCA statement that clearly names the hazard,
+      the unsafe context, the originating responsibility, and the safety constraint that governs it.
     </p>
+    <div class="bpmn-preview-inline">
+      <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+      <button
+        type="button"
+        class="bpmn-preview-thumb"
+        (click)="openBpmnModelModal()"
+        aria-label="Open BPMN model preview"
+      >
+        <img src="/assets/ucas-bpmn.png" alt="Small preview of the Step 4 BPMN model" />
+      </button>
+    </div>
   </header>
 
-  <section class="card">
-    <h3>Record a new UCA</h3>
-    <form class="grid" [formGroup]="ucaForm" (ngSubmit)="addUca()">
-      <label class="field">
-        <span>Controller</span>
-        <input type="text" formControlName="controller" placeholder="Which controller issues the action?" />
-      </label>
-      <label class="field">
-        <span>Control action</span>
-        <input type="text" formControlName="controlAction" placeholder="Describe the control action" />
-      </label>
-      <label class="field field--full">
-        <span>Hazard or loss</span>
-        <textarea rows="2" formControlName="hazard" placeholder="Reference the hazard or loss (e.g. H-2, L-1)"></textarea>
-      </label>
-      <label class="field">
-        <span>Category</span>
-        <select formControlName="category">
-          <option value="Not provided">Not provided</option>
-          <option value="Provided incorrectly">Provided incorrectly</option>
-          <option value="Incorrect timing">Incorrect timing</option>
-          <option value="Stopped too soon / applied too long">Stopped too soon / applied too long</option>
-        </select>
-      </label>
-      <div class="actions field--full">
-        <button type="submit">Add unsafe action</button>
-      </div>
-    </form>
+  <div class="page-actions">
+    <button type="button" class="button button--secondary" [disabled]="isSavingStepFour()" (click)="saveStepFour()">
+      {{ isSavingStepFour() ? 'Saving...' : 'Save' }}
+    </button>
+    <button type="button" class="button" [disabled]="isSavingStepFour()" (click)="saveStepFour(true)">
+      {{ isSavingStepFour() ? 'Saving...' : 'Save and Continue' }}
+    </button>
+  </div>
+
+  @if (stepFourSaveMessage()) {
+    <div class="save-feedback save-feedback--success">
+      {{ stepFourSaveMessage() }}
+    </div>
+  }
+
+  @if (stepFourSaveError()) {
+    <div class="save-feedback save-feedback--error">
+      {{ stepFourSaveError() }}
+    </div>
+  }
+
+  <section class="overview-strip" aria-label="Unsafe control action summary">
+    <article class="overview-card overview-card--primary">
+      <span class="overview-card__label">Recorded UCAs</span>
+      <strong>{{ totalUcas() }}</strong>
+      <p>Total unsafe control actions documented for Step 4.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Missing actions</span>
+      <strong>{{ categoryCount('Not provided') }}</strong>
+      <p>Cases where a required control action is not issued.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Timing or duration issues</span>
+      <strong>{{ categoryCount('Incorrect timing') + categoryCount('Stopped too soon / applied too long') }}</strong>
+      <p>Cases driven by ordering, latency, or unsafe action duration.</p>
+    </article>
+    <article class="overview-card">
+      <span class="overview-card__label">Hazardous conditions</span>
+      <strong>{{ totalHazardousConditions() }}</strong>
+      <p>Responsibilities or hazards that are not fully covered by the identified UCAs.</p>
+    </article>
   </section>
 
   <section class="card">
-    <h3>Unsafe control actions list</h3>
+    <div class="card__heading">
+      <div>
+        <h3>UCA evaluation and traceability</h3>
+        <p>Select a control action and evaluate it against the four STPA situations, then associate the resulting UCA with hazards, responsibilities, and safety constraints.</p>
+      </div>
+      <span class="status-pill" [class.status-pill--ready]="readyForRecording()">
+        {{ readyForRecording() ? 'Evaluation and traceability aligned' : 'Start with control action evaluation' }}
+      </span>
+    </div>
+
+    <section class="form-map" aria-label="Step 4 workflow map">
+      <article class="form-map__card form-map__card--active">
+        <span>Control action evaluation</span>
+        <strong>Steps 4.1-4.5</strong>
+        <p>Select the control action and test it against the four unsafe situations.</p>
+      </article>
+      <article class="form-map__card" [class.form-map__card--active]="readyForRecording()">
+        <span>Traceability and associations</span>
+        <strong>Steps 4.6-4.7</strong>
+        <p>Associate each UCA with hazards, responsibilities, and the governing safety constraint.</p>
+      </article>
+      <article class="form-map__card" [class.form-map__card--active]="hcDecision() === 'yes'">
+        <span>Hazardous condition modelling</span>
+        <strong>Step 4.8</strong>
+        <p>Model hazardous conditions when passive feedback or external states create risk without an active control action.</p>
+      </article>
+      <article class="form-map__card">
+        <span>Controller constraint derivation</span>
+        <strong>Steps 4.9-4.10</strong>
+        <p>Convert each UCA or HC into a controller constraint that states what must happen or be avoided.</p>
+      </article>
+    </section>
+
+    <form class="form-stack" [formGroup]="ucaForm" (ngSubmit)="addUca()">
+      <section class="form-section" aria-label="Control action evaluation">
+        <div class="form-section__heading">
+          <span class="form-section__eyebrow">Control action evaluation · Steps 4.1-4.5</span>
+          <h4>Control action evaluation</h4>
+          <p>Select the control action, review the controller and controlled process, then record one UCA entry for the active STPA condition. Repeat the form to build multiple entries per evaluation list.</p>
+        </div>
+
+        <div class="grid">
+          <label class="field field--full">
+            <span>Select control action (Step 4.1)</span>
+            <select formControlName="controlActionRef" (change)="onControlActionSelected($any($event.target).value)">
+              <option value="">Select a control action from the Step 3 catalogue</option>
+              @for (item of controlActionCatalog(); track item.ref) {
+                <option [value]="item.ref">{{ item.ref }} · {{ item.controlAction }}</option>
+              }
+            </select>
+          </label>
+
+          <div class="summary-grid field--full">
+            <article class="summary-card">
+              <span>Controller</span>
+              <strong>{{ selectedControlActionDetails()?.controller || 'Select a control action' }}</strong>
+            </article>
+            <article class="summary-card">
+              <span>Controlled process</span>
+              <strong>{{ selectedControlActionDetails()?.controlledProcess || 'Waiting for Step 4.1' }}</strong>
+            </article>
+          </div>
+        </div>
+
+        <section class="workflow-grid" aria-label="Step 4 workflow guidance">
+          @for (item of categoryGuidance; track item.step) {
+            <article class="workflow-card" [class.workflow-card--active]="item.category === selectedCategoryGuidance().category">
+              <span class="workflow-card__step">{{ item.step }}</span>
+              <h4>{{ item.category }}</h4>
+              <p>{{ item.prompt }}</p>
+              <small>{{ item.effect }}</small>
+            </article>
+          }
+        </section>
+
+        <section class="evaluation-entry" aria-label="Active UCA evaluation entry">
+          <div>
+            <span class="preview__eyebrow">Active evaluation list</span>
+            <h4>{{ selectedCategoryGuidance().step }} · {{ selectedCategoryGuidance().category }}</h4>
+            <p>{{ selectedCategoryGuidance().prompt }}</p>
+          </div>
+
+          <div class="grid">
+            <label class="field">
+              <span>UCA ID</span>
+              <input type="text" [value]="nextUcaRef()" readonly />
+            </label>
+            <label class="field">
+              <span>Evaluation category</span>
+              <select formControlName="category" [disabled]="!isControlActionSelected()">
+                <option value="Not provided">Not providing (Step 4.2)</option>
+                <option value="Provided incorrectly">Providing incorrectly (Step 4.3)</option>
+                <option value="Incorrect timing">Timing / order (Step 4.4)</option>
+                <option value="Stopped too soon / applied too long">Duration (Step 4.5)</option>
+              </select>
+            </label>
+            <label class="field field--full">
+              <span>Description</span>
+              <textarea rows="2" formControlName="context" [disabled]="!isControlActionSelected()" placeholder="Describe what happens if this control action becomes unsafe in the selected condition"></textarea>
+              <small>{{ selectedCategoryGuidance().prompt }}</small>
+            </label>
+            <label class="field field--full">
+              <span>Potential consequence</span>
+              <textarea rows="2" formControlName="consequence" [disabled]="!isControlActionSelected()" placeholder="Describe the hazardous outcome or loss exposure"></textarea>
+            </label>
+            <label class="field field--full">
+              <span>Why this UCA is unsafe</span>
+              <textarea rows="2" formControlName="rationale" [disabled]="!isControlActionSelected()" placeholder="Explain why the control action violates the assumptions for safe control"></textarea>
+            </label>
+          </div>
+        </section>
+      </section>
+
+      <section class="form-section" aria-label="Traceability and associations">
+        <div class="form-section__heading">
+          <span class="form-section__eyebrow">Traceability and associations · Steps 4.6-4.7</span>
+          <h4>Traceability and associations</h4>
+          <p>For the current UCA entry, select at least one system-level hazard, associate the endangered responsibility, and confirm the governing safety constraint.</p>
+        </div>
+
+        <section class="traceability-panel" aria-label="Step 4 traceability reasoning">
+          <div>
+            <span class="traceability-panel__eyebrow">Step 4.6-4.7 reasoning path</span>
+            <h4>Maintain the UCA traceability chain</h4>
+          </div>
+          <ol>
+            <li>Associate the UCA with one or more system-level hazards from the earlier analysis.</li>
+            <li>Identify the responsibility endangered by that unsafe control action.</li>
+            <li>Confirm the Safety Constraint associated with that responsibility.</li>
+          </ol>
+        </section>
+
+        <div class="grid">
+          <label class="field field--full">
+            <span>Associated system-level hazard(s) (Step 4.6)</span>
+            <select multiple formControlName="hazardSelections" [disabled]="!isControlActionSelected()">
+              @for (hazard of hazardCatalog(); track hazard) {
+                <option [value]="hazard">{{ hazard }}</option>
+              }
+            </select>
+            <small>Select at least one hazard. If no existing hazard fits, define a new one below.</small>
+          </label>
+          <label class="field field--full">
+            <span>Define new system-level hazard</span>
+            <input type="text" formControlName="additionalHazard" [disabled]="!isControlActionSelected()" placeholder="Add a new hazard when no existing option fits the UCA" />
+          </label>
+          <label class="field field--full">
+            <span>Associated responsibility (Step 4.7)</span>
+            <select formControlName="responsibility" [disabled]="!isControlActionSelected()" (change)="onResponsibilitySelected($any($event.target).value)">
+              <option value="">Select a responsibility from Step 1.2.4</option>
+              @for (item of responsibilityCatalog(); track item.responsibility) {
+                <option [value]="item.responsibility">{{ item.responsibility }}</option>
+              }
+            </select>
+          </label>
+          <label class="field field--full">
+            <span>Associated Safety Constraint (SC)</span>
+            <input type="text" formControlName="safetyConstraint" readonly placeholder="Auto-populated from the associated responsibility" />
+          </label>
+        </div>
+      </section>
+
+      <div class="actions field--full">
+        <button type="submit" [disabled]="ucaForm.invalid">Record unsafe control action</button>
+      </div>
+    </form>
+
+    <section class="preview" aria-label="Generated UCA statement preview">
+      <div>
+        <span class="preview__eyebrow">Step 4.2-4.7 preview</span>
+        <h4>Generated unsafe control action statement</h4>
+      </div>
+      <p>{{ previewStatement() }}</p>
+    </section>
+
+    @if (!isControlActionSelected()) {
+      <p class="hint">Complete Step 4.1 first by selecting a control action from the Step 3 list. The controller and controlled process will be auto-filled for the current evaluation.</p>
+    }
+  </section>
+
+  <section class="card">
+    <div class="card__heading">
+      <div>
+        <h3>Hazardous condition decision and modelling</h3>
+        <p>Capture hazardous conditions when passive feedback, external inputs, or environmental states create risk without generating an unsafe control action.</p>
+      </div>
+      <span class="status-pill" [class.status-pill--ready]="hcDecision() === 'yes'">
+        {{ hcDecision() === 'yes' ? 'Model HC' : 'No additional HC' }}
+      </span>
+    </div>
+
+    <div class="decision-grid" role="radiogroup" aria-label="Need to model hazardous conditions">
+      <button type="button" class="decision-card" [class.decision-card--active]="hcDecision() === 'yes'" (click)="setHazardousConditionDecision('yes')">
+        <strong>Yes</strong>
+        <span>There are responsibilities fulfilled only through passive feedback or additional hazardous states that still need modelling.</span>
+      </button>
+      <button type="button" class="decision-card" [class.decision-card--active]="hcDecision() === 'no'" (click)="setHazardousConditionDecision('no')">
+        <strong>No</strong>
+        <span>Proceed directly to controller constraint derivation from the identified UCAs.</span>
+      </button>
+    </div>
+
+    @if (hcDecision() === 'yes') {
+      <form class="grid" [formGroup]="hcForm" (ngSubmit)="addHazardousCondition()">
+        <label class="field">
+          <span>HC ID</span>
+          <input type="text" [value]="nextHcRef()" readonly />
+        </label>
+        <label class="field field--full">
+          <span>Hazardous Condition (HC)</span>
+          <textarea rows="2" formControlName="description" placeholder="Describe the dangerous state or passive feedback condition that must be modeled"></textarea>
+        </label>
+        <label class="field field--full">
+          <span>Associated hazard(s)</span>
+          <select multiple formControlName="linkedHazards">
+            @for (hazard of hazardCatalog(); track hazard) {
+              <option [value]="hazard">{{ hazard }}</option>
+            }
+          </select>
+          <small>Select at least one hazard, or define a new one below.</small>
+        </label>
+        <label class="field field--full">
+          <span>Define new system-level hazard</span>
+          <input type="text" formControlName="additionalHazard" placeholder="Add a hazard if the HC does not map to an existing one" />
+        </label>
+        <label class="field field--full">
+          <span>Associated responsibility (optional)</span>
+          <select formControlName="responsibility" (change)="onHcResponsibilitySelected($any($event.target).value)">
+            <option value="">Select a responsibility if the HC maps to an existing duty</option>
+            @for (item of responsibilityCatalog(); track item.responsibility) {
+              <option [value]="item.responsibility">{{ item.responsibility }}</option>
+            }
+          </select>
+        </label>
+        <label class="field field--full">
+          <span>Associated Safety Constraint (SC)</span>
+          <input type="text" formControlName="safetyConstraint" readonly placeholder="Auto-populated when an associated responsibility is selected" />
+        </label>
+        <label class="field field--full">
+          <span>Coverage gap rationale</span>
+          <textarea rows="2" formControlName="coverageGap" placeholder="Explain why the responsibility or hazard is not fully captured by existing UCAs"></textarea>
+        </label>
+        <div class="actions field--full">
+          <button type="submit" [disabled]="hcForm.invalid">Record hazardous condition</button>
+        </div>
+      </form>
+    }
+
+    <div class="hc-list">
+      @for (hc of hazardousConditions(); track hc.id) {
+        <article class="hc">
+          <header>
+            <span class="uca__ref">{{ hc.ref }}</span>
+            <h4>{{ hc.description }}</h4>
+          </header>
+          <p><strong>Responsibility:</strong> {{ hc.responsibility || 'Not linked to a single responsibility' }}</p>
+          <p><strong>Safety Constraint:</strong> {{ hc.safetyConstraint || 'To be defined from the mapped responsibility' }}</p>
+          <p><strong>Linked hazard(s):</strong> {{ hc.linkedHazards.join(', ') }}</p>
+          <p><strong>Why no UCA?</strong> {{ hc.coverageGap }}</p>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="card__heading">
+      <div>
+        <h3>Unsafe control action register</h3>
+        <p>Each entry keeps the control path, hazard linkage, responsibility, and safety constraint visible for the Step 4.9-4.10 constraint derivation.</p>
+      </div>
+    </div>
     <div class="uca-list">
       @for (uca of ucas(); track uca.id) {
         <article class="uca">
           <header>
             <div>
+              <span class="uca__ref">{{ uca.ref }}</span>
               <h4>{{ uca.controlAction }}</h4>
-              <p>Controller: {{ uca.controller }}</p>
+              <p>{{ uca.sourceActor }} &rarr; {{ uca.targetActor }} · {{ uca.controlledProcess }}</p>
             </div>
             <span class="badge badge--{{ categoryClass(uca.category) }}">{{ uca.category }}</span>
           </header>
-          <p class="uca__hazard">Hazard: {{ uca.hazard }}</p>
+          <p class="uca__hazard">Hazard traceability: {{ uca.hazard.join(', ') }}</p>
+          <div class="uca__detail">
+            <strong>Responsibility</strong>
+            <p>{{ uca.responsibility }}</p>
+          </div>
+          <div class="uca__detail">
+            <strong>Safety Constraint</strong>
+            <p>{{ uca.safetyConstraint }}</p>
+          </div>
+          <div class="uca__detail">
+            <strong>Unsafe context</strong>
+            <p>{{ uca.context }}</p>
+          </div>
+          <div class="uca__detail">
+            <strong>Potential consequence</strong>
+            <p>{{ uca.consequence }}</p>
+          </div>
+          <div class="uca__detail">
+            <strong>Why unsafe</strong>
+            <p>{{ uca.rationale }}</p>
+          </div>
         </article>
       }
     </div>
   </section>
+
+  <app-controller-constraints-page
+    [embedded]="true"
+    [analysisSources]="constraintSources()"
+    [initialConstraints]="controllerConstraints()"
+    [initialNextConstraintId]="nextConstraintIdValue()"
+    (constraintsChange)="onControllerConstraintsChange($event)"
+  />
+
+  <div class="page-actions page-actions--bottom">
+    <button type="button" class="button button--secondary" [disabled]="isSavingStepFour()" (click)="saveStepFour()">
+      {{ isSavingStepFour() ? 'Saving...' : 'Save' }}
+    </button>
+    <button type="button" class="button" [disabled]="isSavingStepFour()" (click)="saveStepFour(true)">
+      {{ isSavingStepFour() ? 'Saving...' : 'Save and Continue' }}
+    </button>
+  </div>
+
+  @if (isBpmnModelModalOpen()) {
+    <div class="modal-backdrop" (click)="closeBpmnModelModal()">
+      <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>BPMN model</h4>
+          <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
+        </header>
+        <img class="bpmn-model-image" src="/assets/ucas-bpmn.png" alt="BPMN model for Step 4 unsafe control actions" />
+      </div>
+    </div>
+  }
 </section>

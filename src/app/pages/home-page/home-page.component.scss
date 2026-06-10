@@ -10,10 +10,79 @@
   color: #0f172a;
 }
 
+.page__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+}
+
 .page__header p {
   margin: 0.3rem 0 0;
   color: #475569;
   max-width: 640px;
+}
+
+.bpmn-preview-inline {
+  margin-top: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  align-self: flex-start;
+}
+
+.button {
+  cursor: pointer;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  padding: 0.65rem 1.2rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.button:hover {
+  background: #1d4ed8;
+}
+
+.button--secondary {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.button--secondary:hover {
+  background: #dbeafe;
+}
+
+.bpmn-preview-thumb {
+  padding: 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.7rem;
+  background: #ffffff;
+  width: clamp(280px, 28vw, 480px);
+  aspect-ratio: 26 / 9;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.bpmn-preview-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.bpmn-preview-thumb:hover {
+  border-color: #60a5fa;
+  background: #f8fbff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  transform: translateY(-1px);
 }
 
 .page__grid {
@@ -102,7 +171,7 @@
 }
 
 .timeline-arrow {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   color: #94a3b8;
   justify-self: center;
 }
@@ -137,6 +206,10 @@
   box-shadow: 0 24px 60px -30px rgba(15, 23, 42, 0.7);
 }
 
+.modal--bpmn {
+  width: min(1000px, 100%);
+}
+
 .modal__header {
   display: flex;
   justify-content: space-between;
@@ -165,6 +238,13 @@
 .modal__description {
   margin: 0.75rem 0 1rem;
   color: #475569;
+}
+
+.bpmn-model-image {
+  width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  object-fit: contain;
 }
 
 .modal__details {
@@ -244,6 +324,14 @@
 
   .timeline-arrow {
     display: none;
+  }
+
+  .bpmn-preview-inline {
+    width: 100%;
+  }
+
+  .bpmn-preview-thumb {
+    width: min(100%, 320px);
   }
 }
 

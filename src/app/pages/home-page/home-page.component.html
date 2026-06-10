@@ -1,9 +1,22 @@
 <section class="page">
   <header class="page__header">
-    <h2>ReSafety Project Workspace</h2>
+    <div class="page__title-row">
+      <h2>ReSafety Project Workspace</h2>
+    </div>
     <p>
-      Coordinate ReSafety project capture and the 7-step workflow for every safety-critical system under analysis.
+      Coordinate ReSafety project capture and the 6-step workflow for every safety-critical system under analysis.
     </p>
+    <div class="bpmn-preview-inline">
+      <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+      <button
+        type="button"
+        class="bpmn-preview-thumb"
+        (click)="openBpmnModelModal()"
+        aria-label="Open ReSafety BPMN model preview"
+      >
+        <img src="/assets/resafety-bpmn.png" alt="Small preview of the ReSafety BPMN model" />
+      </button>
+    </div>
   </header>
 
   <div class="page__grid">
@@ -63,16 +76,6 @@
             i
           </span>
         </button>
-        <button type="button" class="primary button--ai" (click)="createProjectWithAi()">
-          <span>Create project with AI</span>
-          <span
-            class="button__info"
-            data-tooltip="AI will only help fill the fields in Step 1 (Define SCS Scope). The quality depends on the information provided in this form."
-            aria-label="AI fills only Step 1; quality depends on the information provided in this form."
-          >
-            i
-          </span>
-        </button>
       </div>
     </form>
     <div class="page__column">
@@ -98,7 +101,7 @@
                 </p>
                 <p class="tile__description">{{ project.description }}</p>
                 <p class="tile__next">
-                  Current stage: Step {{ project.currentStep ?? '—' }} · {{ project.nextStep }}
+                  Current stage: Step {{ displayCurrentWorkflowStep(project.currentStep) ?? '—' }} · {{ project.nextStep }}
                 </p>
                 <div class="tile__actions">
                   @if (['completed', 'canceled', 'cancelled', 'removed'].includes(project.status.toLowerCase())) {
@@ -152,13 +155,13 @@
   </div>
 
   <section class="card card--summary">
-    <h3>7-step ReSafety timeline</h3>
+    <h3>6-step ReSafety timeline</h3>
     <p class="timeline__intro">
       The RESafety framework is an iterative and incremental process designed to model safety requirements and
       generate safety analysis artifacts by integrating System-Theoretic Process Analysis (STPA) with the iStar4Safety
       language. The process consists of seven main steps, several of which contain detailed substeps and workflows.
     </p>
-    <div class="timeline-diagram" aria-label="7-step ReSafety timeline diagram">
+    <div class="timeline-diagram" aria-label="6-step ReSafety timeline diagram">
       @for (step of timelineSteps; track step.id; let idx = $index) {
         <button type="button" class="timeline-step" (click)="openTimelineStep(step)">
           <span class="timeline-step__index">{{ step.id }}</span>
@@ -232,6 +235,18 @@
             </div>
           }
         }
+      </div>
+    </div>
+  }
+
+  @if (isBpmnModelModalOpen()) {
+    <div class="modal-backdrop" (click)="closeBpmnModelModal()">
+      <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>BPMN model</h4>
+          <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
+        </header>
+        <img class="bpmn-model-image" src="/assets/resafety-bpmn.png" alt="BPMN model for ReSafety workflow" />
       </div>
     </div>
   }

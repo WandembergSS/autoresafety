@@ -1,11 +1,46 @@
 <section class="page">
   <header class="page__header">
     <p class="step">Step 1</p>
-    <h2>Define the Scope of the Safety-Critical System</h2>
-    <p>
+    <div class="page__title-row">
+      <h2>Define the Scope of the Safety-Critical System</h2>
+      <button
+        type="button"
+        class="button button--ai button--with-info"
+        [disabled]="isStepOneAiRunning()"
+        (click)="generateStepOneWithAi()"
+        aria-label="Generate with AI"
+      >
+        🤖 Generate with AI
+        <span
+          class="button__info"
+          data-tooltip="AI will only help fill the fields in Step 1 (Define SCS Scope). The quality depends on the information already provided until now."
+          aria-label="AI fills only Step 1; quality depends on the information provided in this form."
+        >
+          i
+        </span>
+      </button>
+    </div>
+    <p class="page__subtitle">
   Populate the ReSafety project rationale and project scope blocks. Establish the mission context, hazards, and
       high-level constraints that guide the remaining RESafety analysis.
-    </p>
+    </p> 
+    <div class="bpmn-preview-inline">
+      <button
+        type="button"
+        class="button button--secondary"
+        (click)="openBpmnModelModal('Define the Scope of the Safety-Critical System', '/assets/scope-bpmn-model.jpg')"
+      >
+        BPMN model
+      </button>
+      <button
+        type="button"
+        class="bpmn-preview-thumb"
+        (click)="openBpmnModelModal('Define the Scope of the Safety-Critical System', '/assets/scope-bpmn-model.jpg')"
+        aria-label="Open BPMN model preview"
+      >
+        <img src="/assets/scope-bpmn-model.jpg" alt="Small preview of the Step 1 BPMN model" />
+      </button>
+    </div>
   </header>
 
   <div class="page-actions">
@@ -15,32 +50,92 @@
 
   <section class="card lane">
     <header class="lane__header">
-      <h3>1.1 — General concerns</h3>
-      <p>
+      <div class="lane__title-row">
+        <h3>1.1 — General concerns</h3>
+        <button
+          type="button"
+          class="button button--ai"
+          [disabled]="isGeneralConcernsAiRunning()"
+          (click)="generateGeneralConcernsWithAi()"
+          aria-label="Generate with AI"
+        >🤖</button>
+      </div>
+      <p class="lane__subtitle">
         Build a shared understanding of the mission, system definition, available knowledge, scope
         boundaries, and the socio-technical elements that will influence subsequent ReSafety artefacts.
       </p>
+      <div class="bpmn-preview-inline">
+        <button
+          type="button"
+          class="button button--secondary"
+          (click)="openBpmnModelModal('1.1 — General concerns', '/assets/scope-general-concerns-bpmn.jpg')"
+        >
+          BPMN model
+        </button>
+        <button
+          type="button"
+          class="bpmn-preview-thumb"
+          (click)="openBpmnModelModal('1.1 — General concerns', '/assets/scope-general-concerns-bpmn.jpg')"
+          aria-label="Open BPMN model preview for 1.1"
+        >
+          <img src="/assets/scope-general-concerns-bpmn.jpg" alt="Small preview of the 1.1 BPMN model" />
+        </button>
+      </div>
     </header>
 
     <div class="lane__grid">
       <article class="lane__block">
         <header>
           <h4>1.1.1 Clarify analysis objectives</h4>
-          <p>Capture the intent of this iteration.</p>
+          <p>Capture the intent of this iteration. Constraint: complete 1.1.1 before 1.1.2.</p>
         </header>
+
         <form class="stack" [formGroup]="analysisObjectiveForm">
+          <div class="objective-source">
+            <label class="objective-radio">
+              <input
+                type="radio"
+                name="objectiveSource"
+                [checked]="selectedObjectiveSource() === 'manual'"
+                (change)="selectObjectiveSource('manual')"
+              />
+              <span>Use this objective</span>
+            </label>
+          </div>
           <label class="field">
             <textarea
               rows="4"
               formControlName="objectivesText"
-              placeholder="Describe the analysis objectives for Step 1"
+              placeholder="Describe the analysis objectives for Step 1 (manual)"
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai" (click)="generateObjectivesWithAi()">
-              Generate with AI
-            </button>
-            <button type="button" (click)="openObjectiveModal()">Expand</button>
+            <button type="button" (click)="openObjectiveModal()" aria-label="Expand">⛶</button>
+          </div>
+        </form>
+
+        <form class="stack" [formGroup]="analysisObjectiveAiForm">
+          <div class="objective-source">
+            <label class="objective-radio">
+              <input
+                type="radio"
+                name="objectiveSource"
+                [checked]="selectedObjectiveSource() === 'ai'"
+                (change)="selectObjectiveSource('ai')"
+              />
+              <span>Use this objective</span>
+            </label>
+          </div>
+          <label class="field field--ai-objective">
+            <textarea
+              rows="4"
+              formControlName="objectivesText"
+              placeholder="AI generated analysis objectives"
+            ></textarea>
+          </label>
+          <div class="field-actions">
+            <button type="button" class="button button--ai" (click)="generateObjectivesWithAi()" aria-label="Generate with AI">🤖</button>
+            <button type="button" (click)="openObjectiveAiModal()" aria-label="Expand">⛶</button>
           </div>
         </form>
       </article>
@@ -48,48 +143,97 @@
       <article class="lane__block">
         <header>
           <h4>1.1.2 System definition</h4>
-          <p>Briefly introduce the system, along with a concise explanation of its purpose.</p>
+          <p>Briefly introduce the system, along with a concise explanation of its purpose. Constraint: complete 1.1.2 before 1.1.3.</p>
         </header>
         <form [formGroup]="generalSummaryForm" class="stack">
+          <div class="objective-source">
+            <label class="objective-radio">
+              <input
+                type="radio"
+                name="systemDefinitionSource"
+                [checked]="selectedSystemDefinitionSource() === 'manual'"
+                [disabled]="!canEdit112()"
+                (change)="selectSystemDefinitionSource('manual')"
+              />
+              <span>Use this objective</span>
+            </label>
+          </div>
           <label class="field">
             <textarea
               rows="4"
               formControlName="systemDefinition"
+              [disabled]="!canEdit112()"
               placeholder="Describe the system definition"
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai" (click)="generateSystemDefinitionWithAi()">
-              Generate with AI
-            </button>
-            <button type="button" (click)="openSystemDefinitionModal()">Expand</button>
+            <button type="button" [disabled]="!canEdit112()" (click)="openSystemDefinitionModal()" aria-label="Expand">⛶</button>
           </div>
         </form>
+
+        <form [formGroup]="systemDefinitionAiForm" class="stack">
+          <div class="objective-source">
+            <label class="objective-radio">
+              <input
+                type="radio"
+                name="systemDefinitionSource"
+                [checked]="selectedSystemDefinitionSource() === 'ai'"
+                [disabled]="!canEdit112()"
+                (change)="selectSystemDefinitionSource('ai')"
+              />
+              <span>Use this objective</span>
+            </label>
+          </div>
+          <label class="field field--ai-objective">
+            <textarea
+              rows="4"
+              formControlName="systemDefinitionText"
+              [disabled]="!canEdit112()"
+              placeholder="AI generated system definition"
+            ></textarea>
+          </label>
+          <div class="field-actions">
+            <button type="button" class="button button--ai" [disabled]="!canEdit112()" (click)="generateSystemDefinitionWithAi()" aria-label="Generate with AI">🤖</button>
+            <button type="button" [disabled]="!canEdit112()" (click)="openSystemDefinitionAiModal()" aria-label="Expand">⛶</button>
+          </div>
+        </form>
+
+        @if (!canEdit112()) {
+          <small class="hint">Complete 1.1.1 first.</small>
+        }
       </article>
 
       <article class="lane__block">
         <header>
           <h4>1.1.3 Resources Needed ({{ resourceCount() }})</h4>
-          <p>List supporting material that will inform hazards, constraints, and responsibilities.</p>
+          <p>List supporting material that will inform hazards, constraints, and responsibilities. Constraint: complete 1.1.3 before 1.1.4.</p>
         </header>
         <form class="inline-form" [formGroup]="resourceForm" (ngSubmit)="addResource()">
-          <input type="text" formControlName="name" placeholder="Resource name" />
-          <input type="text" formControlName="category" placeholder="Type" />
-          <input type="text" formControlName="reference" placeholder="Reference or link" />
-          <button type="submit">Add</button>
+          <input type="text" formControlName="name" [disabled]="!canEdit113()" placeholder="Resource name" />
+          <input type="text" formControlName="category" [disabled]="!canEdit113()" placeholder="Type" />
+          <input type="text" formControlName="reference" [disabled]="!canEdit113()" placeholder="Reference or link" />
+          <button type="submit" [disabled]="!canEdit113()">Add</button>
         </form>
+        @if (!canEdit113()) {
+          <small class="hint">Complete 1.1.2 first.</small>
+        }
         @if (resourceForm.controls.name.invalid && resourceForm.controls.name.touched) {
           <small class="hint">Resource name is required.</small>
         }
         <div class="field-actions">
-          <button type="button" class="button button--ai">Generate with AI</button>
-          <button type="button" (click)="openResourceModal()">Expand</button>
+          <button type="button" class="button button--ai" [disabled]="!canEdit113()" (click)="generateResourcesWithAi()" aria-label="Generate with AI">🤖</button>
+          <button type="button" [disabled]="!canEdit113()" (click)="openResourceModal()" aria-label="Expand">⛶</button>
         </div>
         <ul class="list list--dense">
           @for (resource of resources(); track resource.id) {
             <li>
               <div>
-                <h5>{{ resource.name }}</h5>
+                <h5>
+                  {{ resource.name }}
+                  @if (resource.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated resource" aria-label="AI-generated resource">🤖</span>
+                  }
+                </h5>
                 <p>{{ resource.category }} · {{ resource.reference }}</p>
               </div>
               <button
@@ -113,21 +257,58 @@
       <article class="lane__block">
         <header>
           <h4>1.1.4 System boundary</h4>
-          <p>Boundaries of the system under analysis.</p>
+          <p>Boundaries of the system under analysis. Constraint: complete 1.1.4 before 1.1.5.</p>
         </header>
         <form [formGroup]="generalSummaryForm" class="stack">
+          <div class="objective-source">
+            <label class="objective-radio">
+              <input
+                type="radio"
+                name="systemBoundarySource"
+                [checked]="selectedSystemBoundarySource() === 'manual'"
+                [disabled]="!canEdit114()"
+                (change)="selectSystemBoundarySource('manual')"
+              />
+              <span>Use this objective</span>
+            </label>
+          </div>
           <label class="field">
             <textarea
               rows="4"
               formControlName="systemBoundary"
+              [disabled]="!canEdit114()"
               placeholder="Describe the system boundary"
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai" (click)="generateSystemBoundaryWithAi()">
-              Generate with AI
-            </button>
-            <button type="button" (click)="openSystemBoundaryModal()">Expand</button>
+            <button type="button" [disabled]="!canEdit114()" (click)="openSystemBoundaryModal()" aria-label="Expand">⛶</button>
+          </div>
+        </form>
+
+        <form [formGroup]="systemBoundaryAiForm" class="stack">
+          <div class="objective-source">
+            <label class="objective-radio">
+              <input
+                type="radio"
+                name="systemBoundarySource"
+                [checked]="selectedSystemBoundarySource() === 'ai'"
+                [disabled]="!canEdit114()"
+                (change)="selectSystemBoundarySource('ai')"
+              />
+              <span>Use this objective</span>
+            </label>
+          </div>
+          <label class="field field--ai-objective">
+            <textarea
+              rows="4"
+              formControlName="systemBoundaryText"
+              [disabled]="!canEdit114()"
+              placeholder="AI generated system boundary"
+            ></textarea>
+          </label>
+          <div class="field-actions">
+            <button type="button" class="button button--ai" [disabled]="!canEdit114()" (click)="generateSystemBoundaryWithAi()" aria-label="Generate with AI">🤖</button>
+            <button type="button" [disabled]="!canEdit114()" (click)="openSystemBoundaryAiModal()" aria-label="Expand">⛶</button>
           </div>
         </form>
       </article>
@@ -135,25 +316,33 @@
       <article class="lane__block">
         <header>
           <h4>1.1.5 System components ({{ componentCount() }})</h4>
-          <p>Basic components of the system.</p>
+          <p>Basic components of the system. Constraint: 1.1.5 output (system components list) is required before 1.2 starts.</p>
         </header>
         <form class="inline-form" [formGroup]="componentForm" (ngSubmit)="addComponent()">
-          <input type="text" formControlName="name" placeholder="Component" />
-          <input type="text" formControlName="description" placeholder="Description" />
-          <button type="submit">Add</button>
+          <input type="text" formControlName="name" [disabled]="!canEdit115()" placeholder="Component" />
+          <input type="text" formControlName="description" [disabled]="!canEdit115()" placeholder="Description" />
+          <button type="submit" [disabled]="!canEdit115()">Add</button>
         </form>
+        @if (!canEdit115()) {
+          <small class="hint">Complete 1.1.4 first.</small>
+        }
         @if (componentForm.controls.name.invalid && componentForm.controls.name.touched) {
           <small class="hint">Component name is required.</small>
         }
         <div class="field-actions">
-          <button type="button" class="button button--ai">Generate with AI</button>
-          <button type="button" (click)="openComponentModal()">Expand</button>
+          <button type="button" class="button button--ai" [disabled]="!canEdit115()" (click)="generateComponentsWithAi()" aria-label="Generate with AI">🤖</button>
+          <button type="button" [disabled]="!canEdit115()" (click)="openComponentModal()" aria-label="Expand">⛶</button>
         </div>
         <ul class="list">
           @for (component of systemComponents(); track component.id) {
             <li>
               <div>
-                <h5>{{ component.name }}</h5>
+                <h5>
+                  {{ component.name }}
+                  @if (component.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated component" aria-label="AI-generated component">🤖</span>
+                  }
+                </h5>
                 <p>{{ component.description }}</p>
               </div>
               <button
@@ -199,6 +388,54 @@
     </div>
   }
 
+  @if (isObjectiveAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeObjectiveAiModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Analysis objectives (AI)</h4>
+          <button type="button" class="modal__close" (click)="closeObjectiveAiModal()">×</button>
+        </header>
+        <form class="stack" [formGroup]="analysisObjectiveAiModalForm">
+          <label class="field field--ai-objective">
+            <textarea
+              rows="12"
+              formControlName="objectivesText"
+              placeholder="AI generated analysis objectives"
+            ></textarea>
+          </label>
+          <div class="form__actions">
+            <button type="button" class="primary" (click)="confirmObjectiveAiModal()">Finish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isObjectivePrimaryDirectiveModalOpen()) {
+    <div class="modal-backdrop" (click)="closeObjectivePrimaryDirectiveModal()">
+      <div class="modal modal--decision" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Use manual objective as primary directive?</h4>
+          <button type="button" class="modal__close" (click)="closeObjectivePrimaryDirectiveModal()">×</button>
+        </header>
+        <p class="modal__description">
+          You have text in the manual objective field and it is different from the objective returned by Step 2 information.
+          Choose which source should be the primary orientation for AI generation.
+        </p>
+        <div class="decision-actions">
+          <button type="button" class="button" (click)="confirmObjectivePrimaryDirective(true)">Yes</button>
+          <button type="button" class="button button--secondary" (click)="confirmObjectivePrimaryDirective(false)">No</button>
+          <button type="button" class="button" (click)="confirmObjectivePrimaryDirective(true, 'always-yes')">
+            Always Yes
+          </button>
+          <button type="button" class="button button--secondary" (click)="confirmObjectivePrimaryDirective(false, 'always-no')">
+            Always No
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
   @if (isSystemDefinitionModalOpen()) {
     <div class="modal-backdrop" (click)="closeSystemDefinitionModal()">
       <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
@@ -211,11 +448,36 @@
             <textarea
               rows="12"
               formControlName="systemDefinitionText"
+              [disabled]="!canEdit112()"
               placeholder="Describe the system definition"
             ></textarea>
           </label>
           <div class="form__actions">
-            <button type="button" class="primary" (click)="confirmSystemDefinitionModal()">Finish</button>
+            <button type="button" class="primary" [disabled]="!canEdit112()" (click)="confirmSystemDefinitionModal()">Finish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isSystemDefinitionAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeSystemDefinitionAiModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>System definition (AI)</h4>
+          <button type="button" class="modal__close" (click)="closeSystemDefinitionAiModal()">×</button>
+        </header>
+        <form class="stack" [formGroup]="systemDefinitionAiModalForm">
+          <label class="field field--ai-objective">
+            <textarea
+              rows="12"
+              formControlName="systemDefinitionText"
+              [disabled]="!canEdit112()"
+              placeholder="AI generated system definition"
+            ></textarea>
+          </label>
+          <div class="form__actions">
+            <button type="button" class="primary" [disabled]="!canEdit112()" (click)="confirmSystemDefinitionAiModal()">Finish</button>
           </div>
         </form>
       </div>
@@ -299,44 +561,155 @@
             <textarea
               rows="12"
               formControlName="systemBoundaryText"
+              [disabled]="!canEdit114()"
               placeholder="Describe the system boundary"
             ></textarea>
           </label>
           <div class="form__actions">
-            <button type="button" class="primary" (click)="confirmSystemBoundaryModal()">Finish</button>
+            <button type="button" class="primary" [disabled]="!canEdit114()" (click)="confirmSystemBoundaryModal()">Finish</button>
           </div>
         </form>
       </div>
     </div>
   }
 
+  @if (isSystemBoundaryAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeSystemBoundaryAiModal()">
+      <div class="modal" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>System boundary (AI)</h4>
+          <button type="button" class="modal__close" (click)="closeSystemBoundaryAiModal()">×</button>
+        </header>
+        <form class="stack" [formGroup]="systemBoundaryAiModalForm">
+          <label class="field field--ai-objective">
+            <textarea
+              rows="12"
+              formControlName="systemBoundaryText"
+              [disabled]="!canEdit114()"
+              placeholder="AI generated system boundary"
+            ></textarea>
+          </label>
+          <div class="form__actions">
+            <button type="button" class="primary" [disabled]="!canEdit114()" (click)="confirmSystemBoundaryAiModal()">Finish</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isBpmnModelModalOpen()) {
+    <div class="modal-backdrop" (click)="closeBpmnModelModal()">
+      <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>{{ selectedBpmnModelTitle() }}</h4>
+          <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
+        </header>
+        <img
+          class="bpmn-model-image"
+          [src]="selectedBpmnModelImage()"
+          alt="BPMN model of Step 1 scope definition"
+        />
+      </div>
+    </div>
+  }
+
   <section class="card lane">
     <header class="lane__header">
-      <h3>1.2 — Safety concerns</h3>
-      <p>
+      <div class="lane__title-row">
+        <h3>1.2 — Safety concerns</h3>
+        <button
+          type="button"
+          class="button button--ai"
+          [disabled]="!canEditStep12() || isSafetyConcernsAiRunning()"
+          (click)="generateSafetyConcernsWithAi()"
+          aria-label="Generate with AI"
+        >🤖</button>
+      </div>
+      <p class="lane__subtitle">
         Transition from mission framing to safety implications. Establish accidents, hazards, safety constraints,
-        responsibilities, and artefacts that will connect with later iStar4Safety and STPA models.
+        responsibilities, and traceability links (including optional UCAs) for later iStar4Safety and STPA modelling.
       </p>
+      <div class="bpmn-preview-inline">
+        <button
+          type="button"
+          class="button button--secondary"
+          (click)="openBpmnModelModal('1.2 — Safety concerns', '/assets/scope-safety-concerns-bpmn.jpg')"
+        >
+          BPMN model
+        </button>
+        <button
+          type="button"
+          class="bpmn-preview-thumb"
+          (click)="openBpmnModelModal('1.2 — Safety concerns', '/assets/scope-safety-concerns-bpmn.jpg')"
+          aria-label="Open BPMN model preview for 1.2"
+        >
+          <img src="/assets/scope-safety-concerns-bpmn.jpg" alt="Small preview of the 1.2 BPMN model" />
+        </button>
+      </div>
     </header>
 
-    <div class="lane__grid">
+    <div class="lane__content" [class.lane__content--locked]="!canEditStep12()">
+      @if (!canEditStep12()) {
+        <div class="lane-lock-overlay" role="status" aria-live="polite">
+          <p class="lane-lock-overlay__title">Step 1.2 is locked</p>
+          <p class="lane-lock-overlay__text">Complete all fields from 1.1.1 to 1.1.5 to unlock Safety concerns.</p>
+        </div>
+      }
+
+      <div class="lane__grid" [attr.inert]="!canEditStep12() ? '' : null" [attr.aria-disabled]="!canEditStep12()">
       <article class="lane__block">
         <header>
-          <h4>1.2.1 Identify unacceptable outcomes ({{ accidentCount() }})</h4>
-          <p>Record accidents that motivate safety constraints.</p>
+          <h4>1.2.1 Loss identification ({{ accidentCount() }})</h4>
+          <p>Define unacceptable losses in system-level terms (without component/cause assignments). Constraint: complete 1.1.5 before 1.2.1, and 1.2.1 before 1.2.2.</p>
         </header>
-        <form class="inline-form" [formGroup]="accidentForm" (ngSubmit)="addAccident()">
-          <input type="text" formControlName="code" placeholder="Accident code" />
-          <input type="text" formControlName="description" placeholder="Accident description" />
-          <button type="submit">Add</button>
+        <form class="stack" [formGroup]="accidentForm" (ngSubmit)="addAccident()">
+          <label class="field">
+            <span>Loss ID (Lx)</span>
+            <input type="text" formControlName="code" [disabled]="!canEditStep12()" placeholder="L1" />
+          </label>
+          <label class="field">
+            <span>Loss description</span>
+            <textarea rows="3" formControlName="description" [disabled]="!canEditStep12()" placeholder="Unplanned and undesired event with significant loss."></textarea>
+          </label>
+          <button type="submit" [disabled]="!canEditStep12()">Add</button>
         </form>
+        <div class="field-actions">
+          <button type="button" class="button button--ai" [disabled]="!canEditStep12()" (click)="generateLossesWithAi()" aria-label="Generate with AI">🤖</button>
+        </div>
+        @if (!canEditStep12()) {
+          <small class="hint">Complete 1.1.5 (system components list) first.</small>
+        }
+        @if (accidentForm.controls.code.touched && accidentForm.controls.code.errors?.['pattern']) {
+          <small class="hint">Loss ID must match Lx (e.g., L1, L2).</small>
+        }
+        @if (accidentForm.controls.description.touched && accidentForm.controls.description.errors?.['componentOrCauseReference']) {
+          <small class="hint">Loss description must avoid component-specific or cause-specific wording.</small>
+        }
         <ul class="list list--dense">
           @for (accident of accidents(); track accident.id) {
             <li>
               <div>
-                <h5>{{ accident.code }}</h5>
+                <h5>
+                  {{ accident.code }}
+                  @if (accident.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated loss" aria-label="AI-generated loss">🤖</span>
+                  }
+                </h5>
                 <p>{{ accident.description }}</p>
               </div>
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="Remove accident"
+                (click)="removeAccident(accident.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
             </li>
           }
         </ul>
@@ -344,38 +717,80 @@
 
       <article class="lane__block">
         <header>
-          <h4>1.2.2 Elicit system hazards ({{ hazardCount() }})</h4>
-          <p>Map hazards back to the accidents they could trigger.</p>
+          <h4>1.2.2 System-level hazard identification ({{ hazardCount() }})</h4>
+          <p>Define hazardous system states and link each hazard to at least one loss. Constraint: hazards must be identified before safety constraints (1.2.3).</p>
         </header>
         <form class="stack" [formGroup]="hazardForm" (ngSubmit)="addHazard()">
           <label class="field">
-            <span>Hazard code</span>
-            <input type="text" formControlName="code" />
+            <span>Hazard ID (Hx)</span>
+            <input type="text" formControlName="code" [disabled]="!canEdit122()" placeholder="H1" />
           </label>
           <label class="field">
             <span>Hazard description</span>
-            <textarea rows="2" formControlName="description"></textarea>
+            <textarea rows="3" formControlName="description" [disabled]="!canEdit122()" placeholder="System-level condition that may lead to accident(s)."></textarea>
           </label>
           <label class="field">
-            <span>Related accidents</span>
-            <input type="text" formControlName="linkedAccidents" placeholder="e.g. A1, A2" />
+            <span>Associated losses</span>
+            <select formControlName="linkedAccidents" [disabled]="!canEdit122()" multiple>
+              @for (accident of accidents(); track accident.id) {
+                <option [value]="accident.code">{{ accident.code }} — {{ accident.description }}</option>
+              }
+            </select>
           </label>
-          <button type="submit">Add hazard</button>
+          <label class="field">
+            <span>Associated UCAs (optional, iterative)</span>
+            <select formControlName="linkedUcas" [disabled]="!canEdit122()" multiple>
+              @for (uca of availableUcas(); track uca) {
+                <option [value]="uca">{{ uca }}</option>
+              }
+            </select>
+          </label>
+          <button type="submit" [disabled]="!canEdit122()">Add hazard</button>
         </form>
+        <div class="field-actions">
+          <button type="button" class="button button--ai" [disabled]="!canEdit122()" (click)="generateHazardsWithAi()" aria-label="Generate with AI">🤖</button>
+        </div>
+        @if (!canEdit122()) {
+          <small class="hint">Complete 1.2.1 first by identifying at least one loss.</small>
+        }
+        @if (hazardForm.controls.code.touched && hazardForm.controls.code.errors?.['pattern']) {
+          <small class="hint">Hazard ID must match Hx (e.g., H1, H2).</small>
+        }
+        @if (hazardForm.controls.linkedAccidents.touched && hazardForm.controls.linkedAccidents.errors?.['required']) {
+          <small class="hint">Select at least one associated accident.</small>
+        }
         <table class="table">
           <thead>
             <tr>
               <th>Code</th>
               <th>Description</th>
-              <th>Accidents</th>
+              <th>Losses</th>
+              <th>UCAs</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             @for (hazard of hazards(); track hazard.id) {
               <tr>
                 <td>{{ hazard.code }}</td>
-                <td>{{ hazard.description }}</td>
-                <td>{{ hazard.linkedAccidents }}</td>
+                <td>
+                  {{ hazard.description }}
+                  @if (hazard.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated hazard" aria-label="AI-generated hazard">🤖</span>
+                  }
+                </td>
+                <td>{{ hazard.linkedAccidents.join(', ') }}</td>
+                <td>{{ hazard.linkedUcas.join(', ') }}</td>
+                <td>
+                  <button type="button" class="icon-button" aria-label="Remove hazard" (click)="removeHazard(hazard.id)">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path
+                        d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </td>
               </tr>
             }
           </tbody>
@@ -384,31 +799,68 @@
 
       <article class="lane__block">
         <header>
-          <h4>1.2.3 Capture safety constraints</h4>
-          <p>State how the socio-technical system prevents or mitigates the hazards.</p>
+          <h4>1.2.3 Safety constraint identification</h4>
+          <p>Define high-level negated constraints and trace each one to known hazard(s). Constraint: complete 1.2.3 before defining responsibilities in 1.2.4.</p>
         </header>
         <form class="stack" [formGroup]="constraintForm" (ngSubmit)="addConstraint()">
           <label class="field">
-            <span>Constraint code</span>
-            <input type="text" formControlName="code" />
+            <span>Safety Constraint ID (SC-xx)</span>
+            <input type="text" formControlName="code" [disabled]="!canEdit123()" placeholder="SC-01" />
           </label>
           <label class="field">
-            <span>Constraint statement</span>
-            <textarea rows="2" formControlName="statement"></textarea>
+            <span>Constraint description</span>
+            <textarea rows="3" formControlName="statement" [disabled]="!canEdit123()" placeholder="The system must not ..."></textarea>
           </label>
           <label class="field">
-            <span>Hazards mitigated</span>
-            <input type="text" formControlName="linkedHazards" placeholder="e.g. H1" />
+            <span>Associated hazards</span>
+            <select formControlName="linkedHazards" [disabled]="!canEdit123()" multiple>
+              @for (hazard of hazards(); track hazard.id) {
+                <option [value]="hazard.code">{{ hazard.code }} — {{ hazard.description }}</option>
+              }
+            </select>
           </label>
-          <button type="submit">Record constraint</button>
+          <button type="submit" [disabled]="!canEdit123()">Record constraint</button>
         </form>
+        <div class="field-actions">
+          <button type="button" class="button button--ai" [disabled]="!canEdit123()" (click)="generateConstraintsWithAi()" aria-label="Generate with AI">🤖</button>
+        </div>
+        @if (!canEdit123()) {
+          <small class="hint">Complete 1.2.2 first by identifying at least one hazard.</small>
+        }
+        @if (constraintForm.controls.code.touched && constraintForm.controls.code.errors?.['pattern']) {
+          <small class="hint">Constraint ID must match SC-xx (e.g., SC-01).</small>
+        }
+        @if (constraintForm.controls.statement.touched && constraintForm.controls.statement.errors?.['negationRequired']) {
+          <small class="hint">Constraint should be stated as a negation (e.g., “must not ...”).</small>
+        }
+        @if (constraintForm.controls.linkedHazards.touched && constraintForm.controls.linkedHazards.errors?.['required']) {
+          <small class="hint">Select at least one associated hazard.</small>
+        }
         <ul class="list list--dense">
           @for (constraint of constraints(); track constraint.id) {
             <li>
               <div>
-                <h5>{{ constraint.code }} — {{ constraint.statement }}</h5>
-                <p>Mitigates: {{ constraint.linkedHazards }}</p>
+                <h5>
+                  {{ constraint.code }} — {{ constraint.statement }}
+                  @if (constraint.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated constraint" aria-label="AI-generated constraint">🤖</span>
+                  }
+                </h5>
+                <p>Hazards: {{ constraint.linkedHazards.join(', ') }}</p>
               </div>
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="Remove safety constraint"
+                (click)="removeConstraint(constraint.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
             </li>
           }
         </ul>
@@ -416,38 +868,81 @@
 
       <article class="lane__block">
         <header>
-          <h4>1.2.4 Assign safety responsibilities</h4>
-          <p>Trace responsibilities to the components catalogued in Substep 1.1.</p>
+          <h4>1.2.4 Responsibilities definition</h4>
+          <p>Assign explicit actor/component responsibilities and trace them to constraints they enforce. Constraint: responsibilities are refinements of safety constraints and must follow 1.2.3.</p>
         </header>
         <form class="stack" [formGroup]="responsibilityForm" (ngSubmit)="addResponsibility()">
           <label class="field">
-            <span>Component</span>
-            <input type="text" formControlName="component" placeholder="Component" />
+            <span>Responsibility ID</span>
+            <input type="text" formControlName="code" [disabled]="!canEdit124()" placeholder="R-01" />
+          </label>
+          <label class="field">
+            <span>System actor / component</span>
+            <input type="text" formControlName="component" [disabled]="!canEdit124()" placeholder="Actor or component name" />
           </label>
           <label class="field">
             <span>Responsibility</span>
-            <textarea rows="2" formControlName="responsibility"></textarea>
+            <textarea rows="3" formControlName="responsibility" [disabled]="!canEdit124()" placeholder="What this actor/component must do to enforce the linked constraints."></textarea>
           </label>
           <label class="field">
-            <span>Linked constraints</span>
-            <input type="text" formControlName="linkedConstraints" placeholder="e.g. SC-01" />
+            <span>Addressed safety constraints</span>
+            <select formControlName="linkedConstraints" [disabled]="!canEdit124()" multiple>
+              @for (constraint of constraints(); track constraint.id) {
+                <option [value]="constraint.code">{{ constraint.code }} — {{ constraint.statement }}</option>
+              }
+            </select>
           </label>
-          <button type="submit">Add responsibility</button>
+          <button type="submit" [disabled]="!canEdit124()">Add responsibility</button>
         </form>
+        <div class="field-actions">
+          <button type="button" class="button button--ai" [disabled]="!canEdit124()" (click)="generateResponsibilitiesWithAi()" aria-label="Generate with AI">🤖</button>
+        </div>
+        @if (!canEdit124()) {
+          <small class="hint">Complete 1.2.3 first by defining at least one safety constraint.</small>
+        }
+        @if (responsibilityForm.controls.code.touched && responsibilityForm.controls.code.errors?.['pattern']) {
+          <small class="hint">Responsibility ID must match R-xx (e.g., R-01).</small>
+        }
+        @if (responsibilityForm.controls.linkedConstraints.touched && responsibilityForm.controls.linkedConstraints.errors?.['required']) {
+          <small class="hint">Select at least one addressed safety constraint.</small>
+        }
         <table class="table">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Component</th>
               <th>Responsibility</th>
               <th>Constraints</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             @for (responsibility of responsibilities(); track responsibility.id) {
               <tr>
+                <td>{{ responsibility.code }}</td>
                 <td>{{ responsibility.component }}</td>
-                <td>{{ responsibility.responsibility }}</td>
-                <td>{{ responsibility.linkedConstraints }}</td>
+                <td>
+                  {{ responsibility.responsibility }}
+                  @if (responsibility.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated responsibility" aria-label="AI-generated responsibility">🤖</span>
+                  }
+                </td>
+                <td>{{ responsibility.linkedConstraints.join(', ') }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="icon-button"
+                    aria-label="Remove responsibility"
+                    (click)="removeResponsibility(responsibility.id)"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <path
+                        d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                        fill="currentColor"
+                      />
+                    </svg>
+                  </button>
+                </td>
               </tr>
             }
           </tbody>
@@ -456,28 +951,63 @@
 
       <article class="lane__block">
         <header>
-          <h4>1.2.5 Register supporting artefacts</h4>
-          <p>Record any artefact that substantiates the identified safety responsibilities.</p>
+          <h4>1.2.5 Relevant artefacts ({{ artefactCount() }})</h4>
+          <p>List additional safety-relevant artefacts available or needed for the project. Constraint: complete 1.2.4 first.</p>
         </header>
         <form class="inline-form" [formGroup]="artefactForm" (ngSubmit)="addArtefact()">
-          <input type="text" formControlName="name" placeholder="Artefact name" />
-          <input type="text" formControlName="purpose" placeholder="Purpose" />
-          <input type="text" formControlName="reference" placeholder="Repository or link" />
-          <button type="submit">Add</button>
+          <input type="text" formControlName="name" [disabled]="!canEdit125()" placeholder="Artefact name" />
+          <input type="text" formControlName="purpose" [disabled]="!canEdit125()" placeholder="Purpose" />
+          <input type="text" formControlName="reference" [disabled]="!canEdit125()" placeholder="Reference or link" />
+          <button type="submit" [disabled]="!canEdit125()">Add</button>
         </form>
+        <div class="field-actions">
+          <button type="button" class="button button--ai" [disabled]="!canEdit125()" (click)="generateArtefactsWithAi()" aria-label="Generate with AI">🤖</button>
+        </div>
+        @if (!canEdit125()) {
+          <small class="hint">Complete 1.2.4 first by defining at least one responsibility.</small>
+        }
+        @if (artefactForm.controls.name.invalid && artefactForm.controls.name.touched) {
+          <small class="hint">Artefact name is required.</small>
+        }
         <ul class="list list--dense">
           @for (artefact of artefacts(); track artefact.id) {
             <li>
               <div>
-                <h5>{{ artefact.name }}</h5>
-                <p>{{ artefact.purpose }}</p>
-                <p class="muted">{{ artefact.reference }}</p>
+                <h5>
+                  {{ artefact.name }}
+                  @if (artefact.sourceType === 'ai') {
+                    <span class="resource-ai-badge" title="AI-generated artefact" aria-label="AI-generated artefact">🤖</span>
+                  }
+                </h5>
+                <p>{{ artefact.purpose }} · {{ artefact.reference }}</p>
               </div>
+              <button
+                type="button"
+                class="icon-button"
+                aria-label="Remove artefact"
+                (click)="removeArtefact(artefact.id)"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM6 9h2v9H6V9z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
             </li>
           }
         </ul>
       </article>
     </div>
+    </div>
+
+    @if (safetyConcernsErrors().length > 0) {
+      <ul class="list list--dense">
+        @for (error of safetyConcernsErrors(); track error) {
+          <li><p>{{ error }}</p></li>
+        }
+      </ul>
+    }
   </section>
 
   <div class="page-actions page-actions--bottom">

@@ -51,6 +51,7 @@ export class HomePageComponent {
   readonly projects = signal<HomeProject[]>([]);
   readonly selectedTimelineStep = signal<TimelineInfo | null>(null);
   readonly modalStack = signal<TimelineInfo[]>([]);
+  readonly isBpmnModelModalOpen = signal(false);
 
   readonly timelineSteps: TimelineStep[] = [
     {
@@ -90,7 +91,7 @@ export class HomePageComponent {
       id: 4,
       title: 'Identify Unsafe Control Actions and Hazardous Conditions',
       description:
-        'Identify unsafe control actions, map them to hazards and responsibilities, and model hazardous conditions.',
+        'Identify unsafe control actions, map them to hazards and responsibilities, model hazardous conditions, and conclude with controller constraints.',
       substeps: [
         '4.1 - Select Control Action',
         '4.2 - Not Providing',
@@ -99,40 +100,35 @@ export class HomePageComponent {
         '4.5 - Duration',
         '4.6 - Associate UCAs with Hazards',
         '4.7 - Associate UCAs with Responsibilities',
-        '4.8 - Model Hazardous Conditions (HC)'
+        '4.8 - Model Hazardous Conditions (HC)',
+        '4.9 - Analyze Identified UCAs and HCs',
+        '4.10 - Formulate Constraints'
       ]
     },
     {
       id: 5,
-      title: 'Derive Safety Constraints',
-      description:
-        'Analyze UCAs and hazardous conditions to derive safety constraints that prevent accidents.',
-      substeps: ['5.1 - Analyze Identified UCAs and HCs', '5.2 - Formulate Constraints']
-    },
-    {
-      id: 6,
       title: 'Identify Loss Scenarios and Safety Requirements',
       description:
         'Develop loss scenarios from UCAs/HCs and derive safety requirements to mitigate them.',
       substeps: [
-        '6.1 - Select UCA/HC',
-        '6.2 - Identify Potential Loss Scenarios',
-        '6.3 - Derive Safety Requirements for Loss Scenarios'
+        '5.1 - Select UCA/HC',
+        '5.2 - Identify Potential Loss Scenarios',
+        '5.3 - Derive Safety Requirements for Loss Scenarios'
       ]
     },
     {
-      id: 7,
+      id: 6,
       title: 'Update the iStar4Safety Models',
       description:
         'Incorporate findings back into the models to ensure full traceability and safety logic operationalization.',
       substeps: [
-        '7.1 - Model UCA or Hazardous Conditions',
-        '7.2 - Model Loss Scenarios as Hazard Elements',
-        '7.3 - Link UCAs/HCs to Responsibility',
-        '7.4 - Model Safety Requirements as Safety Tasks',
-        '7.5 - Collapse Actor Boundaries for SD Model',
-        '7.6 - Expand Actor Boundaries for SR Model',
-        '7.7 - Verify All Models'
+        '6.1 - Model UCA or Hazardous Conditions',
+        '6.2 - Model Loss Scenarios as Hazard Elements',
+        '6.3 - Link UCAs/HCs to Responsibility',
+        '6.4 - Model Safety Requirements as Safety Tasks',
+        '6.5 - Collapse Actor Boundaries for SD Model',
+        '6.6 - Expand Actor Boundaries for SR Model',
+        '6.7 - Verify All Models'
       ]
     }
   ];
@@ -1161,8 +1157,8 @@ export class HomePageComponent {
         'Defining New Hazards: If the current model does not have a hazard that fits the HC, the analyst must create a new one.'
       ]
     },
-    '5.1 - Analyze Identified UCAs and HCs': {
-      title: '5.1 - Analyze Identified UCAs and HCs',
+    '4.9 - Analyze Identified UCAs and HCs': {
+      title: '4.9 - Analyze Identified UCAs and HCs',
       description:
         'Transition from unsafe behaviors to the positive requirements needed for controller constraints.',
       substeps: [
@@ -1206,10 +1202,10 @@ export class HomePageComponent {
         'Purpose: Ensures every unsafe behavior leads directly to a defined constraint for implementation or verification.'
       ]
     },
-    '5.2 - Formulate Constraints': {
-      title: '5.2 - Formulate Constraints',
+    '4.10 - Formulate Constraints': {
+      title: '4.10 - Formulate Constraints',
       description:
-        'Translate the analyzed conditions from Step 5.1 into explicit controller requirements.',
+        'Translate the analyzed conditions from Step 4.9 into explicit controller requirements.',
       substeps: [
         'Specify Required Controller Behavior',
         'Specify Prohibited Controller Behavior',
@@ -1243,7 +1239,7 @@ export class HomePageComponent {
       title: 'Update the Controller Constraints List',
       description: 'Record finalized constraints in the safety analysis document.',
       substeps: [
-        'Purpose: The updated list supports Step 6 and future verification/validation activities.'
+        'Purpose: The updated list supports Step 5 and future verification/validation activities.'
       ]
     },
     'Example: IIP System Controller Constraints Table': {
@@ -1256,8 +1252,8 @@ export class HomePageComponent {
         'HC-01: Pump is misplaced or inaccessible → C-06: Pump must be in an accessible and known location.'
       ]
     },
-    '6.1 - Select UCA/HC': {
-      title: '6.1 - Select UCA/HC',
+    '5.1 - Select UCA/HC': {
+      title: '5.1 - Select UCA/HC',
       description:
         'Entry point for loss-based reasoning: select one UCA or HC to investigate how and why it happens.',
       substeps: [
@@ -1296,8 +1292,8 @@ export class HomePageComponent {
         'Selected HC: HC-01 — “The pump is misplaced or inaccessible to the patient”.'
       ]
     },
-    '6.2 - Identify Potential Loss Scenarios': {
-      title: '6.2 - Identify Potential Loss Scenarios',
+    '5.2 - Identify Potential Loss Scenarios': {
+      title: '5.2 - Identify Potential Loss Scenarios',
       description:
         'Investigate causal factors that could transform an unsafe behavior into a system-level hazard.',
       substeps: [
@@ -1339,8 +1335,8 @@ export class HomePageComponent {
         'HC-01: Pump is misplaced or inaccessible → LS-11: Patient in critical condition cannot remember where the pump was placed.'
       ]
     },
-    '6.3 - Derive Safety Requirements for Loss Scenarios': {
-      title: '6.3 - Derive Safety Requirements for Loss Scenarios',
+    '5.3 - Derive Safety Requirements for Loss Scenarios': {
+      title: '5.3 - Derive Safety Requirements for Loss Scenarios',
       description:
         'Transform Loss Scenarios (LS) into concrete, actionable Safety Requirements (SR).',
       substeps: [
@@ -1349,11 +1345,11 @@ export class HomePageComponent {
         'Formulate Mitigation Strategies',
         'Register Safety Requirements',
         'Establish Traceability Links',
-        'Illustrative Example: IIP System (Step 6.3)'
+        'Illustrative Example: IIP System (Step 5.3)'
       ]
     },
-    'Core Objectives (Step 6.3)': {
-      title: 'Core Objectives (Step 6.3)',
+    'Core Objectives (Step 5.3)': {
+      title: 'Core Objectives (Step 5.3)',
       description: 'Key goals when deriving safety requirements.',
       substeps: [
         'Preventing Manifestation: Design measures that stop a loss scenario from occurring.',
@@ -1376,13 +1372,13 @@ export class HomePageComponent {
       description: 'Record each derived SR in a dedicated list.',
       substeps: []
     },
-    'Establish Traceability Links (Step 6.3)': {
-      title: 'Establish Traceability Links (Step 6.3)',
+    'Establish Traceability Links (Step 5.3)': {
+      title: 'Establish Traceability Links (Step 5.3)',
       description: 'Link each SR to one or more Loss Scenarios.',
       substeps: []
     },
-    'Illustrative Example: IIP System (Step 6.3)': {
-      title: 'Illustrative Example: IIP System (Step 6.3)',
+    'Illustrative Example: IIP System (Step 5.3)': {
+      title: 'Illustrative Example: IIP System (Step 5.3)',
       description: 'Examples of LS-to-SR derivations in the IIP case study.',
       substeps: [
         'LS-01: Patient forgets to program the dose after a meal → SR-01: System shall generate an alert if insulin is not programmed within 15 minutes after a meal is detected.',
@@ -1391,21 +1387,21 @@ export class HomePageComponent {
         'LS-11: Patient cannot remember pump location → SR-10: Pump must support a “locate pump” mobile alert with audible alarm.'
       ]
     },
-    '7.1 - Model UCA or Hazardous Conditions': {
-      title: '7.1 - Model UCA or Hazardous Conditions',
+    '6.1 - Model UCA or Hazardous Conditions': {
+      title: '6.1 - Model UCA or Hazardous Conditions',
       description:
         'Bring UCAs and HCs back into the iStar4Safety SR model as safety tasks for the next iteration.',
       substeps: [
-        'Orientation for Step 7.1',
+        'Orientation for Step 6.1',
         'Modeling Construct',
         'Logical Placement',
         'ID Mapping',
         'Functional Connection',
-        'IIP System Example (Step 7.1)'
+        'IIP System Example (Step 6.1)'
       ]
     },
-    'Orientation for Step 7.1': {
-      title: 'Orientation for Step 7.1',
+    'Orientation for Step 6.1': {
+      title: 'Orientation for Step 6.1',
       description:
         'Incorporate every UCA and HC into the internal reasoning structure of system actors.',
       substeps: []
@@ -1434,24 +1430,24 @@ export class HomePageComponent {
         'Prepare safety tasks for linking to actor responsibilities in subsequent substeps.',
       substeps: []
     },
-    'IIP System Example (Step 7.1)': {
-      title: 'IIP System Example (Step 7.1)',
+    'IIP System Example (Step 6.1)': {
+      title: 'IIP System Example (Step 6.1)',
       description: 'Example modeling for the Insulin Infusion Pump scenario.',
       substeps: [
         'UCA-01 through UCA-05 are added as Safety Tasks within the E1 - Patient (Human Controller) boundary.',
         'HC-01 (“Pump is misplaced”) is added as a Safety Task (or Hazard element) within the same boundary.'
       ]
     },
-    '7.2 - Model Loss Scenarios as Hazard Elements': {
-      title: '7.2 - Model Loss Scenarios as Hazard Elements',
+    '6.2 - Model Loss Scenarios as Hazard Elements': {
+      title: '6.2 - Model Loss Scenarios as Hazard Elements',
       description:
         'Transform Loss Scenarios into explicit Hazard elements so the SR model captures how unsafe behavior emerges in context.',
       substeps: [
         'Treatment of Scenarios',
-        'Modeling Construct (Step 7.2)',
-        'Establishing Links (Step 7.2)',
-        'Traceability (Step 7.2)',
-        'IIP System Example (Step 7.2)'
+        'Modeling Construct (Step 6.2)',
+        'Establishing Links (Step 6.2)',
+        'Traceability (Step 6.2)',
+        'IIP System Example (Step 6.2)'
       ]
     },
     'Treatment of Scenarios': {
@@ -1460,26 +1456,26 @@ export class HomePageComponent {
         'Loss Scenarios are treated as “hazard causes” that trigger an Unsafe Control Action (UCA) or Hazardous Condition (HC).',
       substeps: []
     },
-    'Modeling Construct (Step 7.2)': {
-      title: 'Modeling Construct (Step 7.2)',
+    'Modeling Construct (Step 6.2)': {
+      title: 'Modeling Construct (Step 6.2)',
       description:
         'Each scenario is modeled as a Hazard element (typically shown as a red, jagged, or distinctively colored bubble) in the SR model.',
       substeps: []
     },
-    'Establishing Links (Step 7.2)': {
-      title: 'Establishing Links (Step 7.2)',
+    'Establishing Links (Step 6.2)': {
+      title: 'Establishing Links (Step 6.2)',
       description:
         'Every modeled Loss Scenario is explicitly linked to the specific UCA or HC it contributes to.',
       substeps: []
     },
-    'Traceability (Step 7.2)': {
-      title: 'Traceability (Step 7.2)',
+    'Traceability (Step 6.2)': {
+      title: 'Traceability (Step 6.2)',
       description:
         'Maintains a rigorous paper trail from high-level accidents down to the causal trigger in the model.',
       substeps: []
     },
-    'IIP System Example (Step 7.2)': {
-      title: 'IIP System Example (Step 7.2)',
+    'IIP System Example (Step 6.2)': {
+      title: 'IIP System Example (Step 6.2)',
       description:
         'The model becomes the bridge between unsafe behavior and environmental triggers in the Insulin Infusion Pump case.',
       substeps: [
@@ -1488,37 +1484,37 @@ export class HomePageComponent {
         'Identifying Gaps: This makes it visually obvious why Responsibility R-01 is at risk of being obstructed.'
       ]
     },
-    '7.3 - Link UCAs/HCs to Responsibility': {
-      title: '7.3 - Link UCAs/HCs to Responsibility',
+    '6.3 - Link UCAs/HCs to Responsibility': {
+      title: '6.3 - Link UCAs/HCs to Responsibility',
       description:
         'Connect unsafe behaviors back to the safety responsibilities they jeopardize within the SR model.',
       substeps: [
-        'Mechanism (Step 7.3)',
-        'Logic (Step 7.3)',
-        'Traceability (Step 7.3)',
-        'IIP System Example (Step 7.3)'
+        'Mechanism (Step 6.3)',
+        'Logic (Step 6.3)',
+        'Traceability (Step 6.3)',
+        'IIP System Example (Step 6.3)'
       ]
     },
-    'Mechanism (Step 7.3)': {
-      title: 'Mechanism (Step 7.3)',
+    'Mechanism (Step 6.3)': {
+      title: 'Mechanism (Step 6.3)',
       description:
         'Use the iStar4Safety “Obstructs” link to connect a UCA/HC (Safety Task) to the Responsibility (Safety Goal) it endangers.',
       substeps: []
     },
-    'Logic (Step 7.3)': {
-      title: 'Logic (Step 7.3)',
+    'Logic (Step 6.3)': {
+      title: 'Logic (Step 6.3)',
       description:
         'The link shows how unsafe control actions or hazardous conditions prevent an actor from fulfilling safety-critical duties.',
       substeps: []
     },
-    'Traceability (Step 7.3)': {
-      title: 'Traceability (Step 7.3)',
+    'Traceability (Step 6.3)': {
+      title: 'Traceability (Step 6.3)',
       description:
         'Captures the refinement of safety constraints by pinpointing exactly where responsibilities are obstructed.',
       substeps: []
     },
-    'IIP System Example (Step 7.3)': {
-      title: 'IIP System Example (Step 7.3)',
+    'IIP System Example (Step 6.3)': {
+      title: 'IIP System Example (Step 6.3)',
       description:
         '“Obstructs” links for the E1 - Patient (Human Controller) responsibilities.',
       substeps: [
@@ -1530,52 +1526,52 @@ export class HomePageComponent {
         'HC-01 (Pump misplaced/inaccessible) → R-01 (Ensure configured settings correspond to prescription).'
       ]
     },
-    '7.4 - Model Safety Requirements as Safety Tasks': {
-      title: '7.4 - Model Safety Requirements as Safety Tasks',
+    '6.4 - Model Safety Requirements as Safety Tasks': {
+      title: '6.4 - Model Safety Requirements as Safety Tasks',
       description:
         'Integrate Safety Requirements into the SR model as Safety Task elements to complete the safety logic.',
       substeps: [
-        'Orientation for Step 7.4',
-        'Modeling Construct (Step 7.4)',
-        'Mitigation Logic (Step 7.4)',
-        'OR Relationship (Step 7.4)',
-        'Labeling for Traceability (Step 7.4)',
-        'IIP System Example (Step 7.4)',
-        'Full Safety Reasoning Structure (Step 7.4)'
+        'Orientation for Step 6.4',
+        'Modeling Construct (Step 6.4)',
+        'Mitigation Logic (Step 6.4)',
+        'OR Relationship (Step 6.4)',
+        'Labeling for Traceability (Step 6.4)',
+        'IIP System Example (Step 6.4)',
+        'Full Safety Reasoning Structure (Step 6.4)'
       ]
     },
-    'Orientation for Step 7.4': {
-      title: 'Orientation for Step 7.4',
+    'Orientation for Step 6.4': {
+      title: 'Orientation for Step 6.4',
       description:
-        'Add each Safety Requirement (SR) derived in Step 6 as a Safety Task in the SR model.',
+        'Add each Safety Requirement (SR) derived in Step 5 as a Safety Task in the SR model.',
       substeps: []
     },
-    'Modeling Construct (Step 7.4)': {
-      title: 'Modeling Construct (Step 7.4)',
+    'Modeling Construct (Step 6.4)': {
+      title: 'Modeling Construct (Step 6.4)',
       description:
         'Safety requirements are represented as Safety Task elements in iStar4Safety.',
       substeps: []
     },
-    'Mitigation Logic (Step 7.4)': {
-      title: 'Mitigation Logic (Step 7.4)',
+    'Mitigation Logic (Step 6.4)': {
+      title: 'Mitigation Logic (Step 6.4)',
       description:
         'Each Safety Task must be explicitly linked to the Loss Scenarios (LS) it mitigates.',
       substeps: []
     },
-    'OR Relationship (Step 7.4)': {
-      title: 'OR Relationship (Step 7.4)',
+    'OR Relationship (Step 6.4)': {
+      title: 'OR Relationship (Step 6.4)',
       description:
         'When multiple SRs address the same LS, connect them with an OR relationship to show any one is sufficient.',
       substeps: []
     },
-    'Labeling for Traceability (Step 7.4)': {
-      title: 'Labeling for Traceability (Step 7.4)',
+    'Labeling for Traceability (Step 6.4)': {
+      title: 'Labeling for Traceability (Step 6.4)',
       description:
         'Label each SR with its unique ID (e.g., SR-01, SR-02) and keep detailed descriptions in documentation or tool fields.',
       substeps: []
     },
-    'IIP System Example (Step 7.4)': {
-      title: 'IIP System Example (Step 7.4)',
+    'IIP System Example (Step 6.4)': {
+      title: 'IIP System Example (Step 6.4)',
       description:
         'Defensive safety layer modeling for the Insulin Infusion Pump case study.',
       substeps: [
@@ -1585,8 +1581,8 @@ export class HomePageComponent {
         'SR-01 and SR-02 are linked to LS-01 and LS-02 Hazard elements, completing traceability back to UCA-01.'
       ]
     },
-    'Full Safety Reasoning Structure (Step 7.4)': {
-      title: 'Full Safety Reasoning Structure (Step 7.4)',
+    'Full Safety Reasoning Structure (Step 6.4)': {
+      title: 'Full Safety Reasoning Structure (Step 6.4)',
       description:
         'A safety element is complete only when the full logic chain is present.',
       substeps: [
@@ -1596,111 +1592,111 @@ export class HomePageComponent {
         'Mitigation: The Safety Task that addresses the LS (e.g., SR-01).'
       ]
     },
-    '7.5 - Collapse Actor Boundaries for SD Model': {
-      title: '7.5 - Collapse Actor Boundaries for SD Model',
+    '6.5 - Collapse Actor Boundaries for SD Model': {
+      title: '6.5 - Collapse Actor Boundaries for SD Model',
       description:
         'Summarize the system’s social and strategic interactions by collapsing SR internals into a high-level SD view.',
       substeps: [
-        'Orientation for Step 7.5',
-        'Boundary Collapsing (Step 7.5)',
-        'External View (Step 7.5)',
-        'Exclusion of Safety Elements (Step 7.5)',
-        'Logic (Step 7.5)',
-        'Refinement (Step 7.5)',
-        'Why Behind Step 7.5',
-        'Model View Comparison (Step 7.5)'
+        'Orientation for Step 6.5',
+        'Boundary Collapsing (Step 6.5)',
+        'External View (Step 6.5)',
+        'Exclusion of Safety Elements (Step 6.5)',
+        'Logic (Step 6.5)',
+        'Refinement (Step 6.5)',
+        'Why Behind Step 6.5',
+        'Model View Comparison (Step 6.5)'
       ]
     },
-    'Orientation for Step 7.5': {
-      title: 'Orientation for Step 7.5',
+    'Orientation for Step 6.5': {
+      title: 'Orientation for Step 6.5',
       description:
         'Provide a clean, high-level summary of social and strategic interactions without internal safety reasoning details.',
       substeps: []
     },
-    'Boundary Collapsing (Step 7.5)': {
-      title: 'Boundary Collapsing (Step 7.5)',
+    'Boundary Collapsing (Step 6.5)': {
+      title: 'Boundary Collapsing (Step 6.5)',
       description:
-        'Hide or collapse the internal actor boundaries that were expanded in Step 7.1.',
+        'Hide or collapse the internal actor boundaries that were expanded in Step 6.1.',
       substeps: []
     },
-    'External View (Step 7.5)': {
-      title: 'External View (Step 7.5)',
+    'External View (Step 6.5)': {
+      title: 'External View (Step 6.5)',
       description:
         'Show only actors and dependencies (Goals, Tasks, Resources) between them.',
       substeps: []
     },
-    'Exclusion of Safety Elements (Step 7.5)': {
-      title: 'Exclusion of Safety Elements (Step 7.5)',
+    'Exclusion of Safety Elements (Step 6.5)': {
+      title: 'Exclusion of Safety Elements (Step 6.5)',
       description:
         'Do not include UCAs, Loss Scenarios, or Safety Requirements in the SD model.',
       substeps: []
     },
-    'Logic (Step 7.5)': {
-      title: 'Logic (Step 7.5)',
+    'Logic (Step 6.5)': {
+      title: 'Logic (Step 6.5)',
       description:
         'Safety elements require the full Goal → Hazard → Mitigation reasoning chain, which is too complex for the SD view.',
       substeps: []
     },
-    'Refinement (Step 7.5)': {
-      title: 'Refinement (Step 7.5)',
+    'Refinement (Step 6.5)': {
+      title: 'Refinement (Step 6.5)',
       description:
         'Reflect any new actors or updated dependencies discovered during the SR analysis.',
       substeps: []
     },
-    'Why Behind Step 7.5': {
-      title: 'Why Behind Step 7.5',
+    'Why Behind Step 6.5': {
+      title: 'Why Behind Step 6.5',
       description:
         'The collapsed SD model answers “Who is responsible for what?” for stakeholders without deep causal chains.',
       substeps: []
     },
-    'Model View Comparison (Step 7.5)': {
-      title: 'Model View Comparison (Step 7.5)',
+    'Model View Comparison (Step 6.5)': {
+      title: 'Model View Comparison (Step 6.5)',
       description:
         'Compare SR vs SD views after collapsing actor boundaries.',
       substeps: [
-        'SR (Step 7.6) — Expanded: Internal goals, UCAs, HCs, Loss Scenarios, SRs → Detailed safety logic and traceability.',
-        'SD (Step 7.5) — Collapsed: Only external dependencies (Goals, Tasks, Resources) → High-level social and strategic overview.'
+        'SR (Step 6.6) — Expanded: Internal goals, UCAs, HCs, Loss Scenarios, SRs → Detailed safety logic and traceability.',
+        'SD (Step 6.5) — Collapsed: Only external dependencies (Goals, Tasks, Resources) → High-level social and strategic overview.'
       ]
     },
-    '7.6 - Expand Actor Boundaries for SR Model': {
-      title: '7.6 - Expand Actor Boundaries for SR Model',
+    '6.6 - Expand Actor Boundaries for SR Model': {
+      title: '6.6 - Expand Actor Boundaries for SR Model',
       description:
         'Expand actor boundaries to expose the full internal safety reasoning and traceability structure.',
       substeps: [
-        'Objective (Step 7.6)',
-        'Internal Reasoning Elements (Step 7.6)',
-        'Traceability Visualization (Step 7.6)',
-        'Safety Element Classification (Step 7.6)',
-        'IIP System Example (Step 7.6)',
-        'Final Consistency Check (Step 7.7)'
+        'Objective (Step 6.6)',
+        'Internal Reasoning Elements (Step 6.6)',
+        'Traceability Visualization (Step 6.6)',
+        'Safety Element Classification (Step 6.6)',
+        'IIP System Example (Step 6.6)',
+        'Final Consistency Check (Step 6.7)'
       ]
     },
-    'Objective (Step 7.6)': {
-      title: 'Objective (Step 7.6)',
+    'Objective (Step 6.6)': {
+      title: 'Objective (Step 6.6)',
       description:
         'Show the internal reasoning and safety logic that governs how each actor fulfills responsibilities while mitigating hazards.',
       substeps: []
     },
-    'Internal Reasoning Elements (Step 7.6)': {
-      title: 'Internal Reasoning Elements (Step 7.6)',
+    'Internal Reasoning Elements (Step 6.6)': {
+      title: 'Internal Reasoning Elements (Step 6.6)',
       description:
         'Expanded boundaries reveal goals, hazards (UCAs/HCs), and safety tasks that mitigate them.',
       substeps: []
     },
-    'Traceability Visualization (Step 7.6)': {
-      title: 'Traceability Visualization (Step 7.6)',
+    'Traceability Visualization (Step 6.6)': {
+      title: 'Traceability Visualization (Step 6.6)',
       description:
         'Enables tracing safety requirements back through loss scenarios and UCAs to the safety goals they protect.',
       substeps: []
     },
-    'Safety Element Classification (Step 7.6)': {
-      title: 'Safety Element Classification (Step 7.6)',
+    'Safety Element Classification (Step 6.6)': {
+      title: 'Safety Element Classification (Step 6.6)',
       description:
         'An element is only part of the safety analysis if the full Safety Goal → Hazard (Obstruction) → Mitigation Task chain is visible.',
       substeps: []
     },
-    'IIP System Example (Step 7.6)': {
-      title: 'IIP System Example (Step 7.6)',
+    'IIP System Example (Step 6.6)': {
+      title: 'IIP System Example (Step 6.6)',
       description:
         'Expanded E1 - Patient boundary with full internal safety logic in the Insulin Infusion Pump case.',
       substeps: [
@@ -1710,31 +1706,31 @@ export class HomePageComponent {
         'Mitigation (Requirements): Safety Requirements SR-01 through SR-10 modeled as safety tasks linked to the loss scenarios they resolve.'
       ]
     },
-    'Final Consistency Check (Step 7.7)': {
-      title: 'Final Consistency Check (Step 7.7)',
+    'Final Consistency Check (Step 6.7)': {
+      title: 'Final Consistency Check (Step 6.7)',
       description:
-        'After expanding boundaries, proceed to Step 7.7 to verify models are aligned, well-formed, and consistent.',
+        'After expanding boundaries, proceed to Step 6.7 to verify models are aligned, well-formed, and consistent.',
       substeps: []
     },
-    '7.7 - Verify All Models': {
-      title: '7.7 - Verify All Models',
+    '6.7 - Verify All Models': {
+      title: '6.7 - Verify All Models',
       description:
         'Perform a final quality check to ensure SD and SR models are aligned and logically consistent.',
       substeps: [
-        'Orientation for Step 7.7',
-        'Core Objectives (Step 7.7)',
-        'Verification Criteria (Step 7.7)',
-        'Final Output of the Iteration (Step 7.7)'
+        'Orientation for Step 6.7',
+        'Core Objectives (Step 6.7)',
+        'Verification Criteria (Step 6.7)',
+        'Final Output of the Iteration (Step 6.7)'
       ]
     },
-    'Orientation for Step 7.7': {
-      title: 'Orientation for Step 7.7',
+    'Orientation for Step 6.7': {
+      title: 'Orientation for Step 6.7',
       description:
         'Review SD and SR models to confirm they are aligned, well-formed, and reflect safety analysis outcomes.',
       substeps: []
     },
-    'Core Objectives (Step 7.7)': {
-      title: 'Core Objectives (Step 7.7)',
+    'Core Objectives (Step 6.7)': {
+      title: 'Core Objectives (Step 6.7)',
       description: 'Key checks for the final model verification.',
       substeps: [
         'Consistency Check: Ensure expanded SR safety logic aligns with SD social dependencies.',
@@ -1742,8 +1738,8 @@ export class HomePageComponent {
         'Final Alignment: Confirm every UCA, HC, Loss Scenario, and Safety Requirement is represented and traceable.'
       ]
     },
-    'Verification Criteria (Step 7.7)': {
-      title: 'Verification Criteria (Step 7.7)',
+    'Verification Criteria (Step 6.7)': {
+      title: 'Verification Criteria (Step 6.7)',
       description: 'Conditions for models to be considered well-formed and consistent.',
       substeps: [
         'Full Safety Reasoning Structure: Safety Goal → Hazard (Obstruction) → Mitigation Task.',
@@ -1751,8 +1747,8 @@ export class HomePageComponent {
         'Boundary Integrity: SR shows internal reasoning; SD shows collapsed boundaries at the right abstraction.'
       ]
     },
-    'Final Output of the Iteration (Step 7.7)': {
-      title: 'Final Output of the Iteration (Step 7.7)',
+    'Final Output of the Iteration (Step 6.7)': {
+      title: 'Final Output of the Iteration (Step 6.7)',
       description:
         'Decide whether to iterate or conclude after successful verification.',
       substeps: [
@@ -1792,6 +1788,14 @@ export class HomePageComponent {
     this.modalStack.set([]);
     const detail = this.substepDetails[step.title];
     this.selectedTimelineStep.set(detail ?? step);
+  }
+
+  openBpmnModelModal(): void {
+    this.isBpmnModelModalOpen.set(true);
+  }
+
+  closeBpmnModelModal(): void {
+    this.isBpmnModelModalOpen.set(false);
   }
 
   closeTimelineModal(): void {
@@ -1862,35 +1866,7 @@ export class HomePageComponent {
     if (step.id) {
       return true;
     }
-    return (
-      step.title.startsWith('1.1 -') ||
-      step.title.startsWith('1.2 -') ||
-      step.title.startsWith('2.2 -') ||
-      step.title.startsWith('3.1 -') ||
-      step.title.startsWith('3.2 -') ||
-      step.title.startsWith('4.1 -') ||
-      step.title.startsWith('4.8 -') ||
-      step.title.startsWith('5.1 -') ||
-      step.title.startsWith('5.2 -') ||
-      step.title.startsWith('6.1 -') ||
-      step.title.startsWith('6.2 -') ||
-      step.title.startsWith('6.3 -') ||
-      step.title.startsWith('7.1 -') ||
-      step.title.startsWith('7.2 -') ||
-      step.title.startsWith('7.3 -') ||
-      step.title.startsWith('7.4 -') ||
-      step.title.startsWith('7.5 -') ||
-      step.title.startsWith('7.6 -') ||
-      step.title.startsWith('7.7 -') ||
-      step.title.startsWith('Step 1:') ||
-      step.title.startsWith('Step 2:') ||
-      step.title.startsWith('Step 3:') ||
-      step.title.startsWith('Step 4:') ||
-      step.title.startsWith('1. Necessity Analysis') ||
-      step.title.startsWith('2. Construction of the Strategic Reasoning') ||
-      step.title.startsWith('3. Application of Validation Rules') ||
-      step.title.startsWith('4. Tool Support')
-    );
+    return /^(?:\d+\.\d+ -|Step \d+:|\d+\. )/.test(step.title.trim());
   }
 
   isDeepDetailModal(): boolean {
@@ -1941,56 +1917,56 @@ export class HomePageComponent {
       title === 'Register Unique Scenarios' ||
       title === 'Document and Maintain Traceability' ||
       title === 'Illustrative Example (IIP System)' ||
-      title === 'Core Objectives (Step 6.3)' ||
+      title === 'Core Objectives (Step 5.3)' ||
       title === 'Analyze LS Causal Factors' ||
       title === 'Formulate Mitigation Strategies' ||
       title === 'Register Safety Requirements' ||
-      title === 'Establish Traceability Links (Step 6.3)' ||
-      title === 'Illustrative Example: IIP System (Step 6.3)' ||
+      title === 'Establish Traceability Links (Step 5.3)' ||
+      title === 'Illustrative Example: IIP System (Step 5.3)' ||
       title === 'Prerequisites' ||
       title === 'Objective' ||
       title === 'Substep Details (Workflow Logic)' ||
       title === 'Illustrative Example: IIP System' ||
-      title === 'Orientation for Step 7.1' ||
+      title === 'Orientation for Step 6.1' ||
       title === 'Modeling Construct' ||
       title === 'Logical Placement' ||
       title === 'ID Mapping' ||
       title === 'Functional Connection' ||
-      title === 'IIP System Example (Step 7.1)' ||
+      title === 'IIP System Example (Step 6.1)' ||
       title === 'Treatment of Scenarios' ||
-      title === 'Modeling Construct (Step 7.2)' ||
-      title === 'Establishing Links (Step 7.2)' ||
-      title === 'Traceability (Step 7.2)' ||
-      title === 'IIP System Example (Step 7.2)' ||
-      title === 'Mechanism (Step 7.3)' ||
-      title === 'Logic (Step 7.3)' ||
-      title === 'Traceability (Step 7.3)' ||
-      title === 'IIP System Example (Step 7.3)' ||
-      title === 'Orientation for Step 7.4' ||
-      title === 'Modeling Construct (Step 7.4)' ||
-      title === 'Mitigation Logic (Step 7.4)' ||
-      title === 'OR Relationship (Step 7.4)' ||
-      title === 'Labeling for Traceability (Step 7.4)' ||
-      title === 'IIP System Example (Step 7.4)' ||
-      title === 'Full Safety Reasoning Structure (Step 7.4)' ||
-      title === 'Orientation for Step 7.5' ||
-      title === 'Boundary Collapsing (Step 7.5)' ||
-      title === 'External View (Step 7.5)' ||
-      title === 'Exclusion of Safety Elements (Step 7.5)' ||
-      title === 'Logic (Step 7.5)' ||
-      title === 'Refinement (Step 7.5)' ||
-      title === 'Why Behind Step 7.5' ||
-      title === 'Model View Comparison (Step 7.5)' ||
-      title === 'Objective (Step 7.6)' ||
-      title === 'Internal Reasoning Elements (Step 7.6)' ||
-      title === 'Traceability Visualization (Step 7.6)' ||
-      title === 'Safety Element Classification (Step 7.6)' ||
-      title === 'IIP System Example (Step 7.6)' ||
-      title === 'Final Consistency Check (Step 7.7)' ||
-      title === 'Orientation for Step 7.7' ||
-      title === 'Core Objectives (Step 7.7)' ||
-      title === 'Verification Criteria (Step 7.7)' ||
-      title === 'Final Output of the Iteration (Step 7.7)' ||
+      title === 'Modeling Construct (Step 6.2)' ||
+      title === 'Establishing Links (Step 6.2)' ||
+      title === 'Traceability (Step 6.2)' ||
+      title === 'IIP System Example (Step 6.2)' ||
+      title === 'Mechanism (Step 6.3)' ||
+      title === 'Logic (Step 6.3)' ||
+      title === 'Traceability (Step 6.3)' ||
+      title === 'IIP System Example (Step 6.3)' ||
+      title === 'Orientation for Step 6.4' ||
+      title === 'Modeling Construct (Step 6.4)' ||
+      title === 'Mitigation Logic (Step 6.4)' ||
+      title === 'OR Relationship (Step 6.4)' ||
+      title === 'Labeling for Traceability (Step 6.4)' ||
+      title === 'IIP System Example (Step 6.4)' ||
+      title === 'Full Safety Reasoning Structure (Step 6.4)' ||
+      title === 'Orientation for Step 6.5' ||
+      title === 'Boundary Collapsing (Step 6.5)' ||
+      title === 'External View (Step 6.5)' ||
+      title === 'Exclusion of Safety Elements (Step 6.5)' ||
+      title === 'Logic (Step 6.5)' ||
+      title === 'Refinement (Step 6.5)' ||
+      title === 'Why Behind Step 6.5' ||
+      title === 'Model View Comparison (Step 6.5)' ||
+      title === 'Objective (Step 6.6)' ||
+      title === 'Internal Reasoning Elements (Step 6.6)' ||
+      title === 'Traceability Visualization (Step 6.6)' ||
+      title === 'Safety Element Classification (Step 6.6)' ||
+      title === 'IIP System Example (Step 6.6)' ||
+      title === 'Final Consistency Check (Step 6.7)' ||
+      title === 'Orientation for Step 6.7' ||
+      title === 'Core Objectives (Step 6.7)' ||
+      title === 'Verification Criteria (Step 6.7)' ||
+      title === 'Final Output of the Iteration (Step 6.7)' ||
       title === 'Define Impact Levels' ||
       title === 'Step A: Define Safety Goals (<<SafetyGoal>>)' ||
       title === 'Step B: Identify Hazards (<<Hazard>>)' ||
@@ -2143,7 +2119,7 @@ export class HomePageComponent {
       2: '/istar-models',
       3: '/control-structure',
       4: '/ucas',
-      5: '/controller-constraints',
+      5: '/ucas',
       6: '/loss-scenarios',
       7: '/model-update'
     };
@@ -2165,16 +2141,17 @@ export class HomePageComponent {
 
     if (status === 'in-progress') {
       const step = currentStep && currentStep >= 1 && currentStep <= 7 ? currentStep : 1;
+      const displayStep = this.displayWorkflowStep(step);
       const labels: Record<number, string> = {
         1: 'Scope Definition',
         2: 'iStar4Safety Models',
         3: 'Control Structure',
-        4: 'Unsafe Control Actions',
+        4: 'Unsafe Control Actions & Hazardous Conditions',
         5: 'Controller Constraints',
         6: 'Loss Scenarios & Safety Requirements',
         7: 'Update iStar4Safety Models'
       };
-      return `Resume Step ${step} · ${labels[step]}`;
+      return `Resume Step ${displayStep} · ${labels[step]}`;
     }
 
     if (status === 'completed') {
@@ -2205,6 +2182,30 @@ export class HomePageComponent {
     }
 
     return currentStep;
+  }
+
+  private displayWorkflowStep(stage: number): number {
+    if (stage <= 4) {
+      return stage;
+    }
+
+    if (stage === 5) {
+      return 4;
+    }
+
+    if (stage === 6) {
+      return 5;
+    }
+
+    return 6;
+  }
+
+  displayCurrentWorkflowStep(stage: number | null | undefined): number | null {
+    if (typeof stage !== 'number' || stage < 1) {
+      return null;
+    }
+
+    return this.displayWorkflowStep(stage);
   }
 
   private toHomeProject(project: Project): HomeProject {

@@ -1,0 +1,63 @@
+<section class="page">
+  <header class="page-header">
+    <p class="step">Artifacts</p>
+    <div class="page-header__title-row">
+      <div>
+        <h2>ReSafety document artifacts</h2>
+        <p>
+          Load the complete project payload and generate 6 ReSafety documents in PDF and DOCX (12 files total).
+        </p>
+      </div>
+      @if (currentProjectId(); as projectId) {
+        <span class="project-badge">Project #{{ projectId }}</span>
+      }
+    </div>
+  </header>
+
+  <section class="card">
+
+    @if (artifactSections().length) {
+      <div class="download-grid">
+        @for (artifact of artifactSections(); track artifact.key) {
+          <article class="download-card">
+            <div>
+              <h4>{{ artifact.title }}</h4>
+              <p>{{ artifact.description }}</p>
+            </div>
+            <div class="download-actions">
+              <button
+                type="button"
+                class="download-link"
+                [disabled]="isExporting()"
+                (click)="downloadPdf(artifact)"
+              >
+                @if (exportingKey() === artifact.key + '-pdf') {
+                  Generating PDF...
+                } @else {
+                  Download PDF
+                }
+              </button>
+              <button
+                type="button"
+                class="download-link download-link--secondary"
+                [disabled]="isExporting()"
+                (click)="downloadDocx(artifact)"
+              >
+                @if (exportingKey() === artifact.key + '-docx') {
+                  Generating DOCX...
+                } @else {
+                  Download DOCX
+                }
+              </button>
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+      <p class="empty-state">
+        No artifact sections are available yet. Provide a valid <strong>projectId</strong> query parameter and ensure the backend returns a full project payload.
+      </p>
+    }
+  </section>
+
+</section>
