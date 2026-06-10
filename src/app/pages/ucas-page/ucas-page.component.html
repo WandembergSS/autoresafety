@@ -72,38 +72,6 @@
   </section>
 
   <section class="card">
-    <div class="card__heading">
-      <div>
-        <h3>UCA evaluation and traceability</h3>
-        <p>Select a control action and evaluate it against the four STPA situations, then associate the resulting UCA with hazards, responsibilities, and safety constraints.</p>
-      </div>
-      <span class="status-pill" [class.status-pill--ready]="readyForRecording()">
-        {{ readyForRecording() ? 'Evaluation and traceability aligned' : 'Start with control action evaluation' }}
-      </span>
-    </div>
-
-    <section class="form-map" aria-label="Step 4 workflow map">
-      <article class="form-map__card form-map__card--active">
-        <span>Control action evaluation</span>
-        <strong>Steps 4.1-4.5</strong>
-        <p>Select the control action and test it against the four unsafe situations.</p>
-      </article>
-      <article class="form-map__card" [class.form-map__card--active]="readyForRecording()">
-        <span>Traceability and associations</span>
-        <strong>Steps 4.6-4.7</strong>
-        <p>Associate each UCA with hazards, responsibilities, and the governing safety constraint.</p>
-      </article>
-      <article class="form-map__card" [class.form-map__card--active]="hcDecision() === 'yes'">
-        <span>Hazardous condition modelling</span>
-        <strong>Step 4.8</strong>
-        <p>Model hazardous conditions when passive feedback or external states create risk without an active control action.</p>
-      </article>
-      <article class="form-map__card">
-        <span>Controller constraint derivation</span>
-        <strong>Steps 4.9-4.10</strong>
-        <p>Convert each UCA or HC into a controller constraint that states what must happen or be avoided.</p>
-      </article>
-    </section>
 
     <form class="form-stack" [formGroup]="ucaForm" (ngSubmit)="addUca()">
       <section class="form-section" aria-label="Control action evaluation">
@@ -115,7 +83,7 @@
 
         <div class="grid">
           <label class="field field--full">
-            <span>Select control action (Step 4.1)</span>
+            <span>Select control action</span>
             <select formControlName="controlActionRef" (change)="onControlActionSelected($any($event.target).value)">
               <option value="">Select a control action from the Step 3 catalogue</option>
               @for (item of controlActionCatalog(); track item.ref) {

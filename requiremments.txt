@@ -56,3 +56,7 @@ TESTAR COM NOVA INTERACAO COM IA - VERIFICAR POSSIBILIADE OU ESCREVER COMO TRABA
 
 
 
+Corrigir problema carregamento elementos opcionais step 3
+
+bt save and continue step 3 nao avanca
+

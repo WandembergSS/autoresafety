@@ -112,6 +112,37 @@ interface StepThreeFlatResponse {
   feedbackLoops?: StepThreeFlatFeedbackLoop[];
 }
 
+interface SketchNode {
+  id: string;
+  label: string;
+  kind: 'controller' | 'process' | 'external';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface SketchEdge {
+  id: string;
+  fromId: string;
+  toId: string;
+  label: string;
+  kind: 'control' | 'feedback' | 'optional';
+}
+
+interface SketchEdgeGeometry {
+  id: string;
+  label: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  labelX: number;
+  labelY: number;
+  marker: string;
+  cssClass: string;
+}
+
 @Component({
   selector: 'app-control-structure-page',
   standalone: true,
@@ -227,6 +258,101 @@ export class ControlStructurePageComponent {
     () => this.entities().filter((entity) => this.hasRole(entity, 'Passive Entity')).length
   );
   readonly optionalElementsCount = computed(() => this.optionalElements().length);
+
+  readonly sketchCanvasWidth = 1020;
+
+  readonly sketchNodes = computed<SketchNode[]>(() => {
+    const controllerNames = this.uniqueNames(this.controllerEntities().map((entity) => entity.name));
+    const processNames = this.uniqueNames(this.controllableEntities().map((entity) => entity.name));
+
+    const controllerNodes = this.layoutNodes(controllerNames, 'controller', 170, 920, 60);
+    const processNodes = this.layoutNodes(processNames, 'process', 170, 920, 395);
+
+    const knownNames = new Set([...controllerNames, ...processNames].map((name) => name.toLowerCase()));
+    const externalNames = this.uniqueNames(
+      this.optionalElements()
+        .flatMap((item) => [item.source, item.destination])
+        .filter((name) => !!name)
+        .map((name) => name.trim())
+        .filter((name) => !knownNames.has(name.toLowerCase()))
+    ).slice(0, 3);
+
+    const externalNodes = externalNames.map((name, index) => ({
+      id: `ext-${index + 1}`,
+      label: name,
+      kind: 'external' as const,
+      x: 760,
+      y: 165 + index * 95,
+      width: 210,
+      height: 68
+    }));
+
+    return [...controllerNodes, ...processNodes, ...externalNodes];
+  });
+
+  readonly sketchEdges = computed<SketchEdge[]>(() => {
+    const nodes = this.sketchNodes();
+    const edges: SketchEdge[] = [];
+
+    for (const action of this.controlActions()) {
+      const source = this.findNodeByName(nodes, action.sourceController, ['controller']);
+      const destination = this.findNodeByName(nodes, action.targetProcess, ['process']);
+
+      if (!source || !destination) {
+        continue;
+      }
+
+      edges.push({
+        id: `control-${action.id}`,
+        fromId: source.id,
+        toId: destination.id,
+        label: `${action.ref}: ${action.action}`,
+        kind: 'control'
+      });
+    }
+
+    for (const element of this.optionalElements()) {
+      const isFeedback = element.type === 'Feedback' || element.type === 'Sensor';
+      const sourceKinds: Array<SketchNode['kind']> = isFeedback
+        ? ['process', 'external', 'controller']
+        : ['controller', 'process', 'external'];
+      const destinationKinds: Array<SketchNode['kind']> = isFeedback
+        ? ['controller', 'process', 'external']
+        : ['process', 'controller', 'external'];
+
+      const source = this.findNodeByName(nodes, element.source, sourceKinds);
+      const destination = this.findNodeByName(nodes, element.destination, destinationKinds);
+
+      if (!source || !destination) {
+        continue;
+      }
+
+      edges.push({
+        id: `optional-${element.id}`,
+        fromId: source.id,
+        toId: destination.id,
+        label: `${element.type}: ${element.name}`,
+        kind: isFeedback ? 'feedback' : 'optional'
+      });
+    }
+
+    return edges;
+  });
+
+  readonly sketchEdgeGeometries = computed(() =>
+    this.buildSketchEdgeGeometries(this.sketchNodes(), this.sketchEdges())
+  );
+
+  readonly sketchCanvasHeight = computed(() => {
+    const nodes = this.sketchNodes();
+    const lowestPoint = nodes.reduce((max, node) => Math.max(max, node.y + node.height), 530);
+    return lowestPoint + 70;
+  });
+
+  readonly hasSketchData = computed(() =>
+    this.sketchNodes().some((node) => node.kind === 'controller') &&
+    this.sketchNodes().some((node) => node.kind === 'process')
+  );
 
   readonly form1Ready = computed(() => this.entities().length > 0);
   readonly form2Ready = computed(
@@ -1573,5 +1699,138 @@ Rules:
     }
 
     return '';
+  }
+
+  private uniqueNames(items: string[]): string[] {
+    const seen = new Set<string>();
+    const values: string[] = [];
+
+    for (const item of items) {
+      const normalized = item.trim();
+      if (!normalized) {
+        continue;
+      }
+
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      values.push(normalized);
+    }
+
+    return values;
+  }
+
+  private layoutNodes(
+    names: string[],
+    kind: SketchNode['kind'],
+    minX: number,
+    maxX: number,
+    y: number
+  ): SketchNode[] {
+    if (names.length === 0) {
+      return [];
+    }
+
+    const width = kind === 'process' ? 250 : 230;
+    const height = kind === 'process' ? 86 : 78;
+    const usableRange = Math.max(maxX - minX - width, 0);
+    const spacing = names.length > 1 ? usableRange / (names.length - 1) : 0;
+
+    return names.map((name, index) => ({
+      id: `${kind}-${index + 1}`,
+      label: name,
+      kind,
+      x: names.length === 1 ? minX + usableRange / 2 : minX + index * spacing,
+      y,
+      width,
+      height
+    }));
+  }
+
+  private findNodeByName(
+    nodes: SketchNode[],
+    label: string,
+    preferredKinds: Array<SketchNode['kind']>
+  ): SketchNode | null {
+    const normalizedLabel = label.trim().toLowerCase();
+    if (!normalizedLabel) {
+      return null;
+    }
+
+    for (const kind of preferredKinds) {
+      const node = nodes.find(
+        (candidate) => candidate.kind === kind && candidate.label.toLowerCase() === normalizedLabel
+      );
+      if (node) {
+        return node;
+      }
+    }
+
+    return null;
+  }
+
+  private buildSketchEdgeGeometries(nodes: SketchNode[], edges: SketchEdge[]): SketchEdgeGeometry[] {
+    const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+
+    return edges
+      .map((edge) => {
+        const source = nodeMap.get(edge.fromId);
+        const destination = nodeMap.get(edge.toId);
+
+        if (!source || !destination) {
+          return null;
+        }
+
+        const sourceCenterX = source.x + source.width / 2;
+        const sourceCenterY = source.y + source.height / 2;
+        const destinationCenterX = destination.x + destination.width / 2;
+        const destinationCenterY = destination.y + destination.height / 2;
+
+        let x1 = sourceCenterX;
+        let y1 = sourceCenterY;
+        let x2 = destinationCenterX;
+        let y2 = destinationCenterY;
+
+        if (destinationCenterY > sourceCenterY + 6) {
+          y1 = source.y + source.height;
+          y2 = destination.y;
+        } else if (destinationCenterY < sourceCenterY - 6) {
+          y1 = source.y;
+          y2 = destination.y + destination.height;
+        } else if (destinationCenterX >= sourceCenterX) {
+          x1 = source.x + source.width;
+          x2 = destination.x;
+        } else {
+          x1 = source.x;
+          x2 = destination.x + destination.width;
+        }
+
+        const labelX = (x1 + x2) / 2;
+        const labelY = (y1 + y2) / 2 - 8;
+
+        const marker =
+          edge.kind === 'control'
+            ? 'url(#arrow-control)'
+            : edge.kind === 'feedback'
+              ? 'url(#arrow-feedback)'
+              : 'url(#arrow-optional)';
+
+        return {
+          id: edge.id,
+          label: edge.label,
+          x1,
+          y1,
+          x2,
+          y2,
+          labelX,
+          labelY,
+          marker,
+          cssClass: `edge edge--${edge.kind}`
+        } as SketchEdgeGeometry;
+      })
+      .filter((item): item is SketchEdgeGeometry => !!item);
   }
 }

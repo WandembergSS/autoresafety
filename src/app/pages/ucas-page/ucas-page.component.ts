@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signa
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { EMPTY, catchError, finalize, switchMap, tap } from 'rxjs';
+import { EMPTY, catchError, finalize, forkJoin, of, switchMap, tap } from 'rxjs';
 import { AiAssistantService } from '../../services/ai-assistant.service';
 
 import {
@@ -17,7 +17,8 @@ import {
   StepFourHazardCatalogItem,
   StepFourProjectInformation,
   StepFourProjectUpdatePayload,
-  StepFourResponsibilityCatalogItem
+  StepFourResponsibilityCatalogItem,
+  StepThreeProjectInformation
 } from '../../services/project.service';
 
 export type UcaCategory = 'Not provided' | 'Provided incorrectly' | 'Incorrect timing' | 'Stopped too soon / applied too long';
@@ -68,6 +69,35 @@ interface ResponsibilityOption {
   safetyConstraintId: string;
   responsibility: string;
   safetyConstraint: string;
+}
+
+interface StepThreeFlatControlAction {
+  id?: string | number;
+  ref?: string;
+  controller?: string;
+  controlledProcess?: string;
+  action?: string;
+}
+
+interface StepThreeFlatResponse {
+  entities?: Array<Record<string, unknown>>;
+  controlActions?: StepThreeFlatControlAction[];
+}
+
+interface StepFourFlatUca {
+  id?: string | number;
+  ref?: string;
+  controller?: string;
+  controlAction?: string;
+  hazard?: string | string[];
+  category?: string;
+  context?: string;
+  consequence?: string;
+  rationale?: string;
+}
+
+interface StepFourFlatResponse {
+  ucas?: StepFourFlatUca[];
 }
 
 interface StepFourAiDraft {
@@ -320,14 +350,31 @@ export class UcasPageComponent {
             return EMPTY;
           }
 
-          return this.projectService.getStepFourInformation(projectId).pipe(
-            tap((response) => this.hydrateFromStepFourInformation(response)),
+          return forkJoin({
+            stepFour: this.projectService.getStepFourInformation(projectId).pipe(
+              catchError((error) => {
+                console.warn(
+                  'Failed to fetch Step 4 information via GET /api/projects/step_four_project_information/{id}. Loading Step 3 control actions with empty Step 4 data.',
+                  error
+                );
+                this.loadError.set('Step 4 data is not available yet. Control actions were loaded from Step 3.');
+                return of(this.createEmptyStepFourInformation(projectId));
+              })
+            ),
+            stepThree: this.projectService.getStepThreeInformation(projectId).pipe(
+              catchError((error) => {
+                console.warn(
+                  'Failed to fetch Step 3 information via GET /api/projects/step_three_project_information/{id}. Falling back to Step 4 catalog control actions.',
+                  error
+                );
+                return of(null);
+              })
+            )
+          }).pipe(
+            tap(({ stepFour, stepThree }) => this.hydrateFromStepFourInformation(stepFour, stepThree)),
             catchError((error) => {
-              console.error(
-                'Failed to fetch Step 4 information via GET /api/projects/step_four_project_information/{id}',
-                error
-              );
-              this.loadError.set('Failed to load Step 4 information for the selected project.');
+              console.error('Failed to load Step 4 or Step 3 information for the selected project.', error);
+              this.loadError.set('Failed to load Step 4 or Step 3 information for the selected project.');
               this.resetStepFourState();
               return EMPTY;
             }),
@@ -623,10 +670,14 @@ export class UcasPageComponent {
     }
   }
 
-  private hydrateFromStepFourInformation(response: StepFourProjectInformation): void {
-    const hazardLabelMap = new Map(response.catalogs.hazards.map((item) => [item.code, item.label]));
+  private hydrateFromStepFourInformation(
+    response: StepFourProjectInformation | StepFourFlatResponse,
+    stepThreeInformation: StepThreeProjectInformation | StepThreeFlatResponse | null = null
+  ): void {
+    const normalized = this.normalizeStepFourInformation(response);
+    const hazardLabelMap = new Map(normalized.catalogs.hazards.map((item) => [item.code, item.label]));
     const responsibilityMap = new Map(
-      response.catalogs.responsibilities.map((item) => [
+      normalized.catalogs.responsibilities.map((item) => [
         item.responsibilityId,
         {
           responsibility: item.responsibilityLabel,
@@ -636,13 +687,17 @@ export class UcasPageComponent {
       ])
     );
 
-    this.controlActionCatalog.set(response.catalogs.controlActions ?? []);
-    this.availableHazards.set(response.catalogs.hazards ?? []);
-    this.availableResponsibilities.set(response.catalogs.responsibilities ?? []);
-    this.controllerConstraints.set(response.currentData.controllerConstraints ?? []);
+    const stepThreeCatalog = this.buildControlActionCatalogFromStepThree(stepThreeInformation);
+    const stepFourCatalog = normalized.catalogs.controlActions ?? [];
+    const fallbackCatalog = stepFourCatalog.length > 0 ? stepFourCatalog : this.controlActionCatalog();
+
+    this.controlActionCatalog.set(stepThreeCatalog.length > 0 ? stepThreeCatalog : fallbackCatalog);
+    this.availableHazards.set(normalized.catalogs.hazards ?? []);
+    this.availableResponsibilities.set(normalized.catalogs.responsibilities ?? []);
+    this.controllerConstraints.set(normalized.currentData.controllerConstraints ?? []);
 
     this.ucas.set(
-      (response.currentData.unsafeControlActions ?? []).map((item) => ({
+      (normalized.currentData.unsafeControlActions ?? []).map((item) => ({
         id: item.id,
         ref: item.ref,
         controlActionRef: item.controlActionRef,
@@ -664,7 +719,7 @@ export class UcasPageComponent {
     );
 
     this.hazardousConditions.set(
-      (response.currentData.hazardousConditions ?? []).map((item) => ({
+      (normalized.currentData.hazardousConditions ?? []).map((item) => ({
         id: item.id,
         ref: item.ref,
         responsibilityId: item.responsibilityId,
@@ -679,10 +734,295 @@ export class UcasPageComponent {
 
     this.sequence = this.ucas().reduce((maxId, item) => Math.max(maxId, item.id), 0);
     this.hcSequence = this.hazardousConditions().reduce((maxId, item) => Math.max(maxId, item.id), 0);
-    this.nextUcaRefValue.set(response.defaults.nextUcaRef || 'UCA-01');
-    this.nextHcRefValue.set(response.defaults.nextHcRef || 'HC-01');
-    this.nextConstraintIdValue.set(response.defaults.nextConstraintId || 'C-01');
+    this.nextUcaRefValue.set(normalized.defaults.nextUcaRef || 'UCA-01');
+    this.nextHcRefValue.set(normalized.defaults.nextHcRef || 'HC-01');
+    this.nextConstraintIdValue.set(normalized.defaults.nextConstraintId || 'C-01');
     this.hcDecision.set(this.hazardousConditions().length > 0 ? 'yes' : 'no');
+  }
+
+  private normalizeStepFourInformation(
+    response: StepFourProjectInformation | StepFourFlatResponse
+  ): StepFourProjectInformation {
+    const maybeNested = response as StepFourProjectInformation;
+    if (maybeNested.catalogs && maybeNested.currentData && maybeNested.defaults) {
+      return {
+        ...maybeNested,
+        catalogs: {
+          controlActions: maybeNested.catalogs.controlActions ?? [],
+          hazards: maybeNested.catalogs.hazards ?? [],
+          responsibilities: maybeNested.catalogs.responsibilities ?? []
+        },
+        currentData: {
+          unsafeControlActions: maybeNested.currentData.unsafeControlActions ?? [],
+          hazardousConditions: maybeNested.currentData.hazardousConditions ?? [],
+          controllerConstraints: maybeNested.currentData.controllerConstraints ?? []
+        },
+        defaults: {
+          nextUcaRef: maybeNested.defaults.nextUcaRef ?? 'UCA-01',
+          nextHcRef: maybeNested.defaults.nextHcRef ?? 'HC-01',
+          nextConstraintId: maybeNested.defaults.nextConstraintId ?? 'C-01'
+        }
+      };
+    }
+
+    const flat = response as StepFourFlatResponse;
+    const flatUcas = flat.ucas ?? [];
+    const hazardCodes = this.uniqueValues(
+      flatUcas.flatMap((item) => {
+        const hazard = item.hazard;
+        if (Array.isArray(hazard)) {
+          return hazard.map((entry) => String(entry).trim()).filter((entry) => entry.length > 0);
+        }
+
+        if (typeof hazard === 'string' && hazard.trim().length > 0) {
+          return [hazard.trim()];
+        }
+
+        return [];
+      })
+    );
+
+    return {
+      projectId: this.currentProjectId() ?? 0,
+      step: 4,
+      catalogs: {
+        controlActions: [],
+        hazards: hazardCodes.map((code) => ({
+          id: code,
+          code,
+          description: code,
+          label: code
+        })),
+        responsibilities: []
+      },
+      currentData: {
+        unsafeControlActions: flatUcas.map((item, index) => {
+          const id = Number(item.id ?? index + 1);
+          const hazard = item.hazard;
+          const hazardRefs = Array.isArray(hazard)
+            ? hazard.map((entry) => String(entry).trim()).filter((entry) => entry.length > 0)
+            : typeof hazard === 'string' && hazard.trim().length > 0
+              ? [hazard.trim()]
+              : [];
+
+          return {
+            id: Number.isFinite(id) ? id : index + 1,
+            ref: item.ref?.trim() || this.formatUcaRef(Number.isFinite(id) ? id : index + 1),
+            controlActionRef: '',
+            sourceActor: item.controller?.trim() || '',
+            targetActor: '',
+            controller: item.controller?.trim() || '',
+            controlAction: item.controlAction?.trim() || 'Unnamed control action',
+            controlledProcess: '',
+            category: this.normalizeUcaCategory(item.category),
+            context: item.context?.trim() || '',
+            consequence: item.consequence?.trim() || '',
+            rationale: item.rationale?.trim() || '',
+            hazardRefs,
+            responsibilityId: '',
+            safetyConstraintId: ''
+          };
+        }),
+        hazardousConditions: [],
+        controllerConstraints: []
+      },
+      defaults: {
+        nextUcaRef: this.formatUcaRef(flatUcas.length + 1),
+        nextHcRef: 'HC-01',
+        nextConstraintId: 'C-01'
+      }
+    };
+  }
+
+  private buildControlActionCatalogFromStepThree(
+    stepThreeInformation: StepThreeProjectInformation | StepThreeFlatResponse | null
+  ): ControlActionOption[] {
+    if (!stepThreeInformation) {
+      return [];
+    }
+
+    const normalized = this.normalizeStepThreeInformation(stepThreeInformation);
+    const entityNameById = new Map(
+      normalized.currentData.entities.map((entity) => [entity.id, entity.name?.trim() || ''])
+    );
+
+    const mapped = normalized.currentData.controlActions
+      .map((item, index) => {
+        const action = item.action?.trim();
+        if (!action) {
+          return null;
+        }
+
+        const sourceName = entityNameById.get(item.sourceEntityId) || 'Unspecified controller';
+        const targetName = entityNameById.get(item.targetEntityId) || 'Unspecified controlled process';
+        const ref = item.ref?.trim() || `CA-${String(index + 1).padStart(2, '0')}`;
+
+        return {
+          ref,
+          sourceActor: sourceName,
+          targetActor: targetName,
+          controller: sourceName,
+          controlAction: action,
+          controlledProcess: targetName
+        } as ControlActionOption;
+      })
+      .filter((item): item is ControlActionOption => !!item);
+
+    return this.dedupeControlActionOptions(mapped);
+  }
+
+  private normalizeStepThreeInformation(
+    response: StepThreeProjectInformation | StepThreeFlatResponse
+  ): StepThreeProjectInformation {
+    const maybeNested = response as StepThreeProjectInformation;
+    if (maybeNested.availableInputs && maybeNested.currentData && maybeNested.defaults) {
+      return {
+        ...maybeNested,
+        availableInputs: {
+          entityCandidates: maybeNested.availableInputs.entityCandidates ?? [],
+          responsibilities: maybeNested.availableInputs.responsibilities ?? [],
+          entityRoles: maybeNested.availableInputs.entityRoles ?? ['Controller', 'Controlled Process'],
+          optionalElementTypes: maybeNested.availableInputs.optionalElementTypes ?? [
+            'Feedback',
+            'Process Model',
+            'Control Algorithm',
+            'Actuator',
+            'Sensor',
+            'External Input'
+          ],
+          externalSources: maybeNested.availableInputs.externalSources ?? []
+        },
+        currentData: {
+          entities: maybeNested.currentData.entities ?? [],
+          controlActions: maybeNested.currentData.controlActions ?? [],
+          optionalElements: maybeNested.currentData.optionalElements ?? []
+        },
+        defaults: {
+          nextControlActionRef: maybeNested.defaults.nextControlActionRef ?? 'CA-01',
+          defaultOptionalElementType: maybeNested.defaults.defaultOptionalElementType ?? 'Feedback'
+        }
+      };
+    }
+
+    const flat = response as StepThreeFlatResponse;
+    const flatControlActions = flat.controlActions ?? [];
+    const rolesByEntity = new Map<string, Set<'Controller' | 'Controlled Process'>>();
+
+    for (const controlAction of flatControlActions) {
+      const controller = controlAction.controller?.trim();
+      const controlledProcess = controlAction.controlledProcess?.trim();
+
+      if (controller) {
+        const current = rolesByEntity.get(controller) ?? new Set<'Controller' | 'Controlled Process'>();
+        current.add('Controller');
+        rolesByEntity.set(controller, current);
+      }
+
+      if (controlledProcess) {
+        const current = rolesByEntity.get(controlledProcess) ?? new Set<'Controller' | 'Controlled Process'>();
+        current.add('Controlled Process');
+        rolesByEntity.set(controlledProcess, current);
+      }
+    }
+
+    const entities = Array.from(rolesByEntity.entries()).map(([name, roles], index) => ({
+      id: `ent-${index + 1}`,
+      entityCandidateId: `ent-${index + 1}`,
+      name,
+      roles: Array.from(roles)
+    }));
+
+    const entityIdByName = new Map(entities.map((entity) => [entity.name, entity.id]));
+    const controlActions = flatControlActions.map((item, index) => ({
+      id: String(item.id ?? index + 1),
+      ref: item.ref?.trim() || `CA-${String(index + 1).padStart(2, '0')}`,
+      action: item.action?.trim() || 'Unnamed action',
+      sourceEntityId: entityIdByName.get(item.controller?.trim() ?? '') ?? '',
+      targetEntityId: entityIdByName.get(item.controlledProcess?.trim() ?? '') ?? '',
+      responsibilityId: ''
+    }));
+
+    return {
+      projectId: this.currentProjectId() ?? 0,
+      step: 3,
+      availableInputs: {
+        entityCandidates: [],
+        responsibilities: [],
+        entityRoles: ['Controller', 'Controlled Process', 'Passive Entity', 'Dependency/Restriction'],
+        optionalElementTypes: [
+          'Feedback',
+          'Process Model',
+          'Control Algorithm',
+          'Actuator',
+          'Sensor',
+          'External Input'
+        ],
+        externalSources: []
+      },
+      currentData: {
+        entities,
+        controlActions,
+        optionalElements: []
+      },
+      defaults: {
+        nextControlActionRef: `CA-${String(controlActions.length + 1).padStart(2, '0')}`,
+        defaultOptionalElementType: 'Feedback'
+      }
+    };
+  }
+
+  private dedupeControlActionOptions(options: ControlActionOption[]): ControlActionOption[] {
+    const byRef = new Map(options.map((item) => [item.ref, item]));
+
+    return Array.from(byRef.values()).sort((a, b) => {
+      const aNum = Number((a.ref.match(/(\d+)/) ?? [])[1] ?? Number.MAX_SAFE_INTEGER);
+      const bNum = Number((b.ref.match(/(\d+)/) ?? [])[1] ?? Number.MAX_SAFE_INTEGER);
+      return aNum - bNum;
+    });
+  }
+
+  private normalizeUcaCategory(category: string | undefined): UcaCategory {
+    const value = (category ?? '').trim().toLowerCase();
+
+    if (!value || value === 'not provided') {
+      return 'Not provided';
+    }
+
+    if (value.includes('tim') || value.includes('late') || value.includes('early') || value.includes('order')) {
+      return 'Incorrect timing';
+    }
+
+    if (value.includes('soon') || value.includes('long') || value.includes('duration') || value.includes('applied')) {
+      return 'Stopped too soon / applied too long';
+    }
+
+    if (value.includes('incorrect') || value.includes('wrong')) {
+      return 'Provided incorrectly';
+    }
+
+    return 'Provided incorrectly';
+  }
+
+  private createEmptyStepFourInformation(projectId: number): StepFourProjectInformation {
+    return {
+      projectId,
+      step: 4,
+      catalogs: {
+        controlActions: [],
+        hazards: [],
+        responsibilities: []
+      },
+      currentData: {
+        unsafeControlActions: [],
+        hazardousConditions: [],
+        controllerConstraints: []
+      },
+      defaults: {
+        nextUcaRef: 'UCA-01',
+        nextHcRef: 'HC-01',
+        nextConstraintId: 'C-01'
+      }
+    };
   }
 
   private resetStepFourState(): void {

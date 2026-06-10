@@ -328,22 +328,75 @@
 
   <section class="card card--diagram">
     <h3>Control structure sketch</h3>
-    <div class="diagram">
-      <div class="diagram__controller">
-        <h4>Controller</h4>
-        <p>Control Application issues commands based on the current therapy state.</p>
+    @if (hasSketchData()) {
+      <div class="diagram">
+        <svg
+          class="diagram__svg"
+          [attr.viewBox]="'0 0 ' + sketchCanvasWidth + ' ' + sketchCanvasHeight()"
+          preserveAspectRatio="xMidYMin meet"
+          role="img"
+          aria-label="Dynamic Step 3 control structure diagram"
+        >
+          <defs>
+            <marker id="arrow-control" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f172a"></path>
+            </marker>
+            <marker id="arrow-feedback" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"></path>
+            </marker>
+            <marker id="arrow-optional" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#0ea5e9"></path>
+            </marker>
+          </defs>
+
+          <g class="authority-axis">
+            <text x="70" y="46">High authority</text>
+            <rect x="75" y="60" width="46" height="370" rx="10" ry="10"></rect>
+            <polygon points="98,490 58,430 138,430"></polygon>
+            <text x="67" y="530">Low authority</text>
+            <text x="98" y="280" transform="rotate(-90 98 280)">Control, Authority</text>
+          </g>
+
+          @for (edge of sketchEdgeGeometries(); track edge.id) {
+            <g>
+              <line
+                [attr.class]="edge.cssClass"
+                [attr.x1]="edge.x1"
+                [attr.y1]="edge.y1"
+                [attr.x2]="edge.x2"
+                [attr.y2]="edge.y2"
+                [attr.marker-end]="edge.marker"
+              ></line>
+              <text class="edge-label" [attr.x]="edge.labelX" [attr.y]="edge.labelY">{{ edge.label }}</text>
+            </g>
+          }
+
+          @for (node of sketchNodes(); track node.id) {
+            <g [attr.class]="'node node--' + node.kind">
+              <rect
+                [attr.x]="node.x"
+                [attr.y]="node.y"
+                [attr.width]="node.width"
+                [attr.height]="node.height"
+                rx="10"
+                ry="10"
+              ></rect>
+              <text
+                class="node-label"
+                [attr.x]="node.x + node.width / 2"
+                [attr.y]="node.y + node.height / 2"
+              >
+                {{ node.label.length > 32 ? (node.label | slice:0:32) + '...' : node.label }}
+              </text>
+            </g>
+          }
+        </svg>
       </div>
-      <div class="diagram__process">
-        <h4>Controlled Process</h4>
-        <p>Insulin Pump reacts to the issued command and changes the therapy state.</p>
-      </div>
-      <div class="diagram__feedback">
-        <p>Feedback: Continuous Glucose Monitor provides telemetry back to the controller.</p>
-      </div>
-      <div class="diagram__actuation">
-        <p>Control Action: Release insulin delivery</p>
-      </div>
-    </div>
+    } @else {
+      <p class="diagram__empty">
+        Add controllers and controlled processes in Step 3.1 to render the control-structure sketch.
+      </p>
+    }
     <p class="note">
       Treat the sketch as the minimum viable control structure. Add optional structure elements only when they improve the later UCA and loss-scenario analysis.
     </p>
