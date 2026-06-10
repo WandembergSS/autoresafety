@@ -4,7 +4,8 @@
 4. Deve manter menu original da ferramenta pistar4safety
 5. No step 2, os botoes para gerar elementos pra os diagramas com a ajuda da Ia, devem estar liberados se os requisitos para a adicao deles de acorcodo com o Istar4Safety forem atendidas, e quando estiverem bloqueados, app deve informar o motivo
 6. Não deve ser possivel salvar um modelo vazio, deve ter ao menos 1 actor
-7. 
+8. numero do codigo do uca deve ser definido por usuario onde nao pode haver código repetido e sempre inicia por UCA - (fixo)
+9.
 
 
 
@@ -60,3 +61,4 @@ Corrigir problema carregamento elementos opcionais step 3
 
 bt save and continue step 3 nao avanca
 
+implementar em step 4 modelagem de HCs

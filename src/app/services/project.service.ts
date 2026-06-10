@@ -124,7 +124,13 @@ export interface StepFourUnsafeControlActionRecord {
   controller: string;
   controlAction: string;
   controlledProcess: string;
-  category: 'Not provided' | 'Provided incorrectly' | 'Incorrect timing' | 'Stopped too soon / applied too long';
+  category:
+    | 'Not provided'
+    | 'Provided'
+    | 'Incorrect duration'
+    | 'Incorrect timing'
+    | 'Provided incorrectly'
+    | 'Stopped too soon / applied too long';
   context: string;
   consequence: string;
   rationale: string;
