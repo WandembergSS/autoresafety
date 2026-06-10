@@ -14,6 +14,7 @@ import {
 import {
   ProjectService,
   StepFourControlActionCatalogItem,
+  StepFourControllerConstraintRecord,
   StepFourHazardCatalogItem,
   StepFourProjectInformation,
   StepFourProjectUpdatePayload,
@@ -99,6 +100,7 @@ interface StepFourFlatUca {
 
 interface StepFourFlatResponse {
   ucas?: StepFourFlatUca[];
+  controllerConstraints?: StepFourControllerConstraintRecord[];
 }
 
 interface StepFourAiDraft {
@@ -162,7 +164,7 @@ export class UcasPageComponent {
   readonly controllerConstraints = signal<ControllerConstraint[]>([]);
   readonly nextUcaRefValue = signal('UCA-01');
   readonly nextHcRefValue = signal('HC-01');
-  readonly nextConstraintIdValue = signal('C-01');
+  readonly nextConstraintIdValue = signal('CC-01');
 
   readonly ucaForm = this.fb.group({
     refCode: ['01', [Validators.required, Validators.pattern(/^\d+$/)]],
@@ -193,20 +195,20 @@ export class UcasPageComponent {
 
   readonly editUcaForm = this.fb.group({
     refCode: ['01', [Validators.required, Validators.pattern(/^\d+$/)]],
-    controlActionRef: ['', Validators.required],
-    sourceActor: ['', Validators.required],
-    targetActor: ['', Validators.required],
-    controller: ['', Validators.required],
-    controlAction: ['', Validators.required],
-    controlledProcess: ['', Validators.required],
+    controlActionRef: [''],
+    sourceActor: [''],
+    targetActor: [''],
+    controller: [''],
+    controlAction: [''],
+    controlledProcess: [''],
     hazardSelections: [[] as string[]],
     additionalHazard: [''],
-    responsibility: ['', Validators.required],
-    safetyConstraint: ['', Validators.required],
+    responsibility: [''],
+    safetyConstraint: [''],
     category: ['Not provided' as UcaCategory, Validators.required],
-    context: ['', [Validators.required, Validators.minLength(12)]],
-    consequence: ['', [Validators.required, Validators.minLength(12)]],
-    rationale: ['', [Validators.required, Validators.minLength(12)]]
+    context: [''],
+    consequence: [''],
+    rationale: ['']
   });
 
   private sequence = 0;
@@ -522,25 +524,27 @@ export class UcasPageComponent {
     const knownHazards = new Set(this.hazardCatalog());
     const selectedHazards = uca.hazard.filter((hazard) => knownHazards.has(hazard));
     const additionalHazards = uca.hazard.filter((hazard) => !knownHazards.has(hazard));
+    const responsibility = uca.responsibility?.trim() || 'Responsibility pending refinement';
+    const safetyConstraint = uca.safetyConstraint?.trim() || 'Safety constraint pending refinement';
 
     this.ucaModalMode.set('edit');
     this.editingUcaId.set(uca.id);
     this.editUcaForm.reset({
       refCode: String(uca.id),
       controlActionRef: uca.controlActionRef ?? '',
-      sourceActor: uca.sourceActor,
-      targetActor: uca.targetActor,
-      controller: uca.controller,
-      controlAction: uca.controlAction,
-      controlledProcess: uca.controlledProcess,
+      sourceActor: uca.sourceActor?.trim() || 'Source actor',
+      targetActor: uca.targetActor?.trim() || 'Target actor',
+      controller: uca.controller?.trim() || 'Controller',
+      controlAction: uca.controlAction?.trim() || 'Control action',
+      controlledProcess: uca.controlledProcess?.trim() || 'Controlled process',
       hazardSelections: selectedHazards,
       additionalHazard: additionalHazards.join(', '),
-      responsibility: uca.responsibility,
-      safetyConstraint: uca.safetyConstraint,
+      responsibility,
+      safetyConstraint,
       category: uca.category,
-      context: uca.context,
-      consequence: uca.consequence,
-      rationale: uca.rationale
+      context: uca.context?.trim() || 'Context pending refinement',
+      consequence: uca.consequence?.trim() || 'Consequence pending refinement',
+      rationale: uca.rationale?.trim() || 'Rationale pending refinement'
     });
   }
 
@@ -619,21 +623,24 @@ export class UcasPageComponent {
               ...item,
               id: nextId,
               ref: nextRef,
-              controlActionRef: value.controlActionRef ?? '',
-              sourceActor: value.sourceActor ?? 'Source actor',
-              targetActor: value.targetActor ?? 'Target actor',
-              controller: value.controller ?? 'Controller',
-              controlAction: value.controlAction ?? 'Control action',
-              controlledProcess: value.controlledProcess ?? 'Controlled process',
+              controlActionRef: value.controlActionRef?.trim() || '',
+              sourceActor: value.sourceActor?.trim() || 'Source actor',
+              targetActor: value.targetActor?.trim() || 'Target actor',
+              controller: value.controller?.trim() || 'Controller',
+              controlAction: value.controlAction?.trim() || 'Control action',
+              controlledProcess: value.controlledProcess?.trim() || 'Controlled process',
               responsibilityId: responsibility?.responsibilityId,
               safetyConstraintId: responsibility?.safetyConstraintId,
-              responsibility: value.responsibility ?? 'Responsibility pending refinement',
-              safetyConstraint: value.safetyConstraint ?? 'Safety constraint pending refinement',
+              responsibility: value.responsibility?.trim() || 'Responsibility pending refinement',
+              safetyConstraint:
+                value.safetyConstraint?.trim() ||
+                responsibility?.safetyConstraint ||
+                'Safety constraint pending refinement',
               hazard: this.collectHazards(value.hazardSelections, value.additionalHazard),
               category: (value.category as UcaCategory) ?? 'Not provided',
-              context: value.context ?? 'Context pending refinement',
-              consequence: value.consequence ?? 'Consequence pending refinement',
-              rationale: value.rationale ?? 'Rationale pending refinement'
+              context: value.context?.trim() || 'Context pending refinement',
+              consequence: value.consequence?.trim() || 'Consequence pending refinement',
+              rationale: value.rationale?.trim() || 'Rationale pending refinement'
             }
           : item
       )
@@ -664,21 +671,24 @@ export class UcasPageComponent {
       {
         id: nextId,
         ref: nextRef,
-        controlActionRef: value.controlActionRef ?? '',
-        sourceActor: value.sourceActor ?? 'Source actor',
-        targetActor: value.targetActor ?? 'Target actor',
-        controller: value.controller ?? 'Controller',
-        controlAction: value.controlAction ?? 'Control action',
-        controlledProcess: value.controlledProcess ?? 'Controlled process',
+        controlActionRef: value.controlActionRef?.trim() || '',
+        sourceActor: value.sourceActor?.trim() || 'Source actor',
+        targetActor: value.targetActor?.trim() || 'Target actor',
+        controller: value.controller?.trim() || 'Controller',
+        controlAction: value.controlAction?.trim() || 'Control action',
+        controlledProcess: value.controlledProcess?.trim() || 'Controlled process',
         responsibilityId: responsibility?.responsibilityId,
         safetyConstraintId: responsibility?.safetyConstraintId,
-        responsibility: value.responsibility ?? 'Responsibility pending refinement',
-        safetyConstraint: value.safetyConstraint ?? 'Safety constraint pending refinement',
+        responsibility: value.responsibility?.trim() || 'Responsibility pending refinement',
+        safetyConstraint:
+          value.safetyConstraint?.trim() ||
+          responsibility?.safetyConstraint ||
+          'Safety constraint pending refinement',
         hazard: this.collectHazards(value.hazardSelections, value.additionalHazard),
         category: (value.category as UcaCategory) ?? 'Not provided',
-        context: value.context ?? 'Context pending refinement',
-        consequence: value.consequence ?? 'Consequence pending refinement',
-        rationale: value.rationale ?? 'Rationale pending refinement'
+        context: value.context?.trim() || 'Context pending refinement',
+        consequence: value.consequence?.trim() || 'Consequence pending refinement',
+        rationale: value.rationale?.trim() || 'Rationale pending refinement'
       },
       ...current
     ]);
@@ -949,10 +959,8 @@ export class UcasPageComponent {
     this.availableHazards.set(resolvedHazards);
     this.availableResponsibilities.set(normalized.catalogs.responsibilities ?? []);
     this.editResponsibilityOptions.set(resolvedEditResponsibilities);
-    this.controllerConstraints.set(normalized.currentData.controllerConstraints ?? []);
 
-    this.ucas.set(
-      (normalized.currentData.unsafeControlActions ?? []).map((item) => ({
+    const hydratedUcas = (normalized.currentData.unsafeControlActions ?? []).map((item) => ({
         id: item.id,
         ref: item.ref,
         controlActionRef: item.controlActionRef,
@@ -970,11 +978,9 @@ export class UcasPageComponent {
         context: item.context,
         consequence: item.consequence,
         rationale: item.rationale
-      }))
-    );
+      }));
 
-    this.hazardousConditions.set(
-      (normalized.currentData.hazardousConditions ?? []).map((item) => ({
+    const hydratedHazardousConditions = (normalized.currentData.hazardousConditions ?? []).map((item) => ({
         id: item.id,
         ref: item.ref,
         responsibilityId: item.responsibilityId,
@@ -984,14 +990,23 @@ export class UcasPageComponent {
         description: item.description,
         linkedHazards: (item.linkedHazardRefs ?? []).map((hazardRef) => hazardLabelMap.get(hazardRef) || hazardRef),
         coverageGap: item.coverageGap
-      }))
+      }));
+
+    const constraintSourceLookup = this.buildConstraintSourceLookup(hydratedUcas, hydratedHazardousConditions);
+
+    this.ucas.set(hydratedUcas);
+    this.hazardousConditions.set(hydratedHazardousConditions);
+    this.controllerConstraints.set(
+      (normalized.currentData.controllerConstraints ?? []).map((item) =>
+        this.mapControllerConstraintRecord(item, constraintSourceLookup)
+      )
     );
 
     this.sequence = this.ucas().reduce((maxId, item) => Math.max(maxId, item.id), 0);
     this.hcSequence = this.hazardousConditions().reduce((maxId, item) => Math.max(maxId, item.id), 0);
     this.nextUcaRefValue.set(normalized.defaults.nextUcaRef || 'UCA-01');
     this.nextHcRefValue.set(normalized.defaults.nextHcRef || 'HC-01');
-    this.nextConstraintIdValue.set(normalized.defaults.nextConstraintId || 'C-01');
+    this.nextConstraintIdValue.set(normalized.defaults.nextConstraintId || this.buildNextConstraintIdFromRecords());
     this.hcDecision.set(this.hazardousConditions().length > 0 ? 'yes' : 'no');
     this.ucaForm.patchValue({ refCode: this.getDefaultUcaRefCode() });
   }
@@ -1016,7 +1031,7 @@ export class UcasPageComponent {
         defaults: {
           nextUcaRef: maybeNested.defaults.nextUcaRef ?? 'UCA-01',
           nextHcRef: maybeNested.defaults.nextHcRef ?? 'HC-01',
-          nextConstraintId: maybeNested.defaults.nextConstraintId ?? 'C-01'
+          nextConstraintId: maybeNested.defaults.nextConstraintId ?? 'CC-01'
         }
       };
     }
@@ -1080,14 +1095,43 @@ export class UcasPageComponent {
           };
         }),
         hazardousConditions: [],
-        controllerConstraints: []
+        controllerConstraints: flat.controllerConstraints ?? []
       },
       defaults: {
         nextUcaRef: this.formatUcaRef(flatUcas.length + 1),
         nextHcRef: 'HC-01',
-        nextConstraintId: 'C-01'
+        nextConstraintId: this.buildNextConstraintIdFromRecords(flat.controllerConstraints ?? [])
       }
     };
+  }
+
+  private buildNextConstraintIdFromRecords(records: StepFourControllerConstraintRecord[] = []): string {
+    const maxValue = records.reduce(
+      (currentMax, item) => Math.max(currentMax, this.parsePrefixedNumericId(item.constraintId)),
+      this.parsePrefixedNumericId(this.nextConstraintIdValue())
+    );
+    const prefix = this.extractConstraintIdPrefix(records.map((item) => item.constraintId), this.nextConstraintIdValue());
+
+    return `${prefix}${String(Math.max(maxValue, 0) + 1).padStart(2, '0')}`;
+  }
+
+  private parsePrefixedNumericId(value: string | null | undefined): number {
+    const match = (value ?? '').match(/(\d+)/);
+    return match ? Number.parseInt(match[1], 10) : 0;
+  }
+
+  private extractConstraintIdPrefix(values: Array<string | null | undefined>, fallback = 'CC-'): string {
+    const match = values
+      .map((value) => (value ?? '').trim())
+      .find((value) => /\d+/.test(value))
+      ?.match(/^([^\d]*?)(\d+)$/);
+
+    if (match?.[1]) {
+      return match[1];
+    }
+
+    const fallbackMatch = (fallback ?? '').trim().match(/^([^\d]*?)(\d+)$/);
+    return fallbackMatch?.[1] || 'CC-';
   }
 
   private buildControlActionCatalogFromStepThree(
@@ -1276,7 +1320,7 @@ export class UcasPageComponent {
       defaults: {
         nextUcaRef: 'UCA-01',
         nextHcRef: 'HC-01',
-        nextConstraintId: 'C-01'
+        nextConstraintId: 'CC-01'
       }
     };
   }
@@ -1295,7 +1339,7 @@ export class UcasPageComponent {
     this.hcDecision.set('no');
     this.nextUcaRefValue.set('UCA-01');
     this.nextHcRefValue.set('HC-01');
-    this.nextConstraintIdValue.set('C-01');
+    this.nextConstraintIdValue.set('CC-01');
     this.stepFourSaveMessage.set(null);
     this.stepFourSaveError.set(null);
     this.ucaForm.reset({
@@ -1331,6 +1375,7 @@ export class UcasPageComponent {
   }
 
   private resetEditUcaForm(): void {
+    const firstResponsibility = this.editResponsibilityOptions()[0];
     this.editUcaForm.reset({
       refCode: this.getDefaultUcaRefCode(),
       controlActionRef: '',
@@ -1341,12 +1386,12 @@ export class UcasPageComponent {
       controlledProcess: '',
       hazardSelections: [],
       additionalHazard: '',
-      responsibility: '',
-      safetyConstraint: '',
+      responsibility: firstResponsibility?.responsibility ?? '',
+      safetyConstraint: firstResponsibility?.safetyConstraint ?? '',
       category: 'Not provided',
-      context: '',
-      consequence: '',
-      rationale: ''
+      context: 'Context pending refinement',
+      consequence: 'Consequence pending refinement',
+      rationale: 'Rationale pending refinement'
     });
   }
 
@@ -1671,16 +1716,80 @@ export class UcasPageComponent {
     }));
   }
 
+  private buildConstraintSourceLookup(
+    ucas: UnsafeControlAction[],
+    hazardousConditions: HazardousCondition[]
+  ): Map<string, ConstraintSourceOption> {
+    return new Map(
+      [
+        ...ucas.map((item) => ({
+          ref: item.ref,
+          summary: `${item.ref}: ${item.controlAction} from ${item.sourceActor} to ${item.targetActor}. ${item.context}`,
+          hazardLinkage: item.hazard.join(', '),
+          responsibilityChain: `${item.responsibility} -> ${item.safetyConstraint} -> ${item.hazard.join(', ')}`
+        })),
+        ...hazardousConditions.map((item) => ({
+          ref: item.ref,
+          summary: `${item.ref}: ${item.description}`,
+          hazardLinkage: item.linkedHazards.join(', '),
+          responsibilityChain: item.responsibility
+            ? `${item.responsibility} -> ${item.safetyConstraint || 'Safety Constraint to be defined'} -> ${item.linkedHazards.join(', ')}`
+            : `Hazard-only condition -> ${item.linkedHazards.join(', ')}`
+        }))
+      ].map((item) => [item.ref, item])
+    );
+  }
+
+  private mapControllerConstraintRecord(
+    item: StepFourControllerConstraintRecord,
+    sourceLookup: Map<string, ConstraintSourceOption>
+  ): ControllerConstraint {
+    const sourceRef = this.normalizeConstraintSourceRef(item.sourceUcaHc ?? item.sourceRef ?? '');
+    const sourceOption = sourceLookup.get(sourceRef);
+    const statement = (item.constraintStatement ?? item.constraint ?? '').trim();
+
+    return {
+      id: Number(item.id),
+      constraintId: item.constraintId?.trim() || '',
+      sourceRef,
+      hazardLinkage: item.hazardLinkage?.trim() || sourceOption?.hazardLinkage || '',
+      responsibilityChain: item.responsibilityChain?.trim() || sourceOption?.responsibilityChain || '',
+      constraint: statement,
+      enforcementMechanism: item.enforcementMechanism?.trim() || 'Not specified',
+      status: this.normalizeControllerConstraintStatus(item.status)
+    };
+  }
+
+  private normalizeConstraintSourceRef(value: string | null | undefined): string {
+    const trimmedValue = (value ?? '').trim();
+    const match = trimmedValue.match(/^(UCA|HC)-(\d+)$/i);
+
+    if (!match) {
+      return trimmedValue;
+    }
+
+    return `${match[1].toUpperCase()}-${String(Number.parseInt(match[2], 10)).padStart(2, '0')}`;
+  }
+
+  private normalizeControllerConstraintStatus(
+    status: StepFourControllerConstraintRecord['status'] | string | null | undefined
+  ): ControllerConstraint['status'] {
+    switch ((status ?? '').trim().toLowerCase()) {
+      case 'approved':
+        return 'Approved';
+      case 'pending review':
+        return 'Pending Review';
+      default:
+        return 'Draft';
+    }
+  }
+
   private buildStepFourControllerConstraintsPayload() {
     return this.controllerConstraints().map((item) => ({
       id: item.id,
       constraintId: item.constraintId,
-      sourceRef: item.sourceRef,
-      hazardLinkage: item.hazardLinkage,
-      responsibilityChain: item.responsibilityChain,
-      constraint: item.constraint,
-      enforcementMechanism: item.enforcementMechanism,
-      status: item.status
+      sourceUcaHc: item.sourceRef,
+      constraintStatement: item.constraint
     }));
   }
 
@@ -1859,10 +1968,11 @@ Rules:
     const sourceMap = new Map<string, ConstraintSourceOption>(sourceEntries);
 
     const allowedStatuses = new Set<ControllerConstraint['status']>(['Draft', 'Approved', 'Pending Review']);
+    const constraintIdPrefix = this.extractConstraintIdPrefix([], this.nextConstraintIdValue());
     let nextConstraintId = 0;
     let normalizedConstraints = (draft.controllerConstraints ?? [])
       .map((item) => {
-        const sourceRef = (item.sourceRef ?? '').trim();
+        const sourceRef = this.normalizeConstraintSourceRef(item.sourceRef ?? '');
         const source = sourceMap.get(sourceRef);
         const constraint = (item.constraint ?? '').trim();
         const enforcementMechanism = (item.enforcementMechanism ?? '').trim();
@@ -1873,7 +1983,7 @@ Rules:
         nextConstraintId += 1;
         return {
           id: nextConstraintId,
-          constraintId: `C-${String(nextConstraintId).padStart(2, '0')}`,
+          constraintId: `${constraintIdPrefix}${String(nextConstraintId).padStart(2, '0')}`,
           sourceRef,
           hazardLinkage: (item.hazardLinkage ?? '').trim() || source.hazardLinkage,
           responsibilityChain: (item.responsibilityChain ?? '').trim() || source.responsibilityChain,
@@ -1889,7 +1999,7 @@ Rules:
     if (normalizedConstraints.length === 0) {
       normalizedConstraints = Array.from(sourceMap.values()).map((source, index) => ({
         id: index + 1,
-        constraintId: `C-${String(index + 1).padStart(2, '0')}`,
+        constraintId: `${constraintIdPrefix}${String(index + 1).padStart(2, '0')}`,
         sourceRef: source.ref,
         hazardLinkage: source.hazardLinkage,
         responsibilityChain: source.responsibilityChain,
@@ -1906,7 +2016,7 @@ Rules:
     this.hcSequence = normalizedHazardousConditions.length;
     this.nextUcaRefValue.set(this.formatUcaRef(normalizedUcas.length + 1));
     this.nextHcRefValue.set(this.formatHcRef(normalizedHazardousConditions.length + 1));
-    this.nextConstraintIdValue.set(`C-${String(normalizedConstraints.length + 1).padStart(2, '0')}`);
+    this.nextConstraintIdValue.set(`${constraintIdPrefix}${String(normalizedConstraints.length + 1).padStart(2, '0')}`);
     this.hcDecision.set(normalizedHazardousConditions.length > 0 ? 'yes' : 'no');
     this.ucaForm.patchValue({ refCode: this.getDefaultUcaRefCode() });
   }

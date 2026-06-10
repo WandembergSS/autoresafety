@@ -54,11 +54,7 @@
       <strong>{{ totalUcas() }}</strong>
       <p>Total unsafe control actions documented for Step 4.</p>
     </article>
-    <article class="overview-card">
-      <span class="overview-card__label">Missing actions</span>
-      <strong>{{ categoryCount('Not provided') }}</strong>
-      <p>Cases where a required control action is not issued.</p>
-    </article>
+
     <article class="overview-card">
       <span class="overview-card__label">Timing or duration issues</span>
       <strong>{{ categoryCount('Incorrect timing') + categoryCount('Incorrect duration') }}</strong>
@@ -272,6 +268,11 @@
               <label class="field field--full">
                 <span>Potential consequence</span>
                 <textarea rows="3" formControlName="consequence"></textarea>
+              </label>
+
+              <label class="field field--full">
+                <span>Rationale</span>
+                <textarea rows="3" formControlName="rationale"></textarea>
               </label>
             </div>
           </section>

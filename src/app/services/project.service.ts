@@ -152,12 +152,14 @@ export interface StepFourHazardousConditionRecord {
 export interface StepFourControllerConstraintRecord {
   id: number;
   constraintId: string;
-  sourceRef: string;
-  hazardLinkage: string;
-  responsibilityChain: string;
-  constraint: string;
-  enforcementMechanism: string;
-  status: 'Draft' | 'Approved' | 'Pending Review';
+  sourceUcaHc?: string;
+  constraintStatement?: string;
+  sourceRef?: string;
+  hazardLinkage?: string;
+  responsibilityChain?: string;
+  constraint?: string;
+  enforcementMechanism?: string;
+  status?: 'Draft' | 'Approved' | 'Pending Review';
 }
 
 export interface StepFourProjectInformation {
