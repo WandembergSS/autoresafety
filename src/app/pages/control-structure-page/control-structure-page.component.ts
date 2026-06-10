@@ -780,7 +780,16 @@ export class ControlStructurePageComponent {
       )
       .subscribe({
         next: (response) => {
-          this.hydrateFromStepThreeInformation(response, this.latestStepOneScope);
+          try {
+            if (response) {
+              this.hydrateFromStepThreeInformation(response, this.latestStepOneScope);
+            }
+          } catch (error) {
+            console.warn(
+              'Step 3 save succeeded, but the update response could not be rehydrated. Preserving local state before navigation.',
+              error
+            );
+          }
           this.stepThreeSaveError.set(null);
           this.stepThreeSaveMessage.set(
             continueAfterSave ? 'Step 3 saved. Opening the next step.' : 'Step 3 saved successfully.'

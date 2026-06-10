@@ -867,7 +867,16 @@ export class UcasPageComponent {
       )
       .subscribe({
         next: (response) => {
-          this.hydrateFromStepFourInformation(response);
+          try {
+            if (response) {
+              this.hydrateFromStepFourInformation(response);
+            }
+          } catch (error) {
+            console.warn(
+              'Step 4 save succeeded, but the update response could not be rehydrated. Preserving local state before navigation.',
+              error
+            );
+          }
           this.stepFourSaveError.set(null);
           this.stepFourSaveMessage.set(
             continueAfterSave ? 'Step 4 saved. Opening the next step.' : 'Step 4 saved successfully.'
