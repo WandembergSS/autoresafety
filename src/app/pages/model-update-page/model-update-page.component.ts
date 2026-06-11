@@ -502,7 +502,7 @@ export class ModelUpdatePageComponent {
           );
 
           if (continueAfterSave) {
-            this.router.navigate(['/resafety-artifacts'], { queryParams: { projectId } });
+            this.router.navigate(['/model-update'], { queryParams: { projectId } });
           }
         },
         error: (error) => {

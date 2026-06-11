@@ -1,0 +1,137 @@
+<section class="page">
+  <header class="page-header">
+    <p class="step">Step 6</p>
+    <div class="page-header__title-row">
+      <div>
+        <h2>Update iStar4Safety Models</h2>
+        <p>
+          This step now works as a review hub. It summarizes what was filled in Steps 1 to 5 and lets you reopen any
+          previous step before generating the final ReSafety artifacts.
+        </p>
+      </div>
+      @if (currentProjectId(); as projectId) {
+        <span class="project-badge">Project #{{ projectId }}</span>
+      }
+    </div>
+  </header>
+
+  <section class="card intro-card">
+    <div class="card__heading">
+      <div>
+        <h3>Step 6 purpose and working format</h3>
+        <p>
+          Step 6 closes the workflow by consolidating the information produced in the five previous steps and preparing
+          the final deliverable set. Instead of asking you to rewrite or duplicate data, this page resumes the analysis
+          already performed and keeps the final stage focused on review, consistency checking, and artifact generation.
+        </p>
+      </div>
+    </div>
+
+    <div class="intro-grid">
+      <article class="intro-block">
+        <h4>What Step 6 does</h4>
+        <p>
+          The goal of this step is to confirm that the scope definition, initial models, control structure, unsafe
+          behaviors, controller constraints, loss scenarios, and safety requirements are coherent as one final safety
+          case. Step 6 acts as the transition from analysis work to final project output.
+        </p>
+      </article>
+
+      <article class="intro-block">
+        <h4>How the substeps are organized</h4>
+        <ul class="intro-list">
+          <li>Review the resumed content of Steps 1 to 5.</li>
+          <li>Reopen any previous step when you need to correct or refine information.</li>
+          <li>Confirm that the previous analysis is complete enough for final packaging.</li>
+          <li>Generate the ReSafety artifacts from the full project payload.</li>
+        </ul>
+      </article>
+
+      <article class="intro-block intro-block--full">
+        <h4>Why this current format is used</h4>
+        <p>
+          This page is intentionally structured as a summary and artifact hub because the detailed modeling and analysis
+          decisions already belong to the previous steps. Repeating full editing forms here would duplicate effort,
+          increase the risk of inconsistency, and make the end of the workflow harder to validate. The current format
+          gives you a controlled final checkpoint: first inspect the resumed state, then jump back to the exact step
+          that needs adjustment, and finally generate the final artifacts only when the chain is complete.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  @if (isLoading()) {
+    <section class="card">
+      <span class="status-chip status-chip--loading">Loading previous-step data...</span>
+    </section>
+  }
+
+  @if (loadError(); as errorMessage) {
+    <section class="card">
+      <span class="status-chip status-chip--error">{{ errorMessage }}</span>
+    </section>
+  }
+
+  @if (projectPayload()) {
+    <section class="summary-strip" aria-label="Step 6 overview">
+      @for (card of overviewCards(); track card.label) {
+        <article class="summary-card">
+          <span>{{ card.label }}</span>
+          <strong>{{ card.value }}</strong>
+        </article>
+      }
+    </section>
+
+    <section class="workflow-card">
+      <div>
+        <p class="workflow-card__eyebrow">Step 6 review hub</p>
+        <h3>Review previous steps before final export</h3>
+        <p>
+          This page only resumes the information already entered in Steps 1 to 5. Use the links below to revise any
+          previous step, then return here to download the ReSafety artifacts.
+        </p>
+      </div>
+      <div class="workflow-status">
+        <span class="badge badge--ready">Summary and artifacts only</span>
+        <p>Previous-step data is loaded from the full project payload.</p>
+        <p>Artifacts are generated directly in this step.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card__heading">
+        <div>
+          <h3>Previous steps summary</h3>
+          <p>Each card resumes what has already been filled and links back to the original step.</p>
+        </div>
+      </div>
+
+      <div class="steps-grid">
+        @for (step of previousStepSummaries(); track step.route) {
+          <article class="step-card">
+            <header>
+              <div>
+                <span class="step-card__ref">Step {{ step.number }}</span>
+                <h4>{{ step.title }}</h4>
+              </div>
+              <a class="step-link" [routerLink]="step.route" [queryParams]="projectQueryParams()">Open step</a>
+            </header>
+            <p class="step-card__description">{{ step.description }}</p>
+            <ul class="metric-list">
+              @for (metric of step.metrics; track metric) {
+                <li>{{ metric }}</li>
+              }
+            </ul>
+          </article>
+        }
+      </div>
+    </section>
+
+    <app-resafety-artifacts-page
+      [embedded]="true"
+      [projectIdInput]="currentProjectId()"
+      [projectNameInput]="projectName()"
+      [projectPayloadInput]="projectPayload()"
+    />
+  }
+</section>

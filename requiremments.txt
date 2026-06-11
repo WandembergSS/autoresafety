@@ -61,4 +61,8 @@ Corrigir problema carregamento elementos opcionais step 3
 
 bt save and continue step 3 nao avanca
 
-implementar em step 4 modelagem de HCs
+melhorar implementacao em step 4 modelagem de HCs
+
+melhorar modelo de dados para nao haver dados repetidos
+melhorar Associated Safety Constraint (SC) para responsabilidaddes em step 4
+falar dissertacao sobre UX e inspiracao mobile com uso de modais

@@ -544,7 +544,7 @@ export class UcasPageComponent {
       category: uca.category,
       context: uca.context?.trim() || 'Context pending refinement',
       consequence: uca.consequence?.trim() || 'Consequence pending refinement',
-      rationale: uca.rationale?.trim() || 'Rationale pending refinement'
+      rationale: ''
     });
   }
 
@@ -640,7 +640,7 @@ export class UcasPageComponent {
               category: (value.category as UcaCategory) ?? 'Not provided',
               context: value.context?.trim() || 'Context pending refinement',
               consequence: value.consequence?.trim() || 'Consequence pending refinement',
-              rationale: value.rationale?.trim() || 'Rationale pending refinement'
+              rationale: ''
             }
           : item
       )
@@ -688,7 +688,7 @@ export class UcasPageComponent {
         category: (value.category as UcaCategory) ?? 'Not provided',
         context: value.context?.trim() || 'Context pending refinement',
         consequence: value.consequence?.trim() || 'Consequence pending refinement',
-        rationale: value.rationale?.trim() || 'Rationale pending refinement'
+        rationale: ''
       },
       ...current
     ]);
@@ -1400,7 +1400,7 @@ export class UcasPageComponent {
       category: 'Not provided',
       context: 'Context pending refinement',
       consequence: 'Consequence pending refinement',
-      rationale: 'Rationale pending refinement'
+      rationale: ''
     });
   }
 
@@ -1704,7 +1704,7 @@ export class UcasPageComponent {
       category: item.category,
       context: item.context,
       consequence: item.consequence,
-      rationale: item.rationale,
+      rationale: '',
       hazardRefs: item.hazard.map((hazard) => hazardCodeByLabel.get(hazard) ?? hazard),
       responsibilityId: item.responsibilityId ?? '',
       safetyConstraintId: item.safetyConstraintId ?? ''

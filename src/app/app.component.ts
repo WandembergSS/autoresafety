@@ -77,12 +77,7 @@ export class AppComponent {
         {
           path: '/model-update',
           label: 'Step 6 · Update iStar4Safety Models',
-          description: 'Close the loop by syncing models and evidence'
-        },
-        {
-          path: '/resafety-artifacts',
-          label: 'Artifacts',
-          description: 'Download ReSafety artifacts from the full project payload'
+          description: 'Review completed steps and generate ReSafety artifacts'
         }
       ]
     }

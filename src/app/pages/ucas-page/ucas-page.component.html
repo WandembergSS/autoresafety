@@ -89,7 +89,6 @@
           <header>
             <div>
               <span class="uca__ref">{{ uca.ref }}</span>
-              <h4>Unsafe control action record</h4>
               <div class="uca__meta">
                 <p><strong>Controller name:</strong> {{ uca.controller || uca.sourceActor }}</p>
                 <p><strong>Control action:</strong> {{ uca.controlActionRef }} · {{ uca.controlAction }}</p>
@@ -270,10 +269,6 @@
                 <textarea rows="3" formControlName="consequence"></textarea>
               </label>
 
-              <label class="field field--full">
-                <span>Rationale</span>
-                <textarea rows="3" formControlName="rationale"></textarea>
-              </label>
             </div>
           </section>
 

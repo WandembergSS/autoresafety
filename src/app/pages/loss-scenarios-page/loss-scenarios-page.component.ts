@@ -85,6 +85,10 @@ export class LossScenariosPageComponent {
   readonly stepFiveSaveMessage = signal<string | null>(null);
   readonly stepFiveSaveError = signal<string | null>(null);
   readonly isBpmnModelModalOpen = signal(false);
+  readonly lossScenarioModalMode = signal<'create' | 'edit' | null>(null);
+  readonly editingLossScenarioId = signal<string | null>(null);
+  readonly safetyRequirementModalMode = signal<'create' | 'edit' | null>(null);
+  readonly editingSafetyRequirementId = signal<string | null>(null);
   readonly nextLossScenarioId = signal('LS-01');
   readonly nextSafetyRequirementId = signal('SR-01');
 
@@ -106,6 +110,22 @@ export class LossScenariosPageComponent {
   readonly lossScenarios = signal<LossScenario[]>([]);
 
   readonly safetyRequirements = signal<SafetyRequirement[]>([]);
+
+  readonly lossScenarioModalTitle = computed(() =>
+    this.lossScenarioModalMode() === 'edit' ? 'Edit loss scenario' : 'Create loss scenario'
+  );
+
+  readonly lossScenarioModalSubmitLabel = computed(() =>
+    this.lossScenarioModalMode() === 'edit' ? 'Save changes' : 'Create loss scenario'
+  );
+
+  readonly safetyRequirementModalTitle = computed(() =>
+    this.safetyRequirementModalMode() === 'edit' ? 'Edit safety requirement' : 'Create safety requirement'
+  );
+
+  readonly safetyRequirementModalSubmitLabel = computed(() =>
+    this.safetyRequirementModalMode() === 'edit' ? 'Save changes' : 'Create safety requirement'
+  );
 
   constructor() {
     this.route.queryParamMap
@@ -221,6 +241,63 @@ export class LossScenariosPageComponent {
     this.isBpmnModelModalOpen.set(false);
   }
 
+  isLossScenarioModalOpen(): boolean {
+    return this.lossScenarioModalMode() !== null;
+  }
+
+  isSafetyRequirementModalOpen(): boolean {
+    return this.safetyRequirementModalMode() !== null;
+  }
+
+  openNewLossScenarioModal(): void {
+    this.closeSafetyRequirementModal();
+    this.lossScenarioModalMode.set('create');
+    this.editingLossScenarioId.set(null);
+    this.resetLossScenarioForm();
+  }
+
+  openEditLossScenario(scenario: LossScenario): void {
+    this.closeSafetyRequirementModal();
+    this.lossScenarioModalMode.set('edit');
+    this.editingLossScenarioId.set(scenario.id);
+    this.lossScenarioForm.reset({
+      id: scenario.id,
+      description: scenario.description,
+      associatedUnsafeBehaviorIds: [...scenario.associatedUnsafeBehaviorIds],
+      sourceRationale: scenario.sourceRationale
+    });
+  }
+
+  closeLossScenarioModal(): void {
+    this.lossScenarioModalMode.set(null);
+    this.editingLossScenarioId.set(null);
+    this.resetLossScenarioForm();
+  }
+
+  openNewSafetyRequirementModal(): void {
+    this.closeLossScenarioModal();
+    this.safetyRequirementModalMode.set('create');
+    this.editingSafetyRequirementId.set(null);
+    this.resetSafetyRequirementForm();
+  }
+
+  openEditSafetyRequirement(requirement: SafetyRequirement): void {
+    this.closeLossScenarioModal();
+    this.safetyRequirementModalMode.set('edit');
+    this.editingSafetyRequirementId.set(requirement.id);
+    this.safetyRequirementForm.reset({
+      id: requirement.id,
+      description: requirement.description,
+      addressedLossScenarioIds: [...requirement.addressedLossScenarioIds]
+    });
+  }
+
+  closeSafetyRequirementModal(): void {
+    this.safetyRequirementModalMode.set(null);
+    this.editingSafetyRequirementId.set(null);
+    this.resetSafetyRequirementForm();
+  }
+
   generateStepFiveWithAi(): void {
     if (this.isGeneratingStepFiveAi()) {
       return;
@@ -297,25 +374,52 @@ export class LossScenariosPageComponent {
     }
 
     const value = this.lossScenarioForm.getRawValue();
-    const nextId = value.id ?? this.nextLossScenarioId();
-    this.lossScenarios.update((current) => [
-      {
-        id: nextId,
-        description: value.description ?? '',
-        associatedUnsafeBehaviorIds: value.associatedUnsafeBehaviorIds ?? [],
-        sourceRationale: value.sourceRationale?.trim() ?? ''
-      },
-      ...current
-    ]);
+    const nextId = (value.id ?? this.nextLossScenarioId()).trim();
+    const editingId = this.editingLossScenarioId();
 
-    this.nextLossScenarioId.set(this.incrementId(nextId, 'LS'));
+    if (this.hasDuplicateLossScenarioId(nextId, editingId ?? undefined)) {
+      this.setDuplicateControlError(this.lossScenarioForm.controls.id);
+      return;
+    }
 
-    this.lossScenarioForm.reset({
-      id: this.nextLossScenarioId(),
-      description: '',
-      associatedUnsafeBehaviorIds: [],
-      sourceRationale: ''
-    });
+    const normalizedScenario: LossScenario = {
+      id: nextId,
+      description: value.description?.trim() ?? '',
+      associatedUnsafeBehaviorIds: this.uniqueValues(value.associatedUnsafeBehaviorIds ?? []),
+      sourceRationale: value.sourceRationale?.trim() ?? ''
+    };
+
+    if (this.lossScenarioModalMode() === 'edit' && editingId) {
+      this.lossScenarios.update((current) =>
+        current.map((item) => (item.id === editingId ? normalizedScenario : item))
+      );
+
+      if (editingId !== nextId) {
+        this.safetyRequirements.update((current) =>
+          current.map((item) => ({
+            ...item,
+            addressedLossScenarioIds: this.uniqueValues(
+              item.addressedLossScenarioIds.map((scenarioId) => (scenarioId === editingId ? nextId : scenarioId))
+            )
+          }))
+        );
+
+        this.safetyRequirementForm.patchValue({
+          addressedLossScenarioIds: this.uniqueValues(
+            (this.safetyRequirementForm.controls.addressedLossScenarioIds.value ?? []).map((scenarioId) =>
+              scenarioId === editingId ? nextId : scenarioId
+            )
+          )
+        });
+      }
+
+      this.bumpNextStepIdIfNeeded(nextId, 'LS');
+    } else {
+      this.lossScenarios.update((current) => [normalizedScenario, ...current]);
+      this.nextLossScenarioId.set(this.incrementId(nextId, 'LS'));
+    }
+
+    this.closeLossScenarioModal();
   }
 
   addSafetyRequirement(): void {
@@ -325,23 +429,31 @@ export class LossScenariosPageComponent {
     }
 
     const value = this.safetyRequirementForm.getRawValue();
-    const nextId = value.id ?? this.nextSafetyRequirementId();
-    this.safetyRequirements.update((current) => [
-      {
-        id: nextId,
-        description: value.description ?? '',
-        addressedLossScenarioIds: value.addressedLossScenarioIds ?? []
-      },
-      ...current
-    ]);
+    const nextId = (value.id ?? this.nextSafetyRequirementId()).trim();
+    const editingId = this.editingSafetyRequirementId();
 
-    this.nextSafetyRequirementId.set(this.incrementId(nextId, 'SR'));
+    if (this.hasDuplicateSafetyRequirementId(nextId, editingId ?? undefined)) {
+      this.setDuplicateControlError(this.safetyRequirementForm.controls.id);
+      return;
+    }
 
-    this.safetyRequirementForm.reset({
-      id: this.nextSafetyRequirementId(),
-      description: '',
-      addressedLossScenarioIds: []
-    });
+    const normalizedRequirement: SafetyRequirement = {
+      id: nextId,
+      description: value.description?.trim() ?? '',
+      addressedLossScenarioIds: this.uniqueValues(value.addressedLossScenarioIds ?? [])
+    };
+
+    if (this.safetyRequirementModalMode() === 'edit' && editingId) {
+      this.safetyRequirements.update((current) =>
+        current.map((item) => (item.id === editingId ? normalizedRequirement : item))
+      );
+      this.bumpNextStepIdIfNeeded(nextId, 'SR');
+    } else {
+      this.safetyRequirements.update((current) => [normalizedRequirement, ...current]);
+      this.nextSafetyRequirementId.set(this.incrementId(nextId, 'SR'));
+    }
+
+    this.closeSafetyRequirementModal();
   }
 
   saveStepFive(continueAfterSave = false): void {
@@ -414,6 +526,38 @@ export class LossScenariosPageComponent {
     return behavior ? `${behavior.id} (${behavior.type})` : behaviorId;
   }
 
+  lossScenarioLabel(lossScenarioId: string): string {
+    const scenario = this.findLossScenario(lossScenarioId);
+    return scenario ? `${scenario.id} - ${scenario.description}` : lossScenarioId;
+  }
+
+  removeLossScenario(lossScenarioId: string): void {
+    if (this.editingLossScenarioId() === lossScenarioId) {
+      this.closeLossScenarioModal();
+    }
+
+    this.lossScenarios.update((current) => current.filter((item) => item.id !== lossScenarioId));
+    this.safetyRequirements.update((current) =>
+      current.map((item) => ({
+        ...item,
+        addressedLossScenarioIds: item.addressedLossScenarioIds.filter((scenarioId) => scenarioId !== lossScenarioId)
+      }))
+    );
+    this.safetyRequirementForm.patchValue({
+      addressedLossScenarioIds: (this.safetyRequirementForm.controls.addressedLossScenarioIds.value ?? []).filter(
+        (scenarioId) => scenarioId !== lossScenarioId
+      )
+    });
+  }
+
+  removeSafetyRequirement(requirementId: string): void {
+    if (this.editingSafetyRequirementId() === requirementId) {
+      this.closeSafetyRequirementModal();
+    }
+
+    this.safetyRequirements.update((current) => current.filter((item) => item.id !== requirementId));
+  }
+
   lossScenarioHazards(lossScenario: LossScenario): string[] {
     return this.uniqueValues(
       this.lookupUnsafeBehaviors(lossScenario.associatedUnsafeBehaviorIds).flatMap((behavior) => behavior.hazards)
@@ -484,15 +628,22 @@ export class LossScenariosPageComponent {
     this.stepFiveSaveMessage.set(null);
     this.stepFiveSaveError.set(null);
 
+    this.closeLossScenarioModal();
+    this.closeSafetyRequirementModal();
+  }
+
+  private resetLossScenarioForm(): void {
     this.lossScenarioForm.reset({
-      id: 'LS-01',
+      id: this.nextLossScenarioId(),
       description: '',
       associatedUnsafeBehaviorIds: [],
       sourceRationale: ''
     });
+  }
 
+  private resetSafetyRequirementForm(): void {
     this.safetyRequirementForm.reset({
-      id: 'SR-01',
+      id: this.nextSafetyRequirementId(),
       description: '',
       addressedLossScenarioIds: []
     });
@@ -502,6 +653,41 @@ export class LossScenariosPageComponent {
     const match = id.match(new RegExp(`${prefix}-(\\d+)`, 'i'));
     const nextNumber = match ? Number(match[1]) + 1 : 1;
     return `${prefix}-${String(nextNumber).padStart(2, '0')}`;
+  }
+
+  private extractIdNumber(id: string): number {
+    const match = id.match(/(\d+)/);
+    return match ? Number.parseInt(match[1], 10) : 0;
+  }
+
+  private bumpNextStepIdIfNeeded(id: string, prefix: 'LS' | 'SR'): void {
+    if (prefix === 'LS') {
+      if (this.extractIdNumber(id) >= this.extractIdNumber(this.nextLossScenarioId())) {
+        this.nextLossScenarioId.set(this.incrementId(id, prefix));
+      }
+      return;
+    }
+
+    if (this.extractIdNumber(id) >= this.extractIdNumber(this.nextSafetyRequirementId())) {
+      this.nextSafetyRequirementId.set(this.incrementId(id, prefix));
+    }
+  }
+
+  private hasDuplicateLossScenarioId(id: string, excludeId?: string): boolean {
+    return this.lossScenarios().some((item) => item.id !== excludeId && item.id === id);
+  }
+
+  private hasDuplicateSafetyRequirementId(id: string, excludeId?: string): boolean {
+    return this.safetyRequirements().some((item) => item.id !== excludeId && item.id === id);
+  }
+
+  private setDuplicateControlError(control: {
+    errors: ValidationErrors | null;
+    setErrors: (errors: ValidationErrors | null) => void;
+    markAsTouched: () => void;
+  }): void {
+    control.setErrors({ ...(control.errors ?? {}), duplicate: true });
+    control.markAsTouched();
   }
 
   private getStepFiveSaveErrorMessage(error: unknown): string {

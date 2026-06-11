@@ -1,20 +1,85 @@
-<section class="page">
-  <header class="page-header">
-    <p class="step">Artifacts</p>
-    <div class="page-header__title-row">
-      <div>
-        <h2>ReSafety document artifacts</h2>
-        <p>
-          Load the complete project payload and generate 6 ReSafety documents in PDF and DOCX (12 files total).
-        </p>
+@if (!embedded()) {
+  <section class="page">
+    <header class="page-header">
+      <p class="step">Artifacts</p>
+      <div class="page-header__title-row">
+        <div>
+          <h2>ReSafety document artifacts</h2>
+          <p>
+            Load the complete project payload and generate 6 ReSafety documents in PDF and DOCX (12 files total).
+          </p>
+        </div>
+        @if (resolvedProjectId(); as projectId) {
+          <span class="project-badge">Project #{{ projectId }}</span>
+        }
       </div>
-      @if (currentProjectId(); as projectId) {
+    </header>
+
+    <section class="card">
+      @if (isLoading()) {
+        <span class="status-chip status-chip--loading">Loading full project payload...</span>
+      }
+
+      @if (errorMessage(); as error) {
+        <span class="status-chip status-chip--error">{{ error }}</span>
+      }
+
+      @if (artifactSections().length) {
+        <div class="download-grid">
+          @for (artifact of artifactSections(); track artifact.key) {
+            <article class="download-card">
+              <div>
+                <h4>{{ artifact.title }}</h4>
+                <p>{{ artifact.description }}</p>
+              </div>
+              <div class="download-actions">
+                <button
+                  type="button"
+                  class="download-link"
+                  [disabled]="isExporting()"
+                  (click)="downloadPdf(artifact)"
+                >
+                  @if (exportingKey() === artifact.key + '-pdf') {
+                    Generating PDF...
+                  } @else {
+                    Download PDF
+                  }
+                </button>
+                <button
+                  type="button"
+                  class="download-link download-link--secondary"
+                  [disabled]="isExporting()"
+                  (click)="downloadDocx(artifact)"
+                >
+                  @if (exportingKey() === artifact.key + '-docx') {
+                    Generating DOCX...
+                  } @else {
+                    Download DOCX
+                  }
+                </button>
+              </div>
+            </article>
+          }
+        </div>
+      } @else if (!isLoading()) {
+        <p class="empty-state">
+          No artifact sections are available yet. Provide a valid <strong>projectId</strong> query parameter and ensure the backend returns a full project payload.
+        </p>
+      }
+    </section>
+  </section>
+} @else {
+  <section class="card card--embedded">
+    <div class="section-heading">
+      <div>
+        <p class="step">Artifacts</p>
+        <h3>ReSafety document artifacts</h3>
+        <p>Generate the final PDF and DOCX artifact set directly from the current full project payload.</p>
+      </div>
+      @if (resolvedProjectId(); as projectId) {
         <span class="project-badge">Project #{{ projectId }}</span>
       }
     </div>
-  </header>
-
-  <section class="card">
 
     @if (artifactSections().length) {
       <div class="download-grid">
@@ -54,10 +119,7 @@
         }
       </div>
     } @else {
-      <p class="empty-state">
-        No artifact sections are available yet. Provide a valid <strong>projectId</strong> query parameter and ensure the backend returns a full project payload.
-      </p>
+      <p class="empty-state">No artifact sections are available yet for this project.</p>
     }
   </section>
-
-</section>
+}

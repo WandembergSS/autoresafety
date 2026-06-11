@@ -71,294 +71,295 @@
   </div>
 </section>
 
-<section class="form-layout">
-  <section class="card">
-    <div class="card__heading">
-      <div>
-        <p class="card__eyebrow">Loss scenario identification: Steps 5.1 and 5.2</p>
-        <h3>Loss Scenario Identification</h3>
-        <p>
-          Investigate and record the specific causal factors, environmental conditions, or operational errors that cause
-          a selected UCA or HC to become a system-level hazard.
-        </p>
-      </div>
-    </div>
-
-    <form class="form-grid" [formGroup]="lossScenarioForm" (ngSubmit)="addLossScenario()">
-      <label class="field">
-        <span>Loss Scenario ID</span>
-        <input type="text" formControlName="id" placeholder="LS-04" />
-        <small>Use the LS-XX format.</small>
-        @if (controlInvalid('lossScenarioForm', 'id')) {
-          <span class="field-error">Use the LS-XX format.</span>
-        }
-      </label>
-
-      <label class="field field--full">
-        <span>Loss Scenario Description</span>
-        <textarea
-          rows="5"
-          formControlName="description"
-          placeholder="Describe the combination of conditions, environmental factors, or operational errors that allow the unsafe behavior to produce a hazard."
-        ></textarea>
-        <small>Capture the causal conditions that make the scenario credible.</small>
-        @if (controlInvalid('lossScenarioForm', 'description')) {
-          <span class="field-error">Provide a specific loss-scenario narrative with at least 20 characters.</span>
-        }
-      </label>
-
-      <label class="field field--full">
-        <span>Associated Unsafe Behaviors (UCAs / HCs)</span>
-        <select multiple formControlName="associatedUnsafeBehaviorIds" size="5">
-          @for (behavior of unsafeBehaviorCatalog(); track behavior.id) {
-            <option [value]="behavior.id">{{ behavior.id }} ({{ behavior.type }}) - {{ behavior.title }}</option>
-          }
-        </select>
-        <small>Select at least one UCA or HC to maintain traceability to the control structure.</small>
-        @if (controlInvalid('lossScenarioForm', 'associatedUnsafeBehaviorIds')) {
-          <span class="field-error">Select at least one UCA or HC.</span>
-        }
-      </label>
-
-      <label class="field field--full">
-        <span>Source / Rationale</span>
-        <input type="text" formControlName="sourceRationale" placeholder="Literature, system manual, or expert reasoning" />
-        <small>Optional justification for why the scenario is plausible.</small>
-      </label>
-
-      <div class="actions field--full">
-        <button type="submit" class="primary">Record loss scenario</button>
-      </div>
-    </form>
-
-    <aside class="draft-panel">
-      <h4>Draft traceability preview</h4>
-      <dl>
-        <div>
-          <dt>Selected unsafe behaviors</dt>
-          <dd>
-            @if (draftLossScenarioBehaviors().length) {
-              <ul class="tag-list">
-                @for (behavior of draftLossScenarioBehaviors(); track behavior.id) {
-                  <li>{{ behavior.id }} ({{ behavior.type }})</li>
-                }
-              </ul>
-            } @else {
-              <span class="muted">No unsafe behavior selected yet.</span>
-            }
-          </dd>
-        </div>
-        <div>
-          <dt>Resulting hazards</dt>
-          <dd>
-            @if (draftLossScenarioHazards().length) {
-              <ul class="tag-list tag-list--hazards">
-                @for (hazard of draftLossScenarioHazards(); track hazard) {
-                  <li>{{ hazard }}</li>
-                }
-              </ul>
-            } @else {
-              <span class="muted">Hazards appear automatically from the selected UCA or HC.</span>
-            }
-          </dd>
-        </div>
-      </dl>
-    </aside>
-  </section>
-
-  <section class="card">
-    <div class="card__heading">
-      <div>
-        <p class="card__eyebrow">Safety requirement derivation: Step 5.3</p>
-        <h3>Derive Safety Requirements</h3>
-        <p>
-          Formulate actionable mitigation strategies that prevent, detect, or reduce the impact of the causal factors
-          documented in the loss scenarios.
-        </p>
-      </div>
-    </div>
-
-    <form class="form-grid" [formGroup]="safetyRequirementForm" (ngSubmit)="addSafetyRequirement()">
-      <label class="field">
-        <span>Safety Requirement ID</span>
-        <input type="text" formControlName="id" placeholder="SR-04" />
-        <small>Use the SR-XX format.</small>
-        @if (controlInvalid('safetyRequirementForm', 'id')) {
-          <span class="field-error">Use the SR-XX format.</span>
-        }
-      </label>
-
-      <label class="field field--full">
-        <span>Safety Requirement Description</span>
-        <textarea
-          rows="5"
-          formControlName="description"
-          placeholder="Describe the alert, interlock, interface behavior, cross-check, or other mitigation strategy that addresses the loss scenario."
-        ></textarea>
-        <small>Write the requirement as an actionable system behavior.</small>
-        @if (controlInvalid('safetyRequirementForm', 'description')) {
-          <span class="field-error">Provide an actionable mitigation strategy with at least 20 characters.</span>
-        }
-      </label>
-
-      <label class="field field--full">
-        <span>Addressed Loss Scenario(s)</span>
-        <select multiple formControlName="addressedLossScenarioIds" size="5">
-          @for (scenario of lossScenarios(); track scenario.id) {
-            <option [value]="scenario.id">{{ scenario.id }} - {{ scenario.description }}</option>
-          }
-        </select>
-        <small>Select at least one loss scenario to justify why the requirement exists.</small>
-        @if (controlInvalid('safetyRequirementForm', 'addressedLossScenarioIds')) {
-          <span class="field-error">Select at least one loss scenario.</span>
-        }
-      </label>
-
-      <div class="actions field--full">
-        <button type="submit" class="primary">Record safety requirement</button>
-      </div>
-    </form>
-
-    <aside class="draft-panel">
-      <h4>Requirement justification preview</h4>
-      @if (draftRequirementScenarios().length) {
-        <ul class="scenario-preview-list">
-          @for (scenario of draftRequirementScenarios(); track scenario.id) {
-            <li>
-              <strong>{{ scenario.id }}</strong>
-              <p>{{ scenario.description }}</p>
-            </li>
-          }
-        </ul>
-      } @else {
-        <p class="muted">Select one or more loss scenarios to preview the linked justification chain.</p>
-      }
-    </aside>
-  </section>
-</section>
-
 <section class="card">
   <div class="card__heading">
     <div>
-      <h3>Loss scenario register</h3>
+      <h3>Loss scenarios</h3>
       <p>Each loss scenario remains linked to at least one Step 4 unsafe behavior and its related hazards.</p>
     </div>
+    <button type="button" class="button button--secondary card__heading-button" (click)="openNewLossScenarioModal()">
+      New loss scenario
+    </button>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>LS ID</th>
-          <th>Description</th>
-          <th>Associated UCAs / HCs</th>
-          <th>System-level hazards</th>
-          <th>Source / rationale</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (scenario of lossScenarios(); track scenario.id) {
-          <tr>
-            <td>{{ scenario.id }}</td>
-            <td>{{ scenario.description }}</td>
-            <td>
-              <ul class="inline-list">
-                @for (behaviorId of scenario.associatedUnsafeBehaviorIds; track behaviorId) {
-                  <li>{{ behaviorLabel(behaviorId) }}</li>
-                }
-              </ul>
-            </td>
-            <td>
-              <ul class="inline-list">
-                @for (hazard of lossScenarioHazards(scenario); track hazard) {
-                  <li>{{ hazard }}</li>
-                }
-              </ul>
-            </td>
-            <td>{{ scenario.sourceRationale || 'Not provided' }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<section class="card">
-  <div class="card__heading">
-    <div>
-      <h3>Safety requirement register</h3>
-      <p>Each requirement must remain linked to at least one recorded loss scenario.</p>
-    </div>
-  </div>
-
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>SR ID</th>
-          <th>Description</th>
-          <th>Addressed loss scenarios</th>
-          <th>Traceability status</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (requirement of safetyRequirements(); track requirement.id) {
-          <tr>
-            <td>{{ requirement.id }}</td>
-            <td>{{ requirement.description }}</td>
-            <td>
-              <ul class="inline-list">
-                @for (scenarioId of requirement.addressedLossScenarioIds; track scenarioId) {
-                  <li>{{ scenarioId }}</li>
-                }
-              </ul>
-            </td>
-            <td>
-              <span class="badge badge--ready">SR to LS link confirmed</span>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<section class="card">
-  <div class="card__heading">
-    <div>
-      <h3>Resolved traceability chains</h3>
-      <p>These chains show the complete reasoning path that Step 6 can rely on.</p>
-    </div>
-  </div>
-
-  <div class="chain-grid">
-    @for (chain of traceabilityChains(); track chain.requirement.id) {
-      <article class="chain-card">
-        <p class="chain-card__eyebrow">{{ chain.requirement.id }}</p>
-        <h4>{{ chain.requirement.description }}</h4>
-
-        @for (entry of chain.scenarios; track entry.scenario.id) {
-          <div class="chain-card__path">
-            <p><strong>{{ chain.requirement.id }}</strong> mitigates <strong>{{ entry.scenario.id }}</strong></p>
-            <p>{{ entry.scenario.description }}</p>
-            <p>
-              Causes:
-              @for (behavior of entry.unsafeBehaviors; track behavior.id) {
-                <span class="chain-token">{{ behavior.id }}</span>
-              }
-            </p>
-            <p>
-              Leads to:
-              @for (hazard of entry.hazards; track hazard) {
-                <span class="chain-token chain-token--hazard">{{ hazard }}</span>
-              }
-            </p>
+  <div class="register-list">
+    @for (scenario of lossScenarios(); track scenario.id) {
+      <article class="register-card register-card--loss">
+        <header>
+          <div>
+            <span class="register-card__ref">{{ scenario.id }}</span>
+            <h4>{{ scenario.description }}</h4>
           </div>
-        }
+          <div class="register-card__actions">
+            <button
+              type="button"
+              class="icon-action"
+              (click)="openEditLossScenario(scenario)"
+              aria-label="Edit loss scenario"
+              title="Edit"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              class="icon-action icon-action--danger"
+              (click)="removeLossScenario(scenario.id)"
+              aria-label="Delete loss scenario"
+              title="Delete"
+            >
+              🗑
+            </button>
+          </div>
+        </header>
+
+        <div class="register-card__detail">
+          <strong>Associated UCAs / HCs</strong>
+          @if (scenario.associatedUnsafeBehaviorIds.length > 0) {
+            <ul class="inline-list">
+              @for (behaviorId of scenario.associatedUnsafeBehaviorIds; track behaviorId) {
+                <li>{{ behaviorLabel(behaviorId) }}</li>
+              }
+            </ul>
+          } @else {
+            <p>No unsafe behaviors linked.</p>
+          }
+        </div>
+
+        <div class="register-card__detail">
+          <strong>System-level hazards</strong>
+          @if (lossScenarioHazards(scenario).length > 0) {
+            <ul class="inline-list">
+              @for (hazard of lossScenarioHazards(scenario); track hazard) {
+                <li>{{ hazard }}</li>
+              }
+            </ul>
+          } @else {
+            <p>No hazards resolved.</p>
+          }
+        </div>
+
+        <div class="register-card__detail">
+          <strong>Source / rationale</strong>
+          <p>{{ scenario.sourceRationale || 'Not provided' }}</p>
+        </div>
       </article>
+    }
+
+    @if (lossScenarios().length === 0) {
+      <p class="register-list__empty">No loss scenarios recorded yet.</p>
     }
   </div>
 </section>
+
+<section class="card">
+  <div class="card__heading">
+    <div>
+      <h3>Safety requirements</h3>
+      <p>Each requirement must remain linked to at least one recorded loss scenario.</p>
+    </div>
+    <button type="button" class="button button--secondary card__heading-button" (click)="openNewSafetyRequirementModal()">
+      New safety requirement
+    </button>
+  </div>
+
+  <div class="register-list">
+    @for (requirement of safetyRequirements(); track requirement.id) {
+      <article class="register-card register-card--requirement">
+        <header>
+          <div>
+            <span class="register-card__ref">{{ requirement.id }}</span>
+            <h4>{{ requirement.description }}</h4>
+          </div>
+          <div class="register-card__actions">
+            <span class="badge" [class.badge--ready]="requirement.addressedLossScenarioIds.length > 0">
+              {{ requirement.addressedLossScenarioIds.length > 0 ? 'SR to LS link confirmed' : 'Traceability missing' }}
+            </span>
+            <button
+              type="button"
+              class="icon-action"
+              (click)="openEditSafetyRequirement(requirement)"
+              aria-label="Edit safety requirement"
+              title="Edit"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              class="icon-action icon-action--danger"
+              (click)="removeSafetyRequirement(requirement.id)"
+              aria-label="Delete safety requirement"
+              title="Delete"
+            >
+              🗑
+            </button>
+          </div>
+        </header>
+
+        <div class="register-card__detail">
+          <strong>Addressed loss scenarios</strong>
+          @if (requirement.addressedLossScenarioIds.length > 0) {
+            <ul class="inline-list">
+              @for (scenarioId of requirement.addressedLossScenarioIds; track scenarioId) {
+                <li>{{ lossScenarioLabel(scenarioId) }}</li>
+              }
+            </ul>
+          } @else {
+            <p>No linked loss scenarios.</p>
+          }
+        </div>
+
+        <div class="register-card__detail">
+          <strong>Traceability status</strong>
+          <p>
+            {{ requirement.addressedLossScenarioIds.length > 0
+              ? 'This requirement is linked to at least one recorded loss scenario.'
+              : 'Link this requirement to one or more loss scenarios to preserve Step 5 traceability.' }}
+          </p>
+        </div>
+      </article>
+    }
+
+    @if (safetyRequirements().length === 0) {
+      <p class="register-list__empty">No safety requirements recorded yet.</p>
+    }
+  </div>
+</section>
+
+@if (isLossScenarioModalOpen()) {
+  <div class="modal-backdrop" (click)="closeLossScenarioModal()">
+    <div
+      class="modal modal--step-five-edit"
+      (click)="$event.stopPropagation()"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="lossScenarioModalTitle()"
+    >
+      <header class="modal__header">
+        <div>
+          <p class="card__eyebrow">Loss scenario identification: Steps 5.1 and 5.2</p>
+          <h4>{{ lossScenarioModalTitle() }}</h4>
+        </div>
+        <button type="button" class="modal__close" (click)="closeLossScenarioModal()">×</button>
+      </header>
+
+      <form class="modal__body form-grid" [formGroup]="lossScenarioForm" (ngSubmit)="addLossScenario()">
+        <label class="field">
+          <span>Loss Scenario ID</span>
+          <input type="text" formControlName="id" placeholder="LS-04" />
+          <small>Use the LS-XX format.</small>
+          @if (controlInvalid('lossScenarioForm', 'id') && !lossScenarioForm.controls.id.hasError('duplicate')) {
+            <span class="field-error">Use the LS-XX format.</span>
+          }
+          @if (lossScenarioForm.controls.id.touched && lossScenarioForm.controls.id.hasError('duplicate')) {
+            <span class="field-error">This loss scenario id already exists. Use a unique id.</span>
+          }
+        </label>
+
+        <label class="field field--full">
+          <span>Loss Scenario Description</span>
+          <textarea
+            rows="5"
+            formControlName="description"
+            placeholder="Describe the combination of conditions, environmental factors, or operational errors that allow the unsafe behavior to produce a hazard."
+          ></textarea>
+          <small>Capture the causal conditions that make the scenario credible.</small>
+          @if (controlInvalid('lossScenarioForm', 'description')) {
+            <span class="field-error">Provide a specific loss-scenario narrative with at least 20 characters.</span>
+          }
+        </label>
+
+        <label class="field field--full">
+          <span>Associated Unsafe Behaviors (UCAs / HCs)</span>
+          <select multiple formControlName="associatedUnsafeBehaviorIds" size="5">
+            @for (behavior of unsafeBehaviorCatalog(); track behavior.id) {
+              <option [value]="behavior.id">{{ behavior.id }} ({{ behavior.type }}) - {{ behavior.title }}</option>
+            }
+          </select>
+          <small>Select at least one UCA or HC to maintain traceability to the control structure.</small>
+          @if (controlInvalid('lossScenarioForm', 'associatedUnsafeBehaviorIds')) {
+            <span class="field-error">Select at least one UCA or HC.</span>
+          }
+        </label>
+
+        <label class="field field--full">
+          <span>Source / Rationale</span>
+          <input type="text" formControlName="sourceRationale" placeholder="Literature, system manual, or expert reasoning" />
+          <small>Optional justification for why the scenario is plausible.</small>
+        </label>
+
+        <div class="page-actions modal__actions field--full">
+          <button type="button" class="button button--secondary" (click)="closeLossScenarioModal()">Cancel</button>
+          <button type="submit" class="button">{{ lossScenarioModalSubmitLabel() }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (isSafetyRequirementModalOpen()) {
+  <div class="modal-backdrop" (click)="closeSafetyRequirementModal()">
+    <div
+      class="modal modal--step-five-edit"
+      (click)="$event.stopPropagation()"
+      role="dialog"
+      aria-modal="true"
+      [attr.aria-label]="safetyRequirementModalTitle()"
+    >
+      <header class="modal__header">
+        <div>
+          <p class="card__eyebrow">Safety requirement derivation: Step 5.3</p>
+          <h4>{{ safetyRequirementModalTitle() }}</h4>
+        </div>
+        <button type="button" class="modal__close" (click)="closeSafetyRequirementModal()">×</button>
+      </header>
+
+      <form class="modal__body form-grid" [formGroup]="safetyRequirementForm" (ngSubmit)="addSafetyRequirement()">
+        <label class="field">
+          <span>Safety Requirement ID</span>
+          <input type="text" formControlName="id" placeholder="SR-04" />
+          <small>Use the SR-XX format.</small>
+          @if (controlInvalid('safetyRequirementForm', 'id') && !safetyRequirementForm.controls.id.hasError('duplicate')) {
+            <span class="field-error">Use the SR-XX format.</span>
+          }
+          @if (safetyRequirementForm.controls.id.touched && safetyRequirementForm.controls.id.hasError('duplicate')) {
+            <span class="field-error">This safety requirement id already exists. Use a unique id.</span>
+          }
+        </label>
+
+        <label class="field field--full">
+          <span>Safety Requirement Description</span>
+          <textarea
+            rows="5"
+            formControlName="description"
+            placeholder="Describe the alert, interlock, interface behavior, cross-check, or other mitigation strategy that addresses the loss scenario."
+          ></textarea>
+          <small>Write the requirement as an actionable system behavior.</small>
+          @if (controlInvalid('safetyRequirementForm', 'description')) {
+            <span class="field-error">Provide an actionable mitigation strategy with at least 20 characters.</span>
+          }
+        </label>
+
+        <label class="field field--full">
+          <span>Addressed Loss Scenario(s)</span>
+          <select multiple formControlName="addressedLossScenarioIds" size="5">
+            @for (scenario of lossScenarios(); track scenario.id) {
+              <option [value]="scenario.id">{{ scenario.id }} - {{ scenario.description }}</option>
+            }
+          </select>
+          <small>Select at least one loss scenario to justify why the requirement exists.</small>
+          @if (controlInvalid('safetyRequirementForm', 'addressedLossScenarioIds')) {
+            <span class="field-error">Select at least one loss scenario.</span>
+          }
+        </label>
+
+        <div class="page-actions modal__actions field--full">
+          <button type="button" class="button button--secondary" (click)="closeSafetyRequirementModal()">Cancel</button>
+          <button type="submit" class="button">{{ safetyRequirementModalSubmitLabel() }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
 
 @if (isBpmnModelModalOpen()) {
   <div class="modal-backdrop" (click)="closeBpmnModelModal()">

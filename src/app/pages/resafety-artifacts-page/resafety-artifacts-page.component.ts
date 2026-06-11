@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { catchError, map, of, switchMap, tap } from 'rxjs';
@@ -127,10 +127,15 @@ interface FullProjectDocumentPayload {
   styleUrl: './resafety-artifacts-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class ResafetyArtifactsPageComponent {
+export class ResafetyArtifactsPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly projectService = inject(ProjectService);
   private readonly destroyRef = inject(DestroyRef);
+
+  readonly embedded = input(false);
+  readonly projectPayloadInput = input<Record<string, unknown> | null>(null);
+  readonly projectIdInput = input<number | null>(null);
+  readonly projectNameInput = input<string | null>(null);
 
   readonly currentProjectId = signal<number | null>(null);
   readonly projectPayload = signal<Record<string, unknown> | null>(null);
@@ -140,24 +145,40 @@ export class ResafetyArtifactsPageComponent {
   readonly exportingKey = signal<string | null>(null);
   readonly errorMessage = signal<string | null>(null);
 
+  readonly resolvedProjectId = computed(() => this.projectIdInput() ?? this.currentProjectId());
+
   readonly artifactSections = computed<ArtifactDocumentSection[]>(() => {
-    const payload = this.projectPayload();
-    const projectId = this.currentProjectId();
+    const payload = this.projectPayloadInput() ?? this.projectPayload();
+    const projectId = this.resolvedProjectId();
+    const resolvedProjectName = (this.projectNameInput() ?? '').trim() || this.projectName();
 
     if (!payload || !projectId) {
       return [];
     }
 
-    const projectSlug = this.sanitizeFileName(this.projectName() || `project-${projectId}`);
+    const projectSlug = this.sanitizeFileName(resolvedProjectName || `project-${projectId}`);
     return this.buildArtifactSections(payload, projectSlug);
   });
 
   readonly payloadPreview = computed(() => {
-    const payload = this.projectPayload();
+    const payload = this.projectPayloadInput() ?? this.projectPayload();
     return payload ? JSON.stringify(payload, null, 2) : '';
   });
 
-  constructor() {
+  ngOnInit(): void {
+    if (this.embedded()) {
+      if (this.projectIdInput()) {
+        this.currentProjectId.set(this.projectIdInput());
+      }
+
+      const providedProjectName = this.projectNameInput();
+      if (providedProjectName && providedProjectName.trim().length > 0) {
+        this.projectName.set(providedProjectName.trim());
+      }
+
+      return;
+    }
+
     this.route.queryParamMap
       .pipe(
         takeUntilDestroyed(this.destroyRef),
