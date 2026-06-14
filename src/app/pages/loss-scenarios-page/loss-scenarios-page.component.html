@@ -7,7 +7,7 @@
         @if (isGeneratingStepFiveAi()) {
           <span class="button__spinner"></span>
         } @else {
-          🤖
+          <span class="ai-robot-icon" aria-hidden="true"></span>
         }
       </span>
       <span>{{ isGeneratingStepFiveAi() ? 'Generating...' : 'Generate with AI' }}</span>

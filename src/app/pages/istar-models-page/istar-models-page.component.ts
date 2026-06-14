@@ -350,6 +350,8 @@ export class IstarModelsPageComponent {
   readonly isAddSafetyResourceAiModalOpen = signal(false);
   readonly isAddSafetyResourceAiRunning = signal(false);
   readonly addSafetyResourceAiError = signal<string | null>(null);
+  readonly isCorrectingModelWithAi = signal(false);
+  readonly correctModelAiError = signal<string | null>(null);
   readonly isSavingStepTwo = signal(false);
   readonly stepTwoSaveMessage = signal<string | null>(null);
   readonly stepTwoSaveError = signal<string | null>(null);
@@ -665,6 +667,7 @@ export class IstarModelsPageComponent {
     successMessage: string;
     closeModal: () => void;
     validatePatch?: (patch: PistarModelPatch) => string | null;
+    preparePatch?: (patch: PistarModelPatch, currentModel: PistarModel) => PistarModelPatch;
     mergeOptions?: { allowExistingActorUpdates?: boolean };
     errorLogLabel: string;
   }): void {
@@ -687,7 +690,11 @@ export class IstarModelsPageComponent {
             return;
           }
 
-          const validationError = options.validatePatch?.(parsedPatch) ?? null;
+          const preparedPatch = options.preparePatch
+            ? options.preparePatch(parsedPatch, options.currentModel)
+            : parsedPatch;
+
+          const validationError = options.validatePatch?.(preparedPatch) ?? null;
           if (validationError) {
             options.setError(validationError);
             this.aiFeedback.showError(validationError);
@@ -696,15 +703,16 @@ export class IstarModelsPageComponent {
 
           const normalizedPatch = this.normalizeAiModelPatchForMerge(
             options.currentModel,
-            parsedPatch,
+            preparedPatch,
             options.mergeOptions
           );
           const mergedModel = this.mergePistarModels(options.currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
+          const sanitizedModel = this.sanitizePistarModelForImport(mergedModel);
+          const serialized = JSON.stringify(sanitizedModel);
           this.lastPulledModelSnapshot = serialized;
           this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
+          this.syncFormsFromPistarModel(sanitizedModel);
+          this.applyModelObjectToPistar(sanitizedModel);
           this.stepTwoSaveError.set(null);
           this.stepTwoSaveMessage.set(options.successMessage);
           options.closeModal();
@@ -1028,6 +1036,7 @@ export class IstarModelsPageComponent {
       requestFailureMessage: 'Failed to generate safety resources with AI.',
       successMessage: 'AI safety resource proposal applied to the Step 2 model.',
       closeModal: () => this.isAddSafetyResourceAiModalOpen.set(false),
+      preparePatch: (parsedPatch, baseModel) => this.coerceSafetyResourceAiPatch(baseModel, parsedPatch),
       validatePatch: (parsedPatch) =>
         this.validateAiSafetyResourcePatchCount(currentModel, parsedPatch, minSafetyResourcesToAdd, maxSafetyResourcesToAdd),
       mergeOptions: { allowExistingActorUpdates: true },
@@ -1324,7 +1333,9 @@ export class IstarModelsPageComponent {
   }
 
   runValidationAndPreview(): void {
-    const errors = this.validateModelDefinition();
+    this.correctModelAiError.set(null);
+
+    const { errors } = this.collectCurrentValidationState();
     this.validationErrors.set(errors);
 
     if (errors.length === 0) {
@@ -1333,6 +1344,77 @@ export class IstarModelsPageComponent {
     }
 
     this.payloadPreview.set('');
+  }
+
+  runAiModelCorrection(): void {
+    if (this.isCorrectingModelWithAi()) {
+      return;
+    }
+
+    this.correctModelAiError.set(null);
+    this.stepTwoSaveMessage.set(null);
+
+    const { model: currentModel, errors: currentErrors } = this.collectCurrentValidationState();
+    this.validationErrors.set(currentErrors);
+
+    if (currentErrors.length === 0) {
+      this.payloadPreview.set(JSON.stringify(this.buildPayload(), null, 2));
+      this.aiFeedback.showWarning('The current Step 2 model already satisfies all validation rules.');
+      return;
+    }
+
+    this.payloadPreview.set('');
+    this.isCorrectingModelWithAi.set(true);
+
+    this.aiAssistant
+      .askWithSummary({
+        question: this.buildCorrectModelAiPrompt(currentModel, currentErrors),
+        context: 'Step 2 iStar4Safety model correction'
+      })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.isCorrectingModelWithAi.set(false))
+      )
+      .subscribe({
+        next: ({ payload, summary }) => {
+          const parsedModel = this.parseCompletePistarModelFromAiResponse(payload);
+          if (!parsedModel) {
+            const message = 'AI correction must return one complete corrected iStar4Safety JSON model.';
+            this.correctModelAiError.set(message);
+            this.aiFeedback.showError(message);
+            return;
+          }
+
+          const sanitizedModel = this.sanitizePistarModelForImport(parsedModel);
+          const correctedErrors = this.validateCandidateModelAgainstAllRules(sanitizedModel, currentModel);
+
+          if (correctedErrors.length > 0) {
+            const message = 'AI returned a model that still violates one or more iStar4Safety rules.';
+            this.validationErrors.set(correctedErrors);
+            this.correctModelAiError.set(message);
+            this.aiFeedback.showError(message);
+            return;
+          }
+
+          const serialized = JSON.stringify(sanitizedModel);
+          this.lastPulledModelSnapshot = serialized;
+          this.lastPushedModelSnapshot = serialized;
+          this.syncFormsFromPistarModel(sanitizedModel);
+          this.applyModelObjectToPistar(sanitizedModel);
+          this.validationErrors.set([]);
+          this.payloadPreview.set(JSON.stringify(this.buildPayload(), null, 2));
+          this.stepTwoSaveError.set(null);
+          this.stepTwoSaveMessage.set('AI corrected model applied to the Step 2 model.');
+          this.correctModelAiError.set(null);
+          this.aiFeedback.showSummary(summary);
+        },
+        error: (error) => {
+          const message = 'Failed to request an AI-corrected Step 2 model.';
+          this.correctModelAiError.set(message);
+          this.aiFeedback.showError(message);
+          console.error('[Step2][AI] Failed to correct Step 2 model via /api/ai/ask', error);
+        }
+      });
   }
 
   saveStepTwo(continueAfterSave = false): void {
@@ -1352,9 +1434,7 @@ export class IstarModelsPageComponent {
     this.stepTwoSaveMessage.set(null);
     this.stepTwoSaveError.set(null);
 
-    this.pullModelFromPistar();
-
-    const errors = this.validateModelDefinition();
+    const { errors } = this.collectCurrentValidationState();
     this.validationErrors.set(errors);
 
     if (errors.length > 0) {
@@ -1507,6 +1587,144 @@ export class IstarModelsPageComponent {
     return this.buildPistarModelFromForms();
   }
 
+  private buildAiPatchResponseFormat(actorDescription: string, linkDescription: string): string {
+    return `Patch Response Format:
+Return an object with only the changed content. Use this structure:
+{
+  "actors": [${actorDescription}],
+  "dependencies": [new or updated social dependency elements only],
+  "links": [${linkDescription}],
+  "display": { optional display updates },
+  "diagram": { optional diagram updates }
+}`;
+  }
+
+  private buildConnectedModelIntegrationInstructions(): string {
+    return `Main objective:
+Add the requested new elements and integrate them into the existing model with the minimum valid relationships needed to make them meaningful.
+
+Mandatory integration rules:
+1. Do not add isolated elements unless no valid relation can be inferred from the current model.
+2. For every new element, try to add at least one valid relation to an existing or newly created element.
+3. Prefer fewer, semantically strong relations over many weak ones.
+4. Keep existing actor ids unchanged when updating actors.
+5. Use fresh unique ids for every new node, dependency, and link.
+
+Relationship rules:
+1. If the relation is inside one actor boundary, return it in links.
+2. If the relation crosses actor boundaries, return it as a social dependency in dependencies and also return its two istar.DependencyLink entries in links.
+3. Do not encode cross-actor dependencies as refinement, contribution, qualification, or needed-by links.
+
+Allowed internal link patterns:
+1. Goal to Goal: istar.AndRefinementLink or istar.OrRefinementLink, child as source and parent as target.
+2. Element to Quality: istar.ContributionLink, with the Quality as target.
+3. Quality to Goal, Task, or Resource: istar.QualificationLink.
+4. Resource or SafetyResource to Task, Hazard, or SafetyTask: istar.NeededByLink when semantically valid.
+
+Element-specific expectations:
+1. New Goals should refine, operationalize, or be qualified by something relevant in the same actor.
+2. New Qualities or Hazards should qualify or contribute to an existing or new goal, task, resource, or safety goal in the same actor.
+3. New Resources or SafetyResources should support a task, safety task, or hazard.
+4. New SafetyTasks should mitigate a hazard, operationalize a responsibility, or support a safety goal.
+5. New actors should, when justified, also include actor-to-actor links such as istar.IsALink or istar.ParticipatesInLink.
+
+Social dependency output format:
+Each new cross-actor dependency must include one dependency object in dependencies with this shape:
+{
+  "id": "dep-unique-id",
+  "text": "Dependum name",
+  "type": "istar.Goal" or "istar.Quality" or "istar.Resource" or "istar.Task",
+  "x": number,
+  "y": number,
+  "customProperties": {},
+  "source": "depender actor id or depender element id",
+  "target": "dependee actor id or dependee element id"
+}
+
+And it must also include these two links in links:
+1. {
+  "id": "dep-unique-id-in",
+  "type": "istar.DependencyLink",
+  "source": "depender actor id or depender element id",
+  "target": "dep-unique-id"
+}
+2. {
+  "id": "dep-unique-id-out",
+  "type": "istar.DependencyLink",
+  "source": "dep-unique-id",
+  "target": "dependee actor id or dependee element id"
+}
+
+Quality bar for this response:
+At least half of the newly added elements must be connected by a valid internal link or dependency unless the current model truly lacks enough context.
+
+${this.buildFullPistarValidationRuleSet()}`;
+  }
+
+  private buildFullPistarValidationRuleSet(): string {
+    return `### Full rule set checked by piStar/iStar4Safety (MUST OBEY)
+You must satisfy the combined rule set enforced by this Step 2 application and by the embedded piStar/iStar4Safety validator. If two rules overlap, obey the stricter rule.
+
+Actor rules:
+1. Actor type must be exactly one of "istar.Actor", "istar.Agent", or "istar.Role".
+2. is-a links are only valid between same-type generic Actors or same-type Roles.
+3. An Agent cannot specialize another actor through an is-a link.
+4. Do not create self is-a links or self participates-in links.
+5. A specific pair of actors can have at most one actor-to-actor link.
+6. is-a and participates-in relationships must be acyclic.
+
+Boundary and patch rules:
+1. Every intentional element must belong to exactly one actor boundary and must appear inside that actor's nodes array.
+2. Keep existing actor ids unchanged when updating actors.
+3. Any non-dependency link must connect elements inside the same actor boundary.
+4. Cross-actor relations must be represented as dependencies plus their two istar.DependencyLink entries, never as refinement, contribution, qualification, or needed-by links.
+5. Use fresh unique ids for every new node, dependency, and link.
+6. Do not produce links or dependencies whose endpoints do not resolve to existing actors, nodes, or dependency ids in the final merged model.
+
+Internal link rules:
+1. Refinement links use the child as source and the parent as target.
+2. A refinement parent cannot mix AND and OR children.
+3. Refinement links must be acyclic.
+4. QualificationLink: source must be a Quality; target must be Goal, Task, or Resource.
+5. ContributionLink: target must be a Quality.
+6. Do not create a self-contribution link.
+7. The same source-target pair cannot have both a ContributionLink and a QualificationLink.
+8. NeededByLink: source must be a Resource or SafetyResource.
+9. If a NeededByLink source is a SafetyResource, its target must be Hazard, Task, or SafetyTask.
+
+Standard element rules:
+1. Standard Goal must use type "istar.Goal" and must not set customProperties.safetyType to a safety kind.
+2. Standard Quality must use type "istar.Quality" and must not set customProperties.safetyType to a safety kind.
+3. Standard Resource must use type "istar.Resource" and must not set customProperties.safetyType to a safety kind.
+
+Safety element rules:
+1. SafetyGoal must use type "istar.SafetyGoal", set customProperties.safetyType to "SafetyGoal", set customProperties.traceabilityId, set customProperties.accidentLevel to L1, L2, L3, L4, or L5, and set customProperties.safetyGoalKind to "Safety Constraint" or "Responsibility".
+2. If a SafetyGoal has safetyGoalKind "Safety Constraint", its traceabilityId must match SC-xx. If it has safetyGoalKind "Responsibility", its traceabilityId must match R-xx.
+3. Hazard must use type "istar.Hazard", set customProperties.safetyType to "Hazard", set customProperties.traceabilityId matching H<number> or UCA-xx, and set customProperties.obstructsSafetyGoalIds to at least one valid SafetyGoal id.
+4. SafetyTask must use type "istar.SafetyTask", set customProperties.safetyType to "SafetyTask", and set customProperties.traceabilityId matching R-xx.
+5. SafetyResource must use type "istar.SafetyResource", set customProperties.safetyType to "SafetyResource", and set customProperties.traceabilityId matching R-xx or SC-xx.
+
+Safety reasoning structure rules:
+1. In this Step 2 application, a SafetyGoal refinement can only use children that are all SafetyGoals or all Hazards.
+2. If a SafetyGoal is refined by Hazards, each such Hazard cannot be a refinement parent and cannot also be the child of another refinement.
+3. A Hazard refinement can only use children that are all Hazards or all SafetyTasks/SafetyResources.
+4. Every Hazard must obstruct at least one existing SafetyGoal.
+5. Every non-Responsibility SafetyGoal must be obstructed by at least one Hazard.
+
+Social dependency rules:
+1. A dependency must have different depender and dependee actors.
+2. A dependency dependum cannot be Hazard, SafetyGoal, SafetyTask, or SafetyResource.
+3. Do not duplicate the same dependum name plus dependum type combination.
+4. If dependerElementId or dependeeElementId is used, that element must exist and belong to the corresponding actor.
+5. A depender element used in a dependency cannot also be a refinement parent and cannot be the target of a contribution link.
+
+Output discipline:
+1. Return only the incremental JSON patch.
+2. Do not repeat untouched actors, dependencies, or links.
+3. Prefer connected additions over isolated additions.
+4. When a relation would violate any rule above, omit it and choose a different valid relation instead.`;
+  }
+
   private buildAddActorsAiPrompt(model: PistarModel, minActorsToAdd: number, maxActorsToAdd: number, promptInstructions: string): string {
     const userInstructions = promptInstructions || 'Add actors that fit the current SD/SR model context.';
     const currentActorCount = model.actors.length;
@@ -1520,16 +1738,11 @@ Valid JSON Only: Your output must be a single, valid JSON object representing on
 
 Endpoint Response Contract: The /ai/ask consumer will merge your response into the current SD/SR model in the embedded PiStar tool. Therefore, the first character of your response must be { and the last character must be }. Return only the final JSON object.
 
-Patch Response Format:
-Return an object with only the changed content. Use this structure:
-{
-  "actors": [new or updated actor objects only],
-  "links": [new or updated actor-to-actor links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('new or updated actor objects only', 'new or updated actor-to-actor links, internal links, and dependency links only')}
 
 Do not repeat untouched existing actors, dependencies, or links.
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Strict Schema Adherence: You must respect the provided JSON template. Actors must contain id, text, type, x, y, customProperties, and nodes.
 
@@ -1583,16 +1796,11 @@ Valid JSON Only: Your output must be a single, valid JSON object representing on
 
 Endpoint Response Contract: The /ai/ask consumer will merge your response into the current SD/SR model in the embedded PiStar tool. Therefore, the first character of your response must be { and the last character must be }. Return only the final JSON object.
 
-Patch Response Format:
-Return an object with only the changed content. Use this structure:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
 
 Do not repeat untouched actors, dependencies, or links. When updating an existing actor, keep the actor id unchanged and include only the new or changed nodes for that actor.
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Strict Schema Adherence: Updated actor objects must remain compatible with the current PiStar schema. Each returned actor should preserve its existing boundary identity and use these fields: id, text, type, x, y, customProperties, and nodes.
 
@@ -1602,7 +1810,8 @@ Reference Rules for Standard Goals (MUST OBEY):
 - Place every new goal inside exactly one existing actor's nodes array.
 - Use fresh unique ids for every new goal and every new link.
 - Keep existing actor ids unchanged so the patch merges into the current actor boundaries.
-- Any internal link in links must stay within the same actor boundary. Cross-actor relations are dependencies and must not be created here.
+- Any non-dependency link in links must stay within the same actor boundary.
+- If a meaningful cross-actor relation is needed, return it in dependencies and add the two istar.DependencyLink entries in links.
 - If you create refinement links, use istar.AndRefinementLink or istar.OrRefinementLink and connect child source -> parent target.
 - If you create contribution links, the target must be a Quality.
 - If you create qualification links, the source must be a Quality and the target must be Goal, Task, or Resource.
@@ -1647,16 +1856,11 @@ Valid JSON Only: Your output must be a single, valid JSON object representing on
 
 Endpoint Response Contract: The /ai/ask consumer will merge your response into the current SD/SR model in the embedded PiStar tool. Therefore, the first character of your response must be { and the last character must be }. Return only the final JSON object.
 
-Patch Response Format:
-Return an object with only the changed content. Use this structure:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
 
 Do not repeat untouched actors, dependencies, or links. When updating an existing actor, keep the actor id unchanged and include only the new or changed nodes for that actor.
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Strict Schema Adherence: Updated actor objects must remain compatible with the current PiStar schema. Each returned actor should preserve its existing boundary identity and use these fields: id, text, type, x, y, customProperties, and nodes.
 
@@ -1666,7 +1870,8 @@ Reference Rules for Standard Qualities (MUST OBEY):
 - Place every new quality inside exactly one existing actor's nodes array.
 - Use fresh unique ids for every new quality and every new link.
 - Keep existing actor ids unchanged so the patch merges into the current actor boundaries.
-- Any internal link in links must stay within the same actor boundary. Cross-actor relations are dependencies and must not be created here.
+- Any non-dependency link in links must stay within the same actor boundary.
+- If a meaningful cross-actor relation is needed, return it in dependencies and add the two istar.DependencyLink entries in links.
 - If you create contribution links, the new or existing Quality must be the target of the contribution.
 - If you create qualification links, the Quality must be the source and the target must be Goal, Task, or Resource in the same actor.
 - Prefer qualities that evaluate or constrain existing goals, tasks, and resources already present in the actor rationale instead of isolated generic labels.
@@ -1710,16 +1915,11 @@ Valid JSON Only: Your output must be a single, valid JSON object representing on
 
 Endpoint Response Contract: The /ai/ask consumer will merge your response into the current SD/SR model in the embedded PiStar tool. Therefore, the first character of your response must be { and the last character must be }. Return only the final JSON object.
 
-Patch Response Format:
-Return an object with only the changed content. Use this structure:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
 
 Do not repeat untouched actors, dependencies, or links. When updating an existing actor, keep the actor id unchanged and include only the new or changed nodes for that actor.
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Strict Schema Adherence: Updated actor objects must remain compatible with the current PiStar schema. Each returned actor should preserve its existing boundary identity and use these fields: id, text, type, x, y, customProperties, and nodes.
 
@@ -1729,7 +1929,8 @@ Reference Rules for Standard Resources (MUST OBEY):
 - Place every new resource inside exactly one existing actor's nodes array.
 - Use fresh unique ids for every new resource and every new link.
 - Keep existing actor ids unchanged so the patch merges into the current actor boundaries.
-- Any internal link in links must stay within the same actor boundary. Cross-actor relations are dependencies and must not be created here.
+- Any non-dependency link in links must stay within the same actor boundary.
+- If a meaningful cross-actor relation is needed, return it in dependencies and add the two istar.DependencyLink entries in links.
 - If you create qualification links, the source must be a Quality and the target may be the new or existing Resource in the same actor.
 - If you create needed-by links, the source must be a Resource and the target must be a Task in the same actor.
 - Prefer resources that operationalize or support existing goals and tasks already present in the actor rationale instead of isolated generic assets.
@@ -1766,22 +1967,19 @@ You are an expert Requirements Engineer and System Modeler specializing in the i
 
 Your Output Constraints:
 Valid JSON Only: return a single JSON object and nothing else.
-Patch Response Format:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Reference Rules for Safety Goals (MUST OBEY):
-- A safety goal node must use type "istar.Goal".
+- A safety goal node must use type "istar.SafetyGoal".
 - Every new safety goal must set customProperties.safetyType to "SafetyGoal".
 - Every new safety goal must set customProperties.traceabilityId.
 - If customProperties.safetyGoalKind is "Safety Constraint", traceabilityId must match SC-xx.
 - If customProperties.safetyGoalKind is "Responsibility", traceabilityId must match R-xx.
 - Every new safety goal must set customProperties.accidentLevel to L1, L2, L3, L4, or L5.
 - Prefer Safety Constraint unless the user explicitly asks for responsibilities.
+- Do not add standard Goal, Task, Resource, or Quality nodes as the primary additions in this SafetyGoal operation.
 - Do not create new actors. Update existing actors only.
 
 Reference Snapshot of the Current Model:
@@ -1810,19 +2008,17 @@ You are an expert Requirements Engineer and System Modeler specializing in the i
 
 Your Output Constraints:
 Valid JSON Only: return a single JSON object and nothing else.
-Patch Response Format:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Reference Rules for Hazards (MUST OBEY):
-- A hazard node must use type "istar.Quality".
+- A hazard node must use type "istar.Hazard".
 - Every new hazard must set customProperties.safetyType to "Hazard".
 - Every new hazard must set customProperties.traceabilityId and it must match H<number> or UCA-xx.
 - Every new hazard must set customProperties.obstructsSafetyGoalIds to an array with at least one valid SafetyGoal id.
+- Do not add standard Goal, Task, Resource, or Quality nodes as the primary additions in this Hazard operation.
+- Do not add SafetyGoal, SafetyTask, or SafetyResource nodes unless the user explicitly asked to update an existing related structure.
 - Do not create new actors. Update existing actors only.
 
 Reference Snapshot of the Current Model:
@@ -1856,18 +2052,15 @@ You are an expert Requirements Engineer and System Modeler specializing in the i
 
 Your Output Constraints:
 Valid JSON Only: return a single JSON object and nothing else.
-Patch Response Format:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Reference Rules for Safety Tasks (MUST OBEY):
-- A safety task node must use type "istar.Task".
+- A safety task node must use type "istar.SafetyTask".
 - Every new safety task must set customProperties.safetyType to "SafetyTask".
 - Every new safety task must set customProperties.traceabilityId and it must match R-xx.
+- Do not add standard Goal, Task, Resource, or Quality nodes as the primary additions in this SafetyTask operation.
 - Do not create new actors. Update existing actors only.
 
 Reference Snapshot of the Current Model:
@@ -1901,18 +2094,15 @@ You are an expert Requirements Engineer and System Modeler specializing in the i
 
 Your Output Constraints:
 Valid JSON Only: return a single JSON object and nothing else.
-Patch Response Format:
-{
-  "actors": [updated existing actor objects only],
-  "links": [new or updated internal links only],
-  "display": { optional display updates },
-  "diagram": { optional diagram updates }
-}
+${this.buildAiPatchResponseFormat('updated existing actor objects only', 'new or updated internal links and dependency links only')}
+
+${this.buildConnectedModelIntegrationInstructions()}
 
 Reference Rules for Safety Resources (MUST OBEY):
-- A safety resource node must use type "istar.Resource".
+- A safety resource node must use type "istar.SafetyResource".
 - Every new safety resource must set customProperties.safetyType to "SafetyResource".
 - Every new safety resource must set customProperties.traceabilityId and it must match R-xx or SC-xx.
+- Do not add standard Goal, Task, Resource, or Quality nodes as the primary additions in this SafetyResource operation.
 - Do not create new actors. Update existing actors only.
 - If you create needed-by links, the source must be a SafetyResource and the target must be Hazard, Task, or SafetyTask in the same actor.
 
@@ -2116,7 +2306,7 @@ Additional constraints for this run:
 
   private parsePistarModelFromAiResponse(response: unknown): PistarModelPatch | null {
     if (response && typeof response === 'object') {
-      const parsedDirect = this.parsePistarModelPatchCandidate(response);
+      const parsedDirect = this.parseWrappedPistarModelPatchCandidate(response as Record<string, unknown>);
       if (parsedDirect) {
         return parsedDirect;
       }
@@ -2154,6 +2344,74 @@ Additional constraints for this run:
     }
   }
 
+  private parseWrappedPistarModelPatchCandidate(candidate: Record<string, unknown>): PistarModelPatch | null {
+    const directCandidate = this.parsePistarModelPatchCandidate(candidate);
+    if (directCandidate) {
+      return directCandidate;
+    }
+
+    const nestedCandidate = candidate['content'];
+    if (nestedCandidate && typeof nestedCandidate === 'object' && !Array.isArray(nestedCandidate)) {
+      return this.parsePistarModelPatchCandidate(nestedCandidate);
+    }
+
+    return null;
+  }
+
+  private parseCompletePistarModelFromAiResponse(response: unknown): PistarModel | null {
+    if (response && typeof response === 'object') {
+      const parsedDirect = this.parseWrappedPistarFullModelCandidate(response as Record<string, unknown>);
+      if (parsedDirect) {
+        return parsedDirect;
+      }
+    }
+
+    const text = this.extractAiResponseText(response);
+    if (!text) {
+      return null;
+    }
+
+    const normalized = text
+      .replace(/^```json\s*/i, '')
+      .replace(/^```\s*/i, '')
+      .replace(/```\s*$/i, '')
+      .trim();
+
+    const parsedModel = this.parsePistarModelFromText(normalized);
+    if (!parsedModel || !Array.isArray(parsedModel.links)) {
+      return null;
+    }
+
+    return parsedModel;
+  }
+
+  private parseWrappedPistarFullModelCandidate(candidate: Record<string, unknown>): PistarModel | null {
+    const directCandidate = this.parsePistarFullModelCandidate(candidate);
+    if (directCandidate) {
+      return directCandidate;
+    }
+
+    const nestedCandidate = candidate['content'];
+    if (nestedCandidate && typeof nestedCandidate === 'object' && !Array.isArray(nestedCandidate)) {
+      return this.parsePistarFullModelCandidate(nestedCandidate);
+    }
+
+    return null;
+  }
+
+  private parsePistarFullModelCandidate(candidate: unknown): PistarModel | null {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      return null;
+    }
+
+    const record = candidate as Record<string, unknown>;
+    if (!Array.isArray(record['actors']) || !Array.isArray(record['dependencies']) || !Array.isArray(record['links'])) {
+      return null;
+    }
+
+    return this.parsePistarModelFromText(JSON.stringify(candidate));
+  }
+
   private parsePistarModelPatchCandidate(candidate: unknown): PistarModelPatch | null {
     if (!candidate || typeof candidate !== 'object') {
       return null;
@@ -2180,6 +2438,34 @@ Additional constraints for this run:
       istar: typeof record['istar'] === 'string' ? record['istar'] : undefined,
       saveDate: typeof record['saveDate'] === 'string' ? record['saveDate'] : undefined,
       diagram: record['diagram'] && typeof record['diagram'] === 'object' ? (record['diagram'] as Partial<PistarModel['diagram']>) : undefined
+    };
+  }
+
+  private coerceSafetyResourceAiPatch(baseModel: PistarModel, aiPatch: PistarModelPatch): PistarModelPatch {
+    const existingNodeIds = new Set(baseModel.actors.flatMap((actor) => (actor.nodes ?? []).map((node) => node.id)));
+
+    const actors = (aiPatch.actors ?? []).map((actor) => ({
+      ...actor,
+      nodes: (actor.nodes ?? []).map((node) => {
+        const mappedType = this.mapPistarTypeToIntentionalElementType(node.type, node.customProperties?.['safetyType']);
+        if (existingNodeIds.has(node.id) || mappedType !== 'Resource') {
+          return node;
+        }
+
+        return {
+          ...node,
+          type: 'istar.SafetyResource',
+          customProperties: {
+            ...(node.customProperties ?? {}),
+            safetyType: 'SafetyResource'
+          }
+        };
+      })
+    }));
+
+    return {
+      ...aiPatch,
+      actors
     };
   }
 
@@ -2244,6 +2530,7 @@ Additional constraints for this run:
         return {
           ...node,
           id: nextNodeId,
+          type: this.normalizePistarNodeType(node.type, customProperties),
           customProperties
         };
       });
@@ -2291,6 +2578,83 @@ Additional constraints for this run:
       links,
       display
     };
+  }
+
+  private sanitizePistarModelForImport(model: PistarModel): PistarModel {
+    const actorIds = new Set(model.actors.map((actor) => actor.id));
+    const nodeOwnerById = new Map<string, string>();
+
+    for (const actor of model.actors) {
+      for (const node of actor.nodes ?? []) {
+        nodeOwnerById.set(node.id, actor.id);
+      }
+    }
+
+    const actorOrNodeIds = new Set<string>([...actorIds, ...nodeOwnerById.keys()]);
+    const dependencies = model.dependencies.filter((dependency) => {
+      if (typeof dependency.source !== 'string' || typeof dependency.target !== 'string') {
+        return false;
+      }
+
+      return actorOrNodeIds.has(dependency.source) && actorOrNodeIds.has(dependency.target);
+    });
+
+    const dependencyIds = new Set(dependencies.map((dependency) => dependency.id));
+    const importableIds = new Set<string>([...actorIds, ...nodeOwnerById.keys(), ...dependencyIds]);
+
+    const links = model.links.filter((link) => {
+      if (!importableIds.has(link.source) || !importableIds.has(link.target)) {
+        return false;
+      }
+
+      const normalizedType = link.type.toLowerCase();
+      if (normalizedType.includes('dependencylink')) {
+        return dependencyIds.has(link.source) || dependencyIds.has(link.target);
+      }
+
+      if (normalizedType.includes('isa') || normalizedType.includes('particip')) {
+        return actorIds.has(link.source) && actorIds.has(link.target);
+      }
+
+      const sourceActorId = nodeOwnerById.get(link.source);
+      const targetActorId = nodeOwnerById.get(link.target);
+      return Boolean(sourceActorId && targetActorId && sourceActorId === targetActorId);
+    });
+
+    return {
+      ...model,
+      dependencies,
+      links
+    };
+  }
+
+  private normalizePistarNodeType(type: string, customProperties?: Record<string, unknown>): string {
+    const safetyTypeHint = customProperties?.['safetyType'];
+    if (typeof safetyTypeHint === 'string') {
+      const normalizedSafetyType = safetyTypeHint.startsWith('istar.')
+        ? safetyTypeHint.replace('istar.', '')
+        : safetyTypeHint;
+      if (
+        normalizedSafetyType === 'SafetyGoal' ||
+        normalizedSafetyType === 'Hazard' ||
+        normalizedSafetyType === 'SafetyTask' ||
+        normalizedSafetyType === 'SafetyResource'
+      ) {
+        return `istar.${normalizedSafetyType}`;
+      }
+    }
+
+    const normalizedType = type.startsWith('istar.') ? type.replace('istar.', '') : type;
+    if (
+      normalizedType === 'SafetyGoal' ||
+      normalizedType === 'Hazard' ||
+      normalizedType === 'SafetyTask' ||
+      normalizedType === 'SafetyResource'
+    ) {
+      return `istar.${normalizedType}`;
+    }
+
+    return type;
   }
 
   private mergePistarModels(baseModel: PistarModel, aiModel: PistarModelPatch): PistarModel {
@@ -2483,6 +2847,100 @@ Additional constraints for this run:
     }
 
     return '';
+  }
+
+  private collectCurrentValidationState(): { model: PistarModel; errors: string[] } {
+    const model = this.getCurrentPistarModelForAi();
+    const errors = this.mergeValidationErrors(this.validateModelDefinition(), this.validatePistarModel(model));
+    return { model, errors };
+  }
+
+  private validateCandidateModelAgainstAllRules(model: PistarModel, restoreModel: PistarModel): string[] {
+    const previousValidationErrors = this.validationErrors();
+    const previousPayloadPreview = this.payloadPreview();
+
+    this.syncFormsFromPistarModel(model);
+    const errors = this.mergeValidationErrors(this.validateModelDefinition(), this.validatePistarModel(model));
+    this.syncFormsFromPistarModel(restoreModel);
+
+    this.validationErrors.set(previousValidationErrors);
+    this.payloadPreview.set(previousPayloadPreview);
+
+    return errors;
+  }
+
+  private validatePistarModel(model: PistarModel): string[] {
+    const frameWindow = this.modellerFrame?.nativeElement?.contentWindow as
+      | {
+          pistarValidateModelText?: (value: string) => unknown;
+        }
+      | null
+      | undefined;
+
+    if (!frameWindow || typeof frameWindow.pistarValidateModelText !== 'function') {
+      return [];
+    }
+
+    try {
+      const result = frameWindow.pistarValidateModelText(JSON.stringify(model));
+      if (!Array.isArray(result)) {
+        return [];
+      }
+
+      return result
+        .filter((message): message is string => typeof message === 'string')
+        .map((message) => message.trim())
+        .filter((message) => message.length > 0);
+    } catch (error) {
+      console.error('[Step2][Validation] Failed to run piStar validation bridge', error);
+      return [];
+    }
+  }
+
+  private mergeValidationErrors(...groups: string[][]): string[] {
+    const seen = new Set<string>();
+    const merged: string[] = [];
+
+    for (const group of groups) {
+      for (const error of group) {
+        const normalized = error.trim();
+        if (!normalized || seen.has(normalized)) {
+          continue;
+        }
+
+        seen.add(normalized);
+        merged.push(normalized);
+      }
+    }
+
+    return merged;
+  }
+
+  private buildCorrectModelAiPrompt(model: PistarModel, validationErrors: string[]): string {
+    const listedErrors = validationErrors.map((error, index) => `${index + 1}. ${error}`).join('\n');
+
+    return `System Role & Objective:
+You are an expert Requirements Engineer and System Modeler specializing in iStar 2.0 and the iStar4Safety extension. Correct the full Step 2 JSON model so it satisfies every rule below while preserving as much of the existing model as possible.
+
+Your Output Constraints:
+Valid JSON Only: Return one complete corrected JSON model object only. Do not return markdown, comments, explanations, prefixes, suffixes, or code fences.
+Full Model Only: Do not return a patch. Return the full corrected model with actors, dependencies, links, display, tool, istar, saveDate, and diagram.
+Preserve ids when possible: Keep existing ids for actors, nodes, dependencies, and links unless an invalid item must be removed or replaced.
+Rule compliance is mandatory: If a structure violates any rule, remove it or replace it with a valid alternative.
+
+Current validation errors to fix:
+${listedErrors}
+
+Current full model JSON:
+${JSON.stringify(model, null, 2)}
+
+${this.buildFullPistarValidationRuleSet()}
+
+Additional correction requirements:
+1. Keep every intentional element inside exactly one actor boundary.
+2. Ensure every dependency endpoint and every link endpoint resolves in the final model.
+3. If a corrected relation cannot be made valid, omit it instead of returning an invalid structure.
+4. Return only the corrected JSON model.`;
   }
 
   private validateModelDefinition(): string[] {
@@ -3395,18 +3853,7 @@ Additional constraints for this run:
   }
 
   private mapIntentionalElementTypeToPistarType(type: IntentionalElementType): string {
-    switch (type) {
-      case 'SafetyGoal':
-        return 'istar.Goal';
-      case 'Hazard':
-        return 'istar.Quality';
-      case 'SafetyTask':
-        return 'istar.Task';
-      case 'SafetyResource':
-        return 'istar.Resource';
-      default:
-        return `istar.${type}`;
-    }
+    return `istar.${type}`;
   }
 
   private mapPistarTypeToIntentionalElementType(type: string, safetyTypeHint?: unknown): IntentionalElementType {

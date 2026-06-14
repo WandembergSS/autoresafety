@@ -37,6 +37,57 @@ button.button--ai,
 	line-height: 1;
 }
 
+.ai-robot-icon {
+	--ai-robot-size: 1.05rem;
+	position: relative;
+	display: inline-block;
+	width: var(--ai-robot-size);
+	height: calc(var(--ai-robot-size) * 0.86);
+	border-radius: 0.24rem;
+	background:
+		radial-gradient(circle at 34% 58%, #f59e0b 0 0.12rem, transparent 0.13rem),
+		radial-gradient(circle at 66% 58%, #f59e0b 0 0.12rem, transparent 0.13rem),
+		linear-gradient(#2f6fa5, #2f6fa5) center / 74% 52% no-repeat,
+		linear-gradient(180deg, #67c3ea 0%, #4ca9dd 100%);
+	box-shadow: inset 0 -1px 0 rgba(15, 82, 132, 0.36), 0 1px 2px rgba(15, 82, 132, 0.26);
+	vertical-align: -0.1rem;
+	margin-right: 0.45rem;
+	flex-shrink: 0;
+}
+
+.ai-robot-icon::before {
+	content: '';
+	position: absolute;
+	left: 50%;
+	top: calc(var(--ai-robot-size) * -0.44);
+	width: calc(var(--ai-robot-size) * 0.2);
+	height: calc(var(--ai-robot-size) * 0.32);
+	transform: translateX(-50%);
+	border-radius: 999px;
+	background:
+		radial-gradient(circle at 50% 0.12rem, #9dd8ef 0 0.11rem, transparent 0.12rem),
+		linear-gradient(#2f6fa5, #2f6fa5) center bottom / 0.12rem 0.2rem no-repeat;
+}
+
+.ai-robot-icon::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	left: 0;
+	width: 0.16rem;
+	height: 0.16rem;
+	border-radius: 50%;
+	background: #f7931e;
+	transform: translate(-55%, -50%);
+	box-shadow: calc(var(--ai-robot-size) * 1.1) 0 0 #f7931e;
+	opacity: 0.95;
+}
+
+.button__icon .ai-robot-icon {
+	margin-right: 0;
+	vertical-align: middle;
+}
+
 .button__spinner {
 	width: 0.95rem;
 	height: 0.95rem;

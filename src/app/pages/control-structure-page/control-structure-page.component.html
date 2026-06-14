@@ -8,7 +8,7 @@
           @if (isGeneratingStepThreeAi()) {
             <span class="button__spinner"></span>
           } @else {
-            🤖
+            <span class="ai-robot-icon" aria-hidden="true"></span>
           }
         </span>
         <span>{{ isGeneratingStepThreeAi() ? 'Generating...' : 'Generate with AI' }}</span>

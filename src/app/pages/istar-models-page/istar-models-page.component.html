@@ -3,7 +3,7 @@
     <p class="step">Step 2</p>
     <div class="page__title-row">
       <h2>Define the iStar4Safety Models</h2>
-      <button type="button" class="button button--ai" aria-label="Generate with AI">🤖 Generate with AI</button>
+      <button type="button" class="button button--ai" aria-label="Generate with AI"><span class="ai-robot-icon" aria-hidden="true"></span> Generate with AI</button>
     </div>
     <p class="page__subtitle">
       Use the five structured stages below to build your iStar4Safety SD and SR models.
@@ -60,7 +60,7 @@
                 [disabled]="!canAiAddActors() || isAddActorsAiRunning()"
                 (click)="openAddActorsAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddActorsAiRunning() ? 'Adding Actors...' : 'Add Actors' }}</span>
               </button>
             </span>
@@ -71,7 +71,7 @@
                 [disabled]="!canAiAddGoals() || isAddGoalsAiRunning()"
                 (click)="openAddGoalsAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddGoalsAiRunning() ? 'Adding Goals...' : 'Add Goals' }}</span>
               </button>
             </span>
@@ -82,7 +82,7 @@
                 [disabled]="!canAiAddQuality() || isAddQualityAiRunning()"
                 (click)="openAddQualityAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddQualityAiRunning() ? 'Adding Quality...' : 'Add Quality' }}</span>
               </button>
             </span>
@@ -93,7 +93,7 @@
                 [disabled]="!canAiAddResource() || isAddResourceAiRunning()"
                 (click)="openAddResourceAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddResourceAiRunning() ? 'Adding Resource...' : 'Add Resource' }}</span>
               </button>
             </span>
@@ -104,7 +104,7 @@
                 [disabled]="!canAiAddSafetyGoal() || isAddSafetyGoalAiRunning()"
                 (click)="openAddSafetyGoalAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddSafetyGoalAiRunning() ? 'Adding Safety goal...' : 'Add Safety goal' }}</span>
               </button>
             </span>
@@ -115,7 +115,7 @@
                 [disabled]="!canAiAddHazard() || isAddHazardAiRunning()"
                 (click)="openAddHazardAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddHazardAiRunning() ? 'Adding Hazard...' : 'Add Hazard' }}</span>
               </button>
             </span>
@@ -126,7 +126,7 @@
                 [disabled]="!canAiAddSafetyTask() || isAddSafetyTaskAiRunning()"
                 (click)="openAddSafetyTaskAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddSafetyTaskAiRunning() ? 'Adding Safety Task...' : 'Add Safety Task' }}</span>
               </button>
             </span>
@@ -137,7 +137,7 @@
                 [disabled]="!canAiAddSafetyResource() || isAddSafetyResourceAiRunning()"
                 (click)="openAddSafetyResourceAiModal()"
               >
-                <span aria-hidden="true">🤖</span>
+                <span class="ai-robot-icon" aria-hidden="true"></span>
                 <span>{{ isAddSafetyResourceAiRunning() ? 'Adding Safety Resource...' : 'Add Safety Resource' }}</span>
               </button>
             </span>
@@ -157,6 +157,56 @@
       ></iframe>
     </div>
   </section>
+
+  <section class="card">
+    <h3>Validation</h3>
+    <div class="validation__controls">
+      <button type="button" class="primary" (click)="runValidationAndPreview()">Validate iStar4Safety model</button>
+      @if (validationErrors().length > 0) {
+        <button
+          type="button"
+          class="button button--ai"
+          [disabled]="isCorrectingModelWithAi()"
+          (click)="runAiModelCorrection()"
+        >
+          <span class="button__icon" aria-hidden="true">
+            @if (isCorrectingModelWithAi()) {
+              <span class="button__spinner"></span>
+            } @else {
+              <span class="ai-robot-icon" aria-hidden="true"></span>
+            }
+          </span>
+          <span>{{ isCorrectingModelWithAi() ? 'Correcting model...' : 'Correct model with AI' }}</span>
+        </button>
+      }
+    </div>
+
+    @if (correctModelAiError()) {
+      <p class="validation__ai-error">{{ correctModelAiError() }}</p>
+    }
+
+    @if (validationErrors().length > 0) {
+      <div class="validation validation--error">
+        <h4>Validation Errors</h4>
+        <ul>
+          @for (error of validationErrors(); track error) {
+            <li>{{ error }}</li>
+          }
+        </ul>
+      </div>
+    } @else {
+      <div class="validation validation--ok">
+        <p>No validation errors.</p>
+      </div>
+    }
+
+    @if (payloadPreview()) {
+      <textarea readonly class="payload-preview">{{ payloadPreview() }}</textarea>
+    }
+  </section>
+
+
+
 
   <div class="forms-grid">
     <section class="card">
@@ -511,32 +561,6 @@
     </section>
   </div>
 
-  <section class="card">
-    <h3>Validation</h3>
-    <div class="validation__controls">
-      <button type="button" class="primary" (click)="runValidationAndPreview()">Validate iStar4Safety payload</button>
-    </div>
-
-    @if (validationErrors().length > 0) {
-      <div class="validation validation--error">
-        <h4>Validation Errors</h4>
-        <ul>
-          @for (error of validationErrors(); track error) {
-            <li>{{ error }}</li>
-          }
-        </ul>
-      </div>
-    } @else {
-      <div class="validation validation--ok">
-        <p>No validation errors.</p>
-      </div>
-    }
-
-    @if (payloadPreview()) {
-      <textarea readonly class="payload-preview">{{ payloadPreview() }}</textarea>
-    }
-  </section>
-
   @if (isBpmnModelModalOpen()) {
     <div class="modal-backdrop" (click)="closeBpmnModelModal()">
       <div class="modal modal--bpmn" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
@@ -594,7 +618,7 @@
                 @if (isAddActorsAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddActorsAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -650,7 +674,7 @@
                 @if (isAddGoalsAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddGoalsAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -706,7 +730,7 @@
                 @if (isAddQualityAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddQualityAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -762,7 +786,7 @@
                 @if (isAddResourceAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddResourceAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -823,7 +847,7 @@
                 @if (isAddSafetyGoalAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddSafetyGoalAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -879,7 +903,7 @@
                 @if (isAddHazardAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddHazardAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -940,7 +964,7 @@
                 @if (isAddSafetyTaskAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddSafetyTaskAiRunning() ? 'Running...' : 'Continue' }}</span>
@@ -1001,7 +1025,7 @@
                 @if (isAddSafetyResourceAiRunning()) {
                   <span class="button__spinner"></span>
                 } @else {
-                  🤖
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
                 }
               </span>
               <span>{{ isAddSafetyResourceAiRunning() ? 'Running...' : 'Continue' }}</span>

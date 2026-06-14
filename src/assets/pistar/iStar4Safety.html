@@ -727,6 +727,78 @@ window.pistarLoadModelFromText = function (modelText) {
     }
 };
 
+window.pistarValidateModelText = function (modelText) {
+    if (typeof modelText !== 'string' || !modelText.trim()) {
+        return [];
+    }
+
+    if (!window.istar || !window.istar.fileManager || typeof window.istar.fileManager.loadModel !== 'function') {
+        return [];
+    }
+
+    var previousModelText = '';
+    if (typeof window.saveModel === 'function') {
+        var serialized = window.saveModel();
+        if (typeof serialized === 'string' && serialized.trim()) {
+            previousModelText = serialized;
+        }
+    }
+
+    var previousExternalModelText = window.__pistarExternalModelText;
+    var capturedMessages = [];
+    var shouldCapture = true;
+    var previousDisplayInvalidModelMessages =
+        window.istar && typeof window.istar.displayInvalidModelMessages === 'function'
+            ? window.istar.displayInvalidModelMessages
+            : null;
+
+    if (window.istar) {
+        window.istar.displayInvalidModelMessages = function (messages) {
+            if (!shouldCapture || !Array.isArray(messages)) {
+                return;
+            }
+
+            capturedMessages = messages
+                .filter(function (message) {
+                    return typeof message === 'string' && message.trim().length > 0;
+                })
+                .map(function (message) {
+                    return message.trim();
+                });
+        };
+    }
+
+    try {
+        window.istar.fileManager.loadModel(modelText);
+
+        if (window.ui && typeof window.ui.selectPaper === 'function') {
+            window.ui.selectPaper();
+        }
+
+        shouldCapture = false;
+
+        if (previousModelText && previousModelText !== modelText) {
+            window.istar.fileManager.loadModel(previousModelText);
+
+            if (window.ui && typeof window.ui.selectPaper === 'function') {
+                window.ui.selectPaper();
+            }
+        }
+    } finally {
+        window.__pistarExternalModelText = previousExternalModelText;
+
+        if (window.istar) {
+            if (typeof previousDisplayInvalidModelMessages === 'function') {
+                window.istar.displayInvalidModelMessages = previousDisplayInvalidModelMessages;
+            } else {
+                delete window.istar.displayInvalidModelMessages;
+            }
+        }
+    }
+
+    return capturedMessages;
+};
+
 window.pistarSetWelcomeModel = function (modelText) {
     window.pistarLoadModelFromText(modelText);
 };
