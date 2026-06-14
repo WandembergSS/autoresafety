@@ -5,8 +5,8 @@ import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, Validatio
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, Observable, forkJoin, merge, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap } from 'rxjs/operators';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { AiAssistantService } from '../../services/ai-assistant.service';
+import { AiFeedbackService } from '../../services/ai-feedback.service';
 import { ProjectService } from '../../services/project.service';
 
 interface AnalysisObjective {
@@ -147,6 +147,17 @@ interface Step1ScopeDto {
 type GeneralSubstepId = '1.1.1' | '1.1.2' | '1.1.3' | '1.1.4' | '1.1.5';
 type SafetySubstepId = '1.2.1' | '1.2.2' | '1.2.3' | '1.2.4' | '1.2.5';
 type AiSubstepId = GeneralSubstepId | SafetySubstepId;
+type ScopeAiActionId =
+  | 'objectives'
+  | 'systemDefinition'
+  | 'resources'
+  | 'systemBoundary'
+  | 'components'
+  | 'losses'
+  | 'hazards'
+  | 'constraints'
+  | 'responsibilities'
+  | 'artefacts';
 
 interface SequenceRunResult {
   succeeded: AiSubstepId[];
@@ -156,6 +167,11 @@ interface SequenceRunResult {
 interface StepExecutionTracker {
   succeeded: Set<AiSubstepId>;
   failed: Set<AiSubstepId>;
+}
+
+interface AiParsedResult<T> {
+  value: T;
+  summary: string;
 }
 
 @Component({
@@ -172,7 +188,7 @@ export class ScopePageComponent {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly aiAssistant = inject(AiAssistantService);
-  private readonly snackBar = inject(MatSnackBar);
+  private readonly aiFeedback = inject(AiFeedbackService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly generalSummaryForm = this.fb.group({
@@ -394,6 +410,7 @@ export class ScopePageComponent {
   readonly isGeneralConcernsAiRunning = signal(false);
   readonly isSafetyConcernsAiRunning = signal(false);
   readonly isStepOneAiRunning = signal(false);
+  readonly activeScopeAiAction = signal<ScopeAiActionId | null>(null);
 
   private pendingObjectiveAiContext: {
     manualObjectives: string;
@@ -406,6 +423,33 @@ export class ScopePageComponent {
   constructor() {
     this.setupProgressiveFieldLocks();
     this.initializeFromRoute();
+  }
+
+  isScopeAiActionRunning(actionId: ScopeAiActionId): boolean {
+    return this.activeScopeAiAction() === actionId;
+  }
+
+  private beginScopeAiAction(actionId: ScopeAiActionId): boolean {
+    if (this.activeScopeAiAction()) {
+      return false;
+    }
+
+    this.activeScopeAiAction.set(actionId);
+    return true;
+  }
+
+  private finishScopeAiAction(actionId: ScopeAiActionId): void {
+    if (this.activeScopeAiAction() === actionId) {
+      this.activeScopeAiAction.set(null);
+    }
+  }
+
+  private showAiSummary(summary: string): void {
+    this.aiFeedback.showSummary(summary);
+  }
+
+  private showAiError(message: string): void {
+    this.aiFeedback.showError(message);
   }
 
   private setupProgressiveFieldLocks(): void {
@@ -924,6 +968,11 @@ export class ScopePageComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          const successMessage = continueAfterSave
+            ? 'Step 1 saved. Opening the next step.'
+            : 'Step 1 saved successfully.';
+          this.aiFeedback.showSuccess(successMessage);
+
           if (continueAfterSave) {
             this.router.navigate(['/istar-models'], { queryParams: { projectId } });
           }
@@ -1063,13 +1112,22 @@ export class ScopePageComponent {
     stepOneInfo: Record<string, unknown> | null,
     stepTwoInfo: Record<string, unknown> | null
   ): void {
+    if (!this.beginScopeAiAction('objectives')) {
+      return;
+    }
+
     const question = this.buildObjectivesAiQuestion(primaryOrientation, resume, stepOneInfo, stepTwoInfo);
 
-    this.requestAiText(question, (text) => {
+    this.requestAiText(
+      question,
+      (text, summary) => {
       this.analysisObjectiveAiForm.patchValue({ objectivesText: text });
       this.analysisObjectiveAiModalForm.patchValue({ objectivesText: text });
       this.selectedObjectiveSource.set('ai');
-    });
+        this.showAiSummary(summary);
+      },
+      { actionId: 'objectives', errorMessage: 'Failed to generate analysis objectives with AI.' }
+    );
   }
 
   private buildObjectivesAiQuestion(
@@ -1351,6 +1409,10 @@ export class ScopePageComponent {
       return;
     }
 
+    if (!this.beginScopeAiAction('systemDefinition')) {
+      return;
+    }
+
     const projectId = this.currentProjectId();
     const primarySystemDefinitionDraft = (this.getSelectedSystemDefinitionText() ?? '').trim();
 
@@ -1404,11 +1466,16 @@ export class ScopePageComponent {
       .subscribe(({ resume, stepOneInfo, stepTwoInfo }) => {
         const question = this.buildSystemDefinitionAiQuestion(primarySystemDefinitionDraft, resume, stepOneInfo, stepTwoInfo);
 
-        this.requestAiText(question, (text) => {
-          this.systemDefinitionAiForm.patchValue({ systemDefinitionText: text });
-          this.systemDefinitionAiModalForm.patchValue({ systemDefinitionText: text });
-          this.selectedSystemDefinitionSource.set('ai');
-        });
+        this.requestAiText(
+          question,
+          (text, summary) => {
+            this.systemDefinitionAiForm.patchValue({ systemDefinitionText: text });
+            this.systemDefinitionAiModalForm.patchValue({ systemDefinitionText: text });
+            this.selectedSystemDefinitionSource.set('ai');
+            this.showAiSummary(summary);
+          },
+          { actionId: 'systemDefinition', errorMessage: 'Failed to generate the system definition with AI.' }
+        );
       });
   }
 
@@ -1658,85 +1725,72 @@ export class ScopePageComponent {
 
   private showRetryWarningSnackbar(failedSubsteps: AiSubstepId[]): void {
     const message = `Failed substeps: ${failedSubsteps.join(', ')}. Retrying once.`;
-    this.snackBar.open(message, 'OK', {
-      duration: 5000,
-      verticalPosition: 'top',
-      horizontalPosition: 'center',
-      panelClass: ['ai-snackbar-warning']
-    });
+    this.aiFeedback.showWarning(message);
   }
 
   private showFinalRunSnackbar(scopeLabel: '1.1' | '1.2' | 'Step 1', result: SequenceRunResult, totalSubsteps: number): void {
     if (result.failed.length === 0) {
-      this.snackBar.open(
-        `${scopeLabel}: all ${totalSubsteps} endpoint calls succeeded.`,
-        'OK',
-        {
-          duration: 4500,
-          verticalPosition: 'top',
-          horizontalPosition: 'center',
-          panelClass: ['ai-snackbar-success']
-        }
-      );
       return;
     }
 
     if (result.failed.length === totalSubsteps) {
-      this.snackBar.open(
-        `${scopeLabel}: all endpoint calls failed. Failed substeps: ${result.failed.join(', ')}`,
-        'OK',
-        {
-          duration: 7000,
-          verticalPosition: 'top',
-          horizontalPosition: 'center',
-          panelClass: ['ai-snackbar-error']
-        }
-      );
+      this.aiFeedback.showError(`${scopeLabel}: all endpoint calls failed. Failed substeps: ${result.failed.join(', ')}`);
       return;
     }
 
-    this.snackBar.open(
-      `${scopeLabel}: partial success. Failed substeps: ${result.failed.join(', ')}`,
-      'OK',
-      {
-        duration: 7000,
-        verticalPosition: 'top',
-        horizontalPosition: 'center',
-        panelClass: ['ai-snackbar-partial']
-      }
+    this.aiFeedback.showPartial(`${scopeLabel}: partial success. Failed substeps: ${result.failed.join(', ')}`);
+  }
+
+  private askAiText$(question: string): Observable<AiParsedResult<string>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiText(payload), summary }))
     );
   }
 
-  private askAiText$(question: string): Observable<string> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiText(response)));
+  private askAiResources$(question: string): Observable<AiParsedResult<Array<{ name: string; category: string; reference: string }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiResources(payload), summary }))
+    );
   }
 
-  private askAiResources$(question: string): Observable<Array<{ name: string; category: string; reference: string }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiResources(response)));
+  private askAiComponents$(question: string): Observable<AiParsedResult<Array<{ name: string; description: string }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiComponents(payload), summary }))
+    );
   }
 
-  private askAiComponents$(question: string): Observable<Array<{ name: string; description: string }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiComponents(response)));
+  private askAiLosses$(question: string): Observable<AiParsedResult<Array<{ code: string; description: string }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiLosses(payload), summary }))
+    );
   }
 
-  private askAiLosses$(question: string): Observable<Array<{ code: string; description: string }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiLosses(response)));
+  private askAiHazards$(
+    question: string
+  ): Observable<AiParsedResult<Array<{ code: string; description: string; linkedAccidents: string[]; linkedUcas: string[] }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiHazards(payload), summary }))
+    );
   }
 
-  private askAiHazards$(question: string): Observable<Array<{ code: string; description: string; linkedAccidents: string[]; linkedUcas: string[] }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiHazards(response)));
+  private askAiConstraints$(question: string): Observable<AiParsedResult<Array<{ code: string; statement: string; linkedHazards: string[] }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiConstraints(payload), summary }))
+    );
   }
 
-  private askAiConstraints$(question: string): Observable<Array<{ code: string; statement: string; linkedHazards: string[] }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiConstraints(response)));
+  private askAiResponsibilities$(
+    question: string
+  ): Observable<AiParsedResult<Array<{ code: string; component: string; responsibility: string; linkedConstraints: string[] }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiResponsibilities(payload), summary }))
+    );
   }
 
-  private askAiResponsibilities$(question: string): Observable<Array<{ code: string; component: string; responsibility: string; linkedConstraints: string[] }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiResponsibilities(response)));
-  }
-
-  private askAiArtefacts$(question: string): Observable<Array<{ name: string; purpose: string; reference: string }>> {
-    return this.aiAssistant.ask({ question }).pipe(map((response) => this.extractAiArtefacts(response)));
+  private askAiArtefacts$(question: string): Observable<AiParsedResult<Array<{ name: string; purpose: string; reference: string }>>> {
+    return this.aiAssistant.askWithSummary({ question }).pipe(
+      map(({ payload, summary }) => ({ value: this.extractAiArtefacts(payload), summary }))
+    );
   }
 
   private runGeneralConcernsSequence$(
@@ -1753,15 +1807,23 @@ export class ScopePageComponent {
       switchMap(({ resume, stepOneInfo, stepTwoInfo }) => {
         const q111 = this.buildObjectivesAiQuestion(initialObjectivesSeed, resume, stepOneInfo, stepTwoInfo);
 
-        return this.executeAiStep$('1.1.1', retryOnlyFailed, this.askAiText$(q111), fallbackObjectives, tracker, (text) => {
-          if (!text) {
-            return;
-          }
+        return this.executeAiStep$(
+          '1.1.1',
+          retryOnlyFailed,
+          this.askAiText$(q111),
+          { value: fallbackObjectives, summary: '' },
+          tracker,
+          (result) => {
+            if (!result.value) {
+              return;
+            }
 
-          this.analysisObjectiveAiForm.patchValue({ objectivesText: text });
-          this.analysisObjectiveAiModalForm.patchValue({ objectivesText: text });
-          this.selectedObjectiveSource.set('ai');
-        }).pipe(map((objectivesText) => ({ resume, stepOneInfo, stepTwoInfo, objectivesText }))); 
+            this.analysisObjectiveAiForm.patchValue({ objectivesText: result.value });
+            this.analysisObjectiveAiModalForm.patchValue({ objectivesText: result.value });
+            this.selectedObjectiveSource.set('ai');
+            this.showAiSummary(result.summary);
+          }
+        ).pipe(map((objectivesResult) => ({ resume, stepOneInfo, stepTwoInfo, objectivesText: objectivesResult.value })));
       }),
       switchMap((state111) => {
         const existingSystemDefinition = (this.getSelectedSystemDefinitionText() ?? '').trim();
@@ -1773,15 +1835,23 @@ export class ScopePageComponent {
           state111.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.1.2', retryOnlyFailed, this.askAiText$(q112), systemDefinitionSeed, tracker, (text) => {
-          if (!text) {
-            return;
-          }
+        return this.executeAiStep$(
+          '1.1.2',
+          retryOnlyFailed,
+          this.askAiText$(q112),
+          { value: systemDefinitionSeed, summary: '' },
+          tracker,
+          (result) => {
+            if (!result.value) {
+              return;
+            }
 
-          this.systemDefinitionAiForm.patchValue({ systemDefinitionText: text });
-          this.systemDefinitionAiModalForm.patchValue({ systemDefinitionText: text });
-          this.selectedSystemDefinitionSource.set('ai');
-        }).pipe(map((systemDefinitionText) => ({ ...state111, systemDefinitionText })));
+            this.systemDefinitionAiForm.patchValue({ systemDefinitionText: result.value });
+            this.systemDefinitionAiModalForm.patchValue({ systemDefinitionText: result.value });
+            this.selectedSystemDefinitionSource.set('ai');
+            this.showAiSummary(result.summary);
+          }
+        ).pipe(map((systemDefinitionResult) => ({ ...state111, systemDefinitionText: systemDefinitionResult.value })));
       }),
       switchMap((state112) => {
         const q113 = this.buildResourcesAiQuestion(
@@ -1793,9 +1863,18 @@ export class ScopePageComponent {
           this.resources()
         );
 
-        return this.executeAiStep$('1.1.3', retryOnlyFailed, this.askAiResources$(q113), [], tracker, (resources) => {
-          this.mergeAiResources(resources);
-        }).pipe(map(() => state112));
+        return this.executeAiStep$(
+          '1.1.3',
+          retryOnlyFailed,
+          this.askAiResources$(q113),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiResources(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        ).pipe(map(() => state112));
       }),
       switchMap((state113) => {
         const q114 = this.buildSystemBoundaryAiQuestion(
@@ -1806,15 +1885,23 @@ export class ScopePageComponent {
           state113.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.1.4', retryOnlyFailed, this.askAiText$(q114), fallbackSystemBoundary, tracker, (text) => {
-          if (!text) {
-            return;
-          }
+        return this.executeAiStep$(
+          '1.1.4',
+          retryOnlyFailed,
+          this.askAiText$(q114),
+          { value: fallbackSystemBoundary, summary: '' },
+          tracker,
+          (result) => {
+            if (!result.value) {
+              return;
+            }
 
-          this.systemBoundaryAiForm.patchValue({ systemBoundaryText: text });
-          this.systemBoundaryAiModalForm.patchValue({ systemBoundaryText: text });
-          this.selectedSystemBoundarySource.set('ai');
-        }).pipe(map((systemBoundaryText) => ({ ...state113, systemBoundaryText })));
+            this.systemBoundaryAiForm.patchValue({ systemBoundaryText: result.value });
+            this.systemBoundaryAiModalForm.patchValue({ systemBoundaryText: result.value });
+            this.selectedSystemBoundarySource.set('ai');
+            this.showAiSummary(result.summary);
+          }
+        ).pipe(map((systemBoundaryResult) => ({ ...state113, systemBoundaryText: systemBoundaryResult.value })));
       }),
       switchMap((state114) => {
         const q115 = this.buildComponentsAiQuestion(
@@ -1826,9 +1913,18 @@ export class ScopePageComponent {
           state114.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.1.5', retryOnlyFailed, this.askAiComponents$(q115), [], tracker, (components) => {
-          this.mergeAiComponents(components);
-        });
+        return this.executeAiStep$(
+          '1.1.5',
+          retryOnlyFailed,
+          this.askAiComponents$(q115),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiComponents(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        );
       }),
       map(() => this.trackerToResult(tracker))
     );
@@ -1854,9 +1950,18 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        return this.executeAiStep$('1.2.1', retryOnlyFailed, this.askAiLosses$(q121), [], tracker, (losses) => {
-          this.mergeAiLosses(losses);
-        }).pipe(map(() => ({ resume, stepOneInfo, stepTwoInfo })));
+        return this.executeAiStep$(
+          '1.2.1',
+          retryOnlyFailed,
+          this.askAiLosses$(q121),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiLosses(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        ).pipe(map(() => ({ resume, stepOneInfo, stepTwoInfo })));
       }),
       switchMap((state121) => {
         const q122 = this.buildHazardsAiQuestion(
@@ -1868,9 +1973,18 @@ export class ScopePageComponent {
           state121.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.2.2', retryOnlyFailed, this.askAiHazards$(q122), [], tracker, (hazards) => {
-          this.mergeAiHazards(hazards);
-        }).pipe(map(() => state121));
+        return this.executeAiStep$(
+          '1.2.2',
+          retryOnlyFailed,
+          this.askAiHazards$(q122),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiHazards(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        ).pipe(map(() => state121));
       }),
       switchMap((state122) => {
         const q123 = this.buildConstraintsAiQuestion(
@@ -1882,9 +1996,18 @@ export class ScopePageComponent {
           state122.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.2.3', retryOnlyFailed, this.askAiConstraints$(q123), [], tracker, (constraints) => {
-          this.mergeAiConstraints(constraints);
-        }).pipe(map(() => state122));
+        return this.executeAiStep$(
+          '1.2.3',
+          retryOnlyFailed,
+          this.askAiConstraints$(q123),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiConstraints(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        ).pipe(map(() => state122));
       }),
       switchMap((state123) => {
         const q124 = this.buildResponsibilitiesAiQuestion(
@@ -1896,9 +2019,18 @@ export class ScopePageComponent {
           state123.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.2.4', retryOnlyFailed, this.askAiResponsibilities$(q124), [], tracker, (responsibilities) => {
-          this.mergeAiResponsibilities(responsibilities);
-        }).pipe(map(() => state123));
+        return this.executeAiStep$(
+          '1.2.4',
+          retryOnlyFailed,
+          this.askAiResponsibilities$(q124),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiResponsibilities(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        ).pipe(map(() => state123));
       }),
       switchMap((state124) => {
         const q125 = this.buildArtefactsAiQuestion(
@@ -1910,17 +2042,26 @@ export class ScopePageComponent {
           state124.stepTwoInfo
         );
 
-        return this.executeAiStep$('1.2.5', retryOnlyFailed, this.askAiArtefacts$(q125), [], tracker, (artefacts) => {
-          this.mergeAiArtefacts(artefacts);
-        });
+        return this.executeAiStep$(
+          '1.2.5',
+          retryOnlyFailed,
+          this.askAiArtefacts$(q125),
+          { value: [], summary: '' },
+          tracker,
+          (result) => {
+            if (this.mergeAiArtefacts(result.value)) {
+              this.showAiSummary(result.summary);
+            }
+          }
+        );
       }),
       map(() => this.trackerToResult(tracker))
     );
   }
 
-  private mergeAiResources(items: Array<{ name: string; category: string; reference: string }>): void {
+  private mergeAiResources(items: Array<{ name: string; category: string; reference: string }>): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const existingNames = new Set(this.resources().map((item) => this.normalizeResourceName(item.name)));
@@ -1937,7 +2078,7 @@ export class ScopePageComponent {
     });
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.resources.update((current) => [
@@ -1950,11 +2091,13 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
-  private mergeAiComponents(items: Array<{ name: string; description: string }>): void {
+  private mergeAiComponents(items: Array<{ name: string; description: string }>): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const existingNames = new Set(this.systemComponents().map((item) => this.normalizeComponentName(item.name)));
@@ -1971,7 +2114,7 @@ export class ScopePageComponent {
     });
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.systemComponents.update((current) => [
@@ -1983,11 +2126,13 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
-  private mergeAiLosses(items: Array<{ code: string; description: string }>): void {
+  private mergeAiLosses(items: Array<{ code: string; description: string }>): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const existingCodes = new Set(this.accidents().map((item) => item.code.trim().toUpperCase()));
@@ -2015,7 +2160,7 @@ export class ScopePageComponent {
       .filter((item): item is { code: string; description: string } => item !== null);
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.accidents.update((current) => [
@@ -2027,13 +2172,15 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
   private mergeAiHazards(
     items: Array<{ code: string; description: string; linkedAccidents: string[]; linkedUcas: string[] }>
-  ): void {
+  ): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const validLosses = new Set(this.accidents().map((item) => item.code.trim().toUpperCase()));
@@ -2078,7 +2225,7 @@ export class ScopePageComponent {
       );
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.hazards.update((current) => [
@@ -2092,11 +2239,13 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
-  private mergeAiConstraints(items: Array<{ code: string; statement: string; linkedHazards: string[] }>): void {
+  private mergeAiConstraints(items: Array<{ code: string; statement: string; linkedHazards: string[] }>): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const validHazards = new Set(this.hazards().map((item) => item.code.trim().toUpperCase()));
@@ -2130,7 +2279,7 @@ export class ScopePageComponent {
       .filter((item): item is { code: string; statement: string; linkedHazards: string[] } => item !== null);
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.constraints.update((current) => [
@@ -2143,13 +2292,15 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
   private mergeAiResponsibilities(
     items: Array<{ code: string; component: string; responsibility: string; linkedConstraints: string[] }>
-  ): void {
+  ): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const validConstraints = new Set(this.constraints().map((item) => item.code.trim().toUpperCase()));
@@ -2195,7 +2346,7 @@ export class ScopePageComponent {
       );
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.responsibilities.update((current) => [
@@ -2209,11 +2360,13 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
-  private mergeAiArtefacts(items: Array<{ name: string; purpose: string; reference: string }>): void {
+  private mergeAiArtefacts(items: Array<{ name: string; purpose: string; reference: string }>): boolean {
     if (items.length === 0) {
-      return;
+      return false;
     }
 
     const existingNames = new Set(this.artefacts().map((item) => this.normalizeFreeText(item.name)));
@@ -2230,7 +2383,7 @@ export class ScopePageComponent {
     });
 
     if (toAdd.length === 0) {
-      return;
+      return false;
     }
 
     this.artefacts.update((current) => [
@@ -2243,6 +2396,8 @@ export class ScopePageComponent {
       })),
       ...current
     ]);
+
+    return true;
   }
 
   private buildSystemDefinitionAiQuestion(
@@ -2404,17 +2559,26 @@ export class ScopePageComponent {
 
   private requestAiResources(
     question: string,
-    onResources: (items: Array<{ name: string; category: string; reference: string }>) => void
+    onResources: (items: Array<{ name: string; category: string; reference: string }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
   ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => {
-          const items = this.extractAiResources(response);
-          onResources(items);
+        next: ({ payload, summary }) => {
+          const items = this.extractAiResources(payload);
+          onResources(items, summary);
         },
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI resources.');
           console.error('Failed to fetch AI resources from /api/ai/ask', error);
         }
       });
@@ -2422,17 +2586,26 @@ export class ScopePageComponent {
 
   private requestAiComponents(
     question: string,
-    onComponents: (items: Array<{ name: string; description: string }>) => void
+    onComponents: (items: Array<{ name: string; description: string }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
   ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => {
-          const items = this.extractAiComponents(response);
-          onComponents(items);
+        next: ({ payload, summary }) => {
+          const items = this.extractAiComponents(payload);
+          onComponents(items, summary);
         },
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI components.');
           console.error('Failed to fetch AI components from /api/ai/ask', error);
         }
       });
@@ -2619,6 +2792,10 @@ export class ScopePageComponent {
       return;
     }
 
+    if (!this.beginScopeAiAction('systemBoundary')) {
+      return;
+    }
+
     const projectId = this.currentProjectId();
     const primaryObjectives = (this.getSelectedObjectivesText() ?? '').trim();
     const primarySystemDefinitionDraft = (this.getSelectedSystemDefinitionText() ?? '').trim();
@@ -2679,11 +2856,16 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiText(question, (text) => {
-          this.systemBoundaryAiForm.patchValue({ systemBoundaryText: text });
-          this.systemBoundaryAiModalForm.patchValue({ systemBoundaryText: text });
-          this.selectedSystemBoundarySource.set('ai');
-        });
+        this.requestAiText(
+          question,
+          (text, summary) => {
+            this.systemBoundaryAiForm.patchValue({ systemBoundaryText: text });
+            this.systemBoundaryAiModalForm.patchValue({ systemBoundaryText: text });
+            this.selectedSystemBoundarySource.set('ai');
+            this.showAiSummary(summary);
+          },
+          { actionId: 'systemBoundary', errorMessage: 'Failed to generate the system boundary with AI.' }
+        );
       });
   }
 
@@ -2740,18 +2922,33 @@ export class ScopePageComponent {
     ].join('\n');
   }
 
-  private requestAiText(question: string, onText: (text: string) => void): void {
+  private requestAiText(
+    question: string,
+    onText: (text: string, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
+  ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (response) => {
-          const text = this.extractAiText(response);
-          if (text) {
-            onText(text);
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
           }
+        })
+      )
+      .subscribe({
+        next: ({ payload, summary }) => {
+          const text = this.extractAiText(payload);
+          if (text) {
+            onText(text, summary);
+            return;
+          }
+
+          this.showAiError(options.errorMessage ?? 'AI returned an empty response.');
         },
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI response.');
           console.error('Failed to fetch AI response from /api/ai/ask', error);
         }
       });
@@ -2948,6 +3145,10 @@ export class ScopePageComponent {
       return;
     }
 
+    if (!this.beginScopeAiAction('components')) {
+      return;
+    }
+
     const projectId = this.currentProjectId();
     const primaryObjectives = (this.getSelectedObjectivesText() ?? '').trim();
     const primarySystemDefinitionDraft = (this.getSelectedSystemDefinitionText() ?? '').trim();
@@ -3010,43 +3211,24 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiComponents(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const existingNames = new Set(this.systemComponents().map((item) => this.normalizeComponentName(item.name)));
-          const addedNames = new Set<string>();
-
-          const toAdd = items.filter((item) => {
-            const normalizedName = this.normalizeComponentName(item.name);
-            if (!normalizedName || existingNames.has(normalizedName) || addedNames.has(normalizedName)) {
-              return false;
+        this.requestAiComponents(
+          question,
+          (items, summary) => {
+            if (this.mergeAiComponents(items)) {
+              this.showAiSummary(summary);
             }
-
-            addedNames.add(normalizedName);
-            return true;
-          });
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.systemComponents.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextComponentId,
-              name: item.name,
-              description: item.description,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+          },
+          { actionId: 'components', errorMessage: 'Failed to generate components with AI.' }
+        );
       });
   }
 
   generateResourcesWithAi(): void {
     if (!this.canEdit113()) {
+      return;
+    }
+
+    if (!this.beginScopeAiAction('resources')) {
       return;
     }
 
@@ -3111,44 +3293,24 @@ export class ScopePageComponent {
           this.resources()
         );
 
-        this.requestAiResources(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const existingNames = new Set(this.resources().map((item) => this.normalizeResourceName(item.name)));
-          const addedNames = new Set<string>();
-
-          const toAdd = items.filter((item) => {
-            const normalizedName = this.normalizeResourceName(item.name);
-            if (!normalizedName || existingNames.has(normalizedName) || addedNames.has(normalizedName)) {
-              return false;
+        this.requestAiResources(
+          question,
+          (items, summary) => {
+            if (this.mergeAiResources(items)) {
+              this.showAiSummary(summary);
             }
-
-            addedNames.add(normalizedName);
-            return true;
-          });
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.resources.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextResourceId,
-              name: item.name,
-              category: item.category,
-              reference: item.reference,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+          },
+          { actionId: 'resources', errorMessage: 'Failed to generate resources with AI.' }
+        );
       });
   }
 
   generateLossesWithAi(): void {
     if (!this.canEditStep12()) {
+      return;
+    }
+
+    if (!this.beginScopeAiAction('losses')) {
       return;
     }
 
@@ -3169,54 +3331,24 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiLosses(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const existingCodes = new Set(this.accidents().map((item) => item.code.trim().toUpperCase()));
-          const existingDescriptions = new Set(this.accidents().map((item) => this.normalizeFreeText(item.description)));
-          const addedCodes = new Set<string>();
-          const addedDescriptions = new Set<string>();
-
-          const toAdd = items
-            .map((item) => {
-              const description = item.description.trim();
-              const normalizedDescription = this.normalizeFreeText(description);
-              if (!normalizedDescription || existingDescriptions.has(normalizedDescription) || addedDescriptions.has(normalizedDescription)) {
-                return null;
-              }
-
-              let code = item.code.trim().toUpperCase();
-              if (!/^L\d+$/.test(code) || existingCodes.has(code) || addedCodes.has(code)) {
-                code = this.nextSequentialCode('L', existingCodes, addedCodes);
-              }
-
-              addedCodes.add(code);
-              addedDescriptions.add(normalizedDescription);
-              return { code, description };
-            })
-            .filter((item): item is { code: string; description: string } => item !== null);
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.accidents.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextAccidentId,
-              code: item.code,
-              description: item.description,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+        this.requestAiLosses(
+          question,
+          (items, summary) => {
+            if (this.mergeAiLosses(items)) {
+              this.showAiSummary(summary);
+            }
+          },
+          { actionId: 'losses', errorMessage: 'Failed to generate losses with AI.' }
+        );
       });
   }
 
   generateHazardsWithAi(): void {
     if (!this.canEdit122()) {
+      return;
+    }
+
+    if (!this.beginScopeAiAction('hazards')) {
       return;
     }
 
@@ -3237,75 +3369,24 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiHazards(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const validLosses = new Set(this.accidents().map((item) => item.code.trim().toUpperCase()));
-          const validUcas = new Set(this.availableUcas());
-          const existingCodes = new Set(this.hazards().map((item) => item.code.trim().toUpperCase()));
-          const existingDescriptions = new Set(this.hazards().map((item) => this.normalizeFreeText(item.description)));
-          const addedCodes = new Set<string>();
-          const addedDescriptions = new Set<string>();
-
-          const toAdd = items
-            .map((item) => {
-              const description = item.description.trim();
-              const normalizedDescription = this.normalizeFreeText(description);
-              if (!normalizedDescription || existingDescriptions.has(normalizedDescription) || addedDescriptions.has(normalizedDescription)) {
-                return null;
-              }
-
-              const linkedAccidents = item.linkedAccidents.filter((code) => validLosses.has(code.trim().toUpperCase()));
-              if (linkedAccidents.length === 0) {
-                return null;
-              }
-
-              const linkedUcas = validUcas.size > 0
-                ? item.linkedUcas.filter((uca) => validUcas.has(uca))
-                : item.linkedUcas;
-
-              let code = item.code.trim().toUpperCase();
-              if (!/^H\d+$/.test(code) || existingCodes.has(code) || addedCodes.has(code)) {
-                code = this.nextSequentialCode('H', existingCodes, addedCodes);
-              }
-
-              addedCodes.add(code);
-              addedDescriptions.add(normalizedDescription);
-              return {
-                code,
-                description,
-                linkedAccidents,
-                linkedUcas
-              };
-            })
-            .filter(
-              (item): item is { code: string; description: string; linkedAccidents: string[]; linkedUcas: string[] } =>
-                item !== null
-            );
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.hazards.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextHazardId,
-              code: item.code,
-              description: item.description,
-              linkedAccidents: item.linkedAccidents,
-              linkedUcas: item.linkedUcas,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+        this.requestAiHazards(
+          question,
+          (items, summary) => {
+            if (this.mergeAiHazards(items)) {
+              this.showAiSummary(summary);
+            }
+          },
+          { actionId: 'hazards', errorMessage: 'Failed to generate hazards with AI.' }
+        );
       });
   }
 
   generateConstraintsWithAi(): void {
     if (!this.canEdit123()) {
+      return;
+    }
+
+    if (!this.beginScopeAiAction('constraints')) {
       return;
     }
 
@@ -3326,61 +3407,24 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiConstraints(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const validHazards = new Set(this.hazards().map((item) => item.code.trim().toUpperCase()));
-          const existingCodes = new Set(this.constraints().map((item) => item.code.trim().toUpperCase()));
-          const existingStatements = new Set(this.constraints().map((item) => this.normalizeFreeText(item.statement)));
-          const addedCodes = new Set<string>();
-          const addedStatements = new Set<string>();
-
-          const toAdd = items
-            .map((item) => {
-              const statement = item.statement.trim();
-              const normalizedStatement = this.normalizeFreeText(statement);
-              if (!normalizedStatement || existingStatements.has(normalizedStatement) || addedStatements.has(normalizedStatement)) {
-                return null;
-              }
-
-              const linkedHazards = item.linkedHazards.filter((code) => validHazards.has(code.trim().toUpperCase()));
-              if (linkedHazards.length === 0) {
-                return null;
-              }
-
-              let code = item.code.trim().toUpperCase();
-              if (!/^SC-\d{2}$/.test(code) || existingCodes.has(code) || addedCodes.has(code)) {
-                code = this.nextSequentialCode('SC-', existingCodes, addedCodes, 2);
-              }
-
-              addedCodes.add(code);
-              addedStatements.add(normalizedStatement);
-              return { code, statement, linkedHazards };
-            })
-            .filter((item): item is { code: string; statement: string; linkedHazards: string[] } => item !== null);
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.constraints.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextConstraintId,
-              code: item.code,
-              statement: item.statement,
-              linkedHazards: item.linkedHazards,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+        this.requestAiConstraints(
+          question,
+          (items, summary) => {
+            if (this.mergeAiConstraints(items)) {
+              this.showAiSummary(summary);
+            }
+          },
+          { actionId: 'constraints', errorMessage: 'Failed to generate constraints with AI.' }
+        );
       });
   }
 
   generateResponsibilitiesWithAi(): void {
     if (!this.canEdit124()) {
+      return;
+    }
+
+    if (!this.beginScopeAiAction('responsibilities')) {
       return;
     }
 
@@ -3401,76 +3445,24 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiResponsibilities(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const validConstraints = new Set(this.constraints().map((item) => item.code.trim().toUpperCase()));
-          const existingCodes = new Set(this.responsibilities().map((item) => item.code.trim().toUpperCase()));
-          const existingPairs = new Set(
-            this.responsibilities().map(
-              (item) => `${this.normalizeFreeText(item.component)}::${this.normalizeFreeText(item.responsibility)}`
-            )
-          );
-          const addedCodes = new Set<string>();
-          const addedPairs = new Set<string>();
-
-          const toAdd = items
-            .map((item) => {
-              const component = item.component.trim();
-              const responsibility = item.responsibility.trim();
-              if (!component || !responsibility) {
-                return null;
-              }
-
-              const key = `${this.normalizeFreeText(component)}::${this.normalizeFreeText(responsibility)}`;
-              if (existingPairs.has(key) || addedPairs.has(key)) {
-                return null;
-              }
-
-              const linkedConstraints = item.linkedConstraints.filter((code) =>
-                validConstraints.has(code.trim().toUpperCase())
-              );
-              if (linkedConstraints.length === 0) {
-                return null;
-              }
-
-              let code = item.code.trim().toUpperCase();
-              if (!/^R-\d{2}$/.test(code) || existingCodes.has(code) || addedCodes.has(code)) {
-                code = this.nextSequentialCode('R-', existingCodes, addedCodes, 2);
-              }
-
-              addedCodes.add(code);
-              addedPairs.add(key);
-              return { code, component, responsibility, linkedConstraints };
-            })
-            .filter(
-              (item): item is { code: string; component: string; responsibility: string; linkedConstraints: string[] } =>
-                item !== null
-            );
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.responsibilities.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextResponsibilityId,
-              code: item.code,
-              component: item.component,
-              responsibility: item.responsibility,
-              linkedConstraints: item.linkedConstraints,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+        this.requestAiResponsibilities(
+          question,
+          (items, summary) => {
+            if (this.mergeAiResponsibilities(items)) {
+              this.showAiSummary(summary);
+            }
+          },
+          { actionId: 'responsibilities', errorMessage: 'Failed to generate responsibilities with AI.' }
+        );
       });
   }
 
   generateArtefactsWithAi(): void {
     if (!this.canEdit125()) {
+      return;
+    }
+
+    if (!this.beginScopeAiAction('artefacts')) {
       return;
     }
 
@@ -3491,38 +3483,15 @@ export class ScopePageComponent {
           stepTwoInfo
         );
 
-        this.requestAiArtefacts(question, (items) => {
-          if (items.length === 0) {
-            return;
-          }
-
-          const existingNames = new Set(this.artefacts().map((item) => this.normalizeFreeText(item.name)));
-          const addedNames = new Set<string>();
-
-          const toAdd = items.filter((item) => {
-            const normalizedName = this.normalizeFreeText(item.name);
-            if (!normalizedName || existingNames.has(normalizedName) || addedNames.has(normalizedName)) {
-              return false;
+        this.requestAiArtefacts(
+          question,
+          (items, summary) => {
+            if (this.mergeAiArtefacts(items)) {
+              this.showAiSummary(summary);
             }
-            addedNames.add(normalizedName);
-            return true;
-          });
-
-          if (toAdd.length === 0) {
-            return;
-          }
-
-          this.artefacts.update((current) => [
-            ...toAdd.map((item) => ({
-              id: ++this.nextArtefactId,
-              name: item.name,
-              purpose: item.purpose,
-              reference: item.reference,
-              sourceType: 'ai' as const
-            })),
-            ...current
-          ]);
-        });
+          },
+          { actionId: 'artefacts', errorMessage: 'Failed to generate artefacts with AI.' }
+        );
       });
   }
 
@@ -3858,13 +3827,25 @@ export class ScopePageComponent {
     ].join('\n');
   }
 
-  private requestAiLosses(question: string, onItems: (items: Array<{ code: string; description: string }>) => void): void {
+  private requestAiLosses(
+    question: string,
+    onItems: (items: Array<{ code: string; description: string }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
+  ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => onItems(this.extractAiLosses(response)),
+        next: ({ payload, summary }) => onItems(this.extractAiLosses(payload), summary),
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI losses.');
           console.error('Failed to fetch AI losses from /api/ai/ask', error);
         }
       });
@@ -3872,14 +3853,23 @@ export class ScopePageComponent {
 
   private requestAiHazards(
     question: string,
-    onItems: (items: Array<{ code: string; description: string; linkedAccidents: string[]; linkedUcas: string[] }>) => void
+    onItems: (items: Array<{ code: string; description: string; linkedAccidents: string[]; linkedUcas: string[] }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
   ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => onItems(this.extractAiHazards(response)),
+        next: ({ payload, summary }) => onItems(this.extractAiHazards(payload), summary),
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI hazards.');
           console.error('Failed to fetch AI hazards from /api/ai/ask', error);
         }
       });
@@ -3887,14 +3877,23 @@ export class ScopePageComponent {
 
   private requestAiConstraints(
     question: string,
-    onItems: (items: Array<{ code: string; statement: string; linkedHazards: string[] }>) => void
+    onItems: (items: Array<{ code: string; statement: string; linkedHazards: string[] }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
   ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => onItems(this.extractAiConstraints(response)),
+        next: ({ payload, summary }) => onItems(this.extractAiConstraints(payload), summary),
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI constraints.');
           console.error('Failed to fetch AI constraints from /api/ai/ask', error);
         }
       });
@@ -3902,14 +3901,23 @@ export class ScopePageComponent {
 
   private requestAiResponsibilities(
     question: string,
-    onItems: (items: Array<{ code: string; component: string; responsibility: string; linkedConstraints: string[] }>) => void
+    onItems: (items: Array<{ code: string; component: string; responsibility: string; linkedConstraints: string[] }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
   ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => onItems(this.extractAiResponsibilities(response)),
+        next: ({ payload, summary }) => onItems(this.extractAiResponsibilities(payload), summary),
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI responsibilities.');
           console.error('Failed to fetch AI responsibilities from /api/ai/ask', error);
         }
       });
@@ -3917,14 +3925,23 @@ export class ScopePageComponent {
 
   private requestAiArtefacts(
     question: string,
-    onItems: (items: Array<{ name: string; purpose: string; reference: string }>) => void
+    onItems: (items: Array<{ name: string; purpose: string; reference: string }>, summary: string) => void,
+    options: { actionId?: ScopeAiActionId; errorMessage?: string } = {}
   ): void {
     this.aiAssistant
-      .ask({ question })
-      .pipe(takeUntilDestroyed(this.destroyRef))
+      .askWithSummary({ question })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => {
+          if (options.actionId) {
+            this.finishScopeAiAction(options.actionId);
+          }
+        })
+      )
       .subscribe({
-        next: (response) => onItems(this.extractAiArtefacts(response)),
+        next: ({ payload, summary }) => onItems(this.extractAiArtefacts(payload), summary),
         error: (error) => {
+          this.showAiError(options.errorMessage ?? 'Failed to fetch AI artefacts.');
           console.error('Failed to fetch AI artefacts from /api/ai/ask', error);
         }
       });

@@ -590,7 +590,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddActorsAiRunning()">
-              {{ isAddActorsAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddActorsAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddActorsAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -639,7 +646,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddGoalsAiRunning()">
-              {{ isAddGoalsAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddGoalsAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddGoalsAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -688,7 +702,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddQualityAiRunning()">
-              {{ isAddQualityAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddQualityAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddQualityAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -737,7 +758,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddResourceAiRunning()">
-              {{ isAddResourceAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddResourceAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddResourceAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -791,7 +819,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddSafetyGoalAiRunning()">
-              {{ isAddSafetyGoalAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddSafetyGoalAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddSafetyGoalAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -840,7 +875,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddHazardAiRunning()">
-              {{ isAddHazardAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddHazardAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddHazardAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -894,7 +936,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddSafetyTaskAiRunning()">
-              {{ isAddSafetyTaskAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddSafetyTaskAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddSafetyTaskAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>
@@ -948,7 +997,14 @@
               Cancel
             </button>
             <button type="submit" class="button button--ai" [disabled]="isAddSafetyResourceAiRunning()">
-              {{ isAddSafetyResourceAiRunning() ? 'Running...' : 'Continue' }}
+              <span class="button__icon" aria-hidden="true">
+                @if (isAddSafetyResourceAiRunning()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+              <span>{{ isAddSafetyResourceAiRunning() ? 'Running...' : 'Continue' }}</span>
             </button>
           </div>
         </form>

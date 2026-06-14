@@ -3,7 +3,14 @@
   <div class="page-header__title-row">
     <h2>Analyze Loss Scenarios and Derive Safety Requirements</h2>
     <button type="button" class="button button--ai" [disabled]="isGeneratingStepFiveAi()" (click)="generateStepFiveWithAi()">
-      {{ isGeneratingStepFiveAi() ? 'Generating...' : '🤖 Generate with AI' }}
+      <span class="button__icon" aria-hidden="true">
+        @if (isGeneratingStepFiveAi()) {
+          <span class="button__spinner"></span>
+        } @else {
+          🤖
+        }
+      </span>
+      <span>{{ isGeneratingStepFiveAi() ? 'Generating...' : 'Generate with AI' }}</span>
     </button>
   </div>
   <p>

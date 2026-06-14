@@ -5,6 +5,7 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, finalize, switchMap, tap } from 'rxjs';
 import { AiAssistantService } from '../../services/ai-assistant.service';
+import { AiFeedbackService } from '../../services/ai-feedback.service';
 
 import {
   ProjectService,
@@ -66,6 +67,7 @@ export class ModelUpdatePageComponent {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly aiAssistant = inject(AiAssistantService);
+  private readonly aiFeedback = inject(AiFeedbackService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly currentProjectId = signal<number | null>(null);
@@ -256,26 +258,31 @@ export class ModelUpdatePageComponent {
     this.stepSixSaveError.set(null);
 
     this.aiAssistant
-      .ask({ question, context })
+      .askWithSummary({ question, context })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isGeneratingStepSixAi.set(false))
       )
       .subscribe({
-        next: (response) => {
-          const draft = this.parseStepSixAiDraft(response);
+        next: ({ payload, summary }) => {
+          const draft = this.parseStepSixAiDraft(payload);
           if (!draft) {
-            this.stepSixSaveError.set('AI returned an invalid Step 6 payload.');
+            const message = 'AI returned an invalid Step 6 payload.';
+            this.stepSixSaveError.set(message);
+            this.aiFeedback.showError(message);
             return;
           }
 
           this.applyStepSixAiDraft(draft);
           this.runVerification();
           this.stepSixSaveMessage.set('AI proposal applied to Step 6. Review and save when ready.');
+          this.aiFeedback.showSummary(summary);
         },
         error: (error) => {
+          const message = 'Failed to generate Step 6 content with AI.';
           this.stepSixSaveMessage.set(null);
-          this.stepSixSaveError.set('Failed to generate Step 6 content with AI.');
+          this.stepSixSaveError.set(message);
+          this.aiFeedback.showError(message);
           console.error('Failed to generate Step 6 content via /api/ai/ask', error);
         }
       });
@@ -497,9 +504,11 @@ export class ModelUpdatePageComponent {
         next: (response) => {
           this.hydrateFromStepSixInformation(response);
           this.stepSixSaveError.set(null);
-          this.stepSixSaveMessage.set(
-            continueAfterSave ? 'Step 6 saved. Opening the next step.' : 'Step 6 saved successfully.'
-          );
+          const successMessage = continueAfterSave
+            ? 'Step 6 saved. Opening the next step.'
+            : 'Step 6 saved successfully.';
+          this.stepSixSaveMessage.set(successMessage);
+          this.aiFeedback.showSuccess(successMessage);
 
           if (continueAfterSave) {
             this.router.navigate(['/model-update'], { queryParams: { projectId } });

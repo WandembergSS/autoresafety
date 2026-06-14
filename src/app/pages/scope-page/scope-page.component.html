@@ -10,7 +10,14 @@
         (click)="generateStepOneWithAi()"
         aria-label="Generate with AI"
       >
-        🤖 Generate with AI
+        <span class="button__icon" aria-hidden="true">
+          @if (isStepOneAiRunning()) {
+            <span class="button__spinner"></span>
+          } @else {
+            🤖
+          }
+        </span>
+        <span>{{ isStepOneAiRunning() ? 'Generating...' : 'Generate with AI' }}</span>
         <span
           class="button__info"
           data-tooltip="AI will only help fill the fields in Step 1 (Define SCS Scope). The quality depends on the information already provided until now."
@@ -58,7 +65,15 @@
           [disabled]="isGeneralConcernsAiRunning()"
           (click)="generateGeneralConcernsWithAi()"
           aria-label="Generate with AI"
-        >🤖</button>
+        >
+          <span class="button__icon" aria-hidden="true">
+            @if (isGeneralConcernsAiRunning()) {
+              <span class="button__spinner"></span>
+            } @else {
+              🤖
+            }
+          </span>
+        </button>
       </div>
       <p class="lane__subtitle">
         Build a shared understanding of the mission, system definition, available knowledge, scope
@@ -134,7 +149,21 @@
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai" (click)="generateObjectivesWithAi()" aria-label="Generate with AI">🤖</button>
+            <button
+              type="button"
+              class="button button--ai"
+              [disabled]="isScopeAiActionRunning('objectives')"
+              (click)="generateObjectivesWithAi()"
+              aria-label="Generate with AI"
+            >
+              <span class="button__icon" aria-hidden="true">
+                @if (isScopeAiActionRunning('objectives')) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+            </button>
             <button type="button" (click)="openObjectiveAiModal()" aria-label="Expand">⛶</button>
           </div>
         </form>
@@ -193,7 +222,21 @@
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai" [disabled]="!canEdit112()" (click)="generateSystemDefinitionWithAi()" aria-label="Generate with AI">🤖</button>
+            <button
+              type="button"
+              class="button button--ai"
+              [disabled]="!canEdit112() || isScopeAiActionRunning('systemDefinition')"
+              (click)="generateSystemDefinitionWithAi()"
+              aria-label="Generate with AI"
+            >
+              <span class="button__icon" aria-hidden="true">
+                @if (isScopeAiActionRunning('systemDefinition')) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+            </button>
             <button type="button" [disabled]="!canEdit112()" (click)="openSystemDefinitionAiModal()" aria-label="Expand">⛶</button>
           </div>
         </form>
@@ -221,7 +264,21 @@
           <small class="hint">Resource name is required.</small>
         }
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEdit113()" (click)="generateResourcesWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEdit113() || isScopeAiActionRunning('resources')"
+            (click)="generateResourcesWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('resources')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
           <button type="button" [disabled]="!canEdit113()" (click)="openResourceModal()" aria-label="Expand">⛶</button>
         </div>
         <ul class="list list--dense">
@@ -307,7 +364,21 @@
             ></textarea>
           </label>
           <div class="field-actions">
-            <button type="button" class="button button--ai" [disabled]="!canEdit114()" (click)="generateSystemBoundaryWithAi()" aria-label="Generate with AI">🤖</button>
+            <button
+              type="button"
+              class="button button--ai"
+              [disabled]="!canEdit114() || isScopeAiActionRunning('systemBoundary')"
+              (click)="generateSystemBoundaryWithAi()"
+              aria-label="Generate with AI"
+            >
+              <span class="button__icon" aria-hidden="true">
+                @if (isScopeAiActionRunning('systemBoundary')) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  🤖
+                }
+              </span>
+            </button>
             <button type="button" [disabled]="!canEdit114()" (click)="openSystemBoundaryAiModal()" aria-label="Expand">⛶</button>
           </div>
         </form>
@@ -330,7 +401,21 @@
           <small class="hint">Component name is required.</small>
         }
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEdit115()" (click)="generateComponentsWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEdit115() || isScopeAiActionRunning('components')"
+            (click)="generateComponentsWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('components')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
           <button type="button" [disabled]="!canEdit115()" (click)="openComponentModal()" aria-label="Expand">⛶</button>
         </div>
         <ul class="list">
@@ -623,7 +708,15 @@
           [disabled]="!canEditStep12() || isSafetyConcernsAiRunning()"
           (click)="generateSafetyConcernsWithAi()"
           aria-label="Generate with AI"
-        >🤖</button>
+        >
+          <span class="button__icon" aria-hidden="true">
+            @if (isSafetyConcernsAiRunning()) {
+              <span class="button__spinner"></span>
+            } @else {
+              🤖
+            }
+          </span>
+        </button>
       </div>
       <p class="lane__subtitle">
         Transition from mission framing to safety implications. Establish accidents, hazards, safety constraints,
@@ -674,7 +767,21 @@
           <button type="submit" [disabled]="!canEditStep12()">Add</button>
         </form>
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEditStep12()" (click)="generateLossesWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEditStep12() || isScopeAiActionRunning('losses')"
+            (click)="generateLossesWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('losses')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
         </div>
         @if (!canEditStep12()) {
           <small class="hint">Complete 1.1.5 (system components list) first.</small>
@@ -748,7 +855,21 @@
           <button type="submit" [disabled]="!canEdit122()">Add hazard</button>
         </form>
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEdit122()" (click)="generateHazardsWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEdit122() || isScopeAiActionRunning('hazards')"
+            (click)="generateHazardsWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('hazards')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
         </div>
         @if (!canEdit122()) {
           <small class="hint">Complete 1.2.1 first by identifying at least one loss.</small>
@@ -822,7 +943,21 @@
           <button type="submit" [disabled]="!canEdit123()">Record constraint</button>
         </form>
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEdit123()" (click)="generateConstraintsWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEdit123() || isScopeAiActionRunning('constraints')"
+            (click)="generateConstraintsWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('constraints')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
         </div>
         @if (!canEdit123()) {
           <small class="hint">Complete 1.2.2 first by identifying at least one hazard.</small>
@@ -895,7 +1030,21 @@
           <button type="submit" [disabled]="!canEdit124()">Add responsibility</button>
         </form>
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEdit124()" (click)="generateResponsibilitiesWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEdit124() || isScopeAiActionRunning('responsibilities')"
+            (click)="generateResponsibilitiesWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('responsibilities')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
         </div>
         @if (!canEdit124()) {
           <small class="hint">Complete 1.2.3 first by defining at least one safety constraint.</small>
@@ -961,7 +1110,21 @@
           <button type="submit" [disabled]="!canEdit125()">Add</button>
         </form>
         <div class="field-actions">
-          <button type="button" class="button button--ai" [disabled]="!canEdit125()" (click)="generateArtefactsWithAi()" aria-label="Generate with AI">🤖</button>
+          <button
+            type="button"
+            class="button button--ai"
+            [disabled]="!canEdit125() || isScopeAiActionRunning('artefacts')"
+            (click)="generateArtefactsWithAi()"
+            aria-label="Generate with AI"
+          >
+            <span class="button__icon" aria-hidden="true">
+              @if (isScopeAiActionRunning('artefacts')) {
+                <span class="button__spinner"></span>
+              } @else {
+                🤖
+              }
+            </span>
+          </button>
         </div>
         @if (!canEdit125()) {
           <small class="hint">Complete 1.2.4 first by defining at least one responsibility.</small>

@@ -1,13 +1,27 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { provideHttpClient, withFetch } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { AppComponent } from './app.component';
+import { AuthService } from './services/auth.service';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
-      providers: [provideHttpClient(withFetch()), provideHttpClientTesting()]
+      providers: [
+        provideRouter([]),
+        provideHttpClient(withFetch()),
+        provideHttpClientTesting(),
+        {
+          provide: AuthService,
+          useValue: {
+            authState: signal(false),
+            signOut: jasmine.createSpy('signOut')
+          }
+        }
+      ]
     }).compileComponents();
   });
 

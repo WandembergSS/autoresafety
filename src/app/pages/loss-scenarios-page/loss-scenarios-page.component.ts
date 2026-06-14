@@ -5,6 +5,7 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, finalize, switchMap, tap } from 'rxjs';
 import { AiAssistantService } from '../../services/ai-assistant.service';
+import { AiFeedbackService } from '../../services/ai-feedback.service';
 
 import { ProjectService, StepFiveProjectInformation, StepFiveProjectUpdatePayload } from '../../services/project.service';
 
@@ -75,6 +76,7 @@ export class LossScenariosPageComponent {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly aiAssistant = inject(AiAssistantService);
+  private readonly aiFeedback = inject(AiFeedbackService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly currentProjectId = signal<number | null>(null);
@@ -327,25 +329,30 @@ export class LossScenariosPageComponent {
     this.stepFiveSaveError.set(null);
 
     this.aiAssistant
-      .ask({ question, context })
+      .askWithSummary({ question, context })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isGeneratingStepFiveAi.set(false))
       )
       .subscribe({
-        next: (response) => {
-          const draft = this.parseStepFiveAiDraft(response);
+        next: ({ payload, summary }) => {
+          const draft = this.parseStepFiveAiDraft(payload);
           if (!draft) {
-            this.stepFiveSaveError.set('AI returned an invalid Step 5 payload.');
+            const message = 'AI returned an invalid Step 5 payload.';
+            this.stepFiveSaveError.set(message);
+            this.aiFeedback.showError(message);
             return;
           }
 
           this.applyStepFiveAiDraft(draft);
           this.stepFiveSaveMessage.set('AI proposal applied to Step 5. Review and save when ready.');
+          this.aiFeedback.showSummary(summary);
         },
         error: (error) => {
+          const message = 'Failed to generate Step 5 content with AI.';
           this.stepFiveSaveMessage.set(null);
-          this.stepFiveSaveError.set('Failed to generate Step 5 content with AI.');
+          this.stepFiveSaveError.set(message);
+          this.aiFeedback.showError(message);
           console.error('Failed to generate Step 5 content via /api/ai/ask', error);
         }
       });
@@ -502,9 +509,11 @@ export class LossScenariosPageComponent {
         next: (response) => {
           this.hydrateFromStepFiveInformation(response);
           this.stepFiveSaveError.set(null);
-          this.stepFiveSaveMessage.set(
-            continueAfterSave ? 'Step 5 saved. Opening the next step.' : 'Step 5 saved successfully.'
-          );
+          const successMessage = continueAfterSave
+            ? 'Step 5 saved. Opening the next step.'
+            : 'Step 5 saved successfully.';
+          this.stepFiveSaveMessage.set(successMessage);
+          this.aiFeedback.showSuccess(successMessage);
 
           if (continueAfterSave) {
             this.router.navigate(['/model-update'], { queryParams: { projectId } });

@@ -4,7 +4,14 @@
     <div class="page__title-row">
       <h2>Define the STPA Control Structure</h2>
       <button type="button" class="button button--ai" [disabled]="isGeneratingStepThreeAi()" (click)="generateStepThreeWithAi()" aria-label="Generate with AI">
-        {{ isGeneratingStepThreeAi() ? 'Generating...' : '🤖 Generate with AI' }}
+        <span class="button__icon" aria-hidden="true">
+          @if (isGeneratingStepThreeAi()) {
+            <span class="button__spinner"></span>
+          } @else {
+            🤖
+          }
+        </span>
+        <span>{{ isGeneratingStepThreeAi() ? 'Generating...' : 'Generate with AI' }}</span>
       </button>
     </div>
     <p>

@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, of, switchMap, tap } from 'rxjs';
 import { AiAssistantService } from '../../services/ai-assistant.service';
+import { AiFeedbackService } from '../../services/ai-feedback.service';
 
 import {
   ConstraintSourceOption,
@@ -145,6 +146,7 @@ export class UcasPageComponent {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly aiAssistant = inject(AiAssistantService);
+  private readonly aiFeedback = inject(AiFeedbackService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly currentProjectId = signal<number | null>(null);
@@ -346,25 +348,30 @@ export class UcasPageComponent {
     this.stepFourSaveError.set(null);
 
     this.aiAssistant
-      .ask({ question, context })
+      .askWithSummary({ question, context })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isGeneratingStepFourAi.set(false))
       )
       .subscribe({
-        next: (response) => {
-          const draft = this.parseStepFourAiDraft(response);
+        next: ({ payload, summary }) => {
+          const draft = this.parseStepFourAiDraft(payload);
           if (!draft) {
-            this.stepFourSaveError.set('AI returned an invalid Step 4 payload.');
+            const message = 'AI returned an invalid Step 4 payload.';
+            this.stepFourSaveError.set(message);
+            this.aiFeedback.showError(message);
             return;
           }
 
           this.applyStepFourAiDraft(draft);
           this.stepFourSaveMessage.set('AI proposal applied to Step 4. Review and save when ready.');
+          this.aiFeedback.showSummary(summary);
         },
         error: (error) => {
+          const message = 'Failed to generate Step 4 content with AI.';
           this.stepFourSaveMessage.set(null);
-          this.stepFourSaveError.set('Failed to generate Step 4 content with AI.');
+          this.stepFourSaveError.set(message);
+          this.aiFeedback.showError(message);
           console.error('Failed to generate Step 4 content via /api/ai/ask', error);
         }
       });
@@ -544,7 +551,7 @@ export class UcasPageComponent {
       category: uca.category,
       context: uca.context?.trim() || 'Context pending refinement',
       consequence: uca.consequence?.trim() || 'Consequence pending refinement',
-      rationale: ''
+      rationale: uca.rationale?.trim() || 'Rationale pending refinement'
     });
   }
 
@@ -640,7 +647,7 @@ export class UcasPageComponent {
               category: (value.category as UcaCategory) ?? 'Not provided',
               context: value.context?.trim() || 'Context pending refinement',
               consequence: value.consequence?.trim() || 'Consequence pending refinement',
-              rationale: ''
+              rationale: value.rationale?.trim() || 'Rationale pending refinement'
             }
           : item
       )
@@ -688,7 +695,7 @@ export class UcasPageComponent {
         category: (value.category as UcaCategory) ?? 'Not provided',
         context: value.context?.trim() || 'Context pending refinement',
         consequence: value.consequence?.trim() || 'Consequence pending refinement',
-        rationale: ''
+        rationale: value.rationale?.trim() || 'Rationale pending refinement'
       },
       ...current
     ]);
@@ -878,9 +885,11 @@ export class UcasPageComponent {
             );
           }
           this.stepFourSaveError.set(null);
-          this.stepFourSaveMessage.set(
-            continueAfterSave ? 'Step 4 saved. Opening the next step.' : 'Step 4 saved successfully.'
-          );
+          const successMessage = continueAfterSave
+            ? 'Step 4 saved. Opening the next step.'
+            : 'Step 4 saved successfully.';
+          this.stepFourSaveMessage.set(successMessage);
+          this.aiFeedback.showSuccess(successMessage);
 
           if (continueAfterSave) {
             this.router.navigate(['/loss-scenarios'], { queryParams: { projectId } });
@@ -1400,7 +1409,7 @@ export class UcasPageComponent {
       category: 'Not provided',
       context: 'Context pending refinement',
       consequence: 'Consequence pending refinement',
-      rationale: ''
+      rationale: 'Rationale pending refinement'
     });
   }
 
@@ -1704,7 +1713,7 @@ export class UcasPageComponent {
       category: item.category,
       context: item.context,
       consequence: item.consequence,
-      rationale: '',
+      rationale: item.rationale,
       hazardRefs: item.hazard.map((hazard) => hazardCodeByLabel.get(hazard) ?? hazard),
       responsibilityId: item.responsibilityId ?? '',
       safetyConstraintId: item.safetyConstraintId ?? ''

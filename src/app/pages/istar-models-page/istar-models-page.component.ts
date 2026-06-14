@@ -6,6 +6,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { EMPTY } from 'rxjs';
 import { catchError, finalize, switchMap, tap } from 'rxjs/operators';
 import { AiAssistantService } from '../../services/ai-assistant.service';
+import { AiFeedbackService } from '../../services/ai-feedback.service';
 import { ProjectService, StepTwoProjectUpdatePayload } from '../../services/project.service';
 
 type ActorType = 'Actor' | 'Agent' | 'Role';
@@ -219,6 +220,7 @@ export class IstarModelsPageComponent {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly aiAssistant = inject(AiAssistantService);
+  private readonly aiFeedback = inject(AiFeedbackService);
   private readonly destroyRef = inject(DestroyRef);
 
   @ViewChild('modellerFrame') private modellerFrame?: ElementRef<HTMLIFrameElement>;
@@ -652,6 +654,70 @@ export class IstarModelsPageComponent {
     this.addSafetyResourceAiError.set(null);
   }
 
+  private runPistarAiRequest(options: {
+    currentModel: PistarModel;
+    question: string;
+    context: string;
+    setRunning: (value: boolean) => void;
+    setError: (message: string | null) => void;
+    invalidPayloadMessage: string;
+    requestFailureMessage: string;
+    successMessage: string;
+    closeModal: () => void;
+    validatePatch?: (patch: PistarModelPatch) => string | null;
+    mergeOptions?: { allowExistingActorUpdates?: boolean };
+    errorLogLabel: string;
+  }): void {
+    options.setRunning(true);
+    options.setError(null);
+    this.stepTwoSaveMessage.set(null);
+
+    this.aiAssistant
+      .askWithSummary({ question: options.question, context: options.context })
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => options.setRunning(false))
+      )
+      .subscribe({
+        next: ({ payload, summary }) => {
+          const parsedPatch = this.parsePistarModelFromAiResponse(payload);
+          if (!parsedPatch) {
+            options.setError(options.invalidPayloadMessage);
+            this.aiFeedback.showError(options.invalidPayloadMessage);
+            return;
+          }
+
+          const validationError = options.validatePatch?.(parsedPatch) ?? null;
+          if (validationError) {
+            options.setError(validationError);
+            this.aiFeedback.showError(validationError);
+            return;
+          }
+
+          const normalizedPatch = this.normalizeAiModelPatchForMerge(
+            options.currentModel,
+            parsedPatch,
+            options.mergeOptions
+          );
+          const mergedModel = this.mergePistarModels(options.currentModel, normalizedPatch);
+          const serialized = JSON.stringify(mergedModel);
+          this.lastPulledModelSnapshot = serialized;
+          this.lastPushedModelSnapshot = serialized;
+          this.syncFormsFromPistarModel(mergedModel);
+          this.applyModelObjectToPistar(mergedModel);
+          this.stepTwoSaveError.set(null);
+          this.stepTwoSaveMessage.set(options.successMessage);
+          options.closeModal();
+          this.aiFeedback.showSummary(summary);
+        },
+        error: (error) => {
+          options.setError(options.requestFailureMessage);
+          this.aiFeedback.showError(options.requestFailureMessage);
+          console.error(`${options.errorLogLabel} via /api/ai/ask`, error);
+        }
+      });
+  }
+
   submitAddActorsAiRequest(): void {
     if (this.isAddActorsAiRunning()) {
       return;
@@ -675,46 +741,19 @@ export class IstarModelsPageComponent {
     const question = this.buildAddActorsAiPrompt(currentModel, minActorsToAdd, maxActorsToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddActorsAiRunning.set(true);
-    this.addActorsAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddActorsAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addActorsAiError.set('AI returned an invalid model payload.');
-            return;
-          }
-
-          const actorCountError = this.validateAiActorPatchCount(parsedPatch, minActorsToAdd, maxActorsToAdd);
-          if (actorCountError) {
-            this.addActorsAiError.set(actorCountError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch);
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI actor proposal applied to the Step 2 model.');
-          this.isAddActorsAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addActorsAiError.set('Failed to generate actors with AI.');
-          console.error('Failed to generate Step 2 actors via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddActorsAiRunning.set(value),
+      setError: (message) => this.addActorsAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid model payload.',
+      requestFailureMessage: 'Failed to generate actors with AI.',
+      successMessage: 'AI actor proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddActorsAiModalOpen.set(false),
+      validatePatch: (parsedPatch) => this.validateAiActorPatchCount(parsedPatch, minActorsToAdd, maxActorsToAdd),
+      errorLogLabel: 'Failed to generate Step 2 actors'
+    });
   }
 
   submitAddGoalsAiRequest(): void {
@@ -740,48 +779,20 @@ export class IstarModelsPageComponent {
     const question = this.buildAddGoalsAiPrompt(currentModel, minGoalsToAdd, maxGoalsToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddGoalsAiRunning.set(true);
-    this.addGoalsAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddGoalsAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addGoalsAiError.set('AI returned an invalid goal patch payload.');
-            return;
-          }
-
-          const goalCountError = this.validateAiGoalPatchCount(currentModel, parsedPatch, minGoalsToAdd, maxGoalsToAdd);
-          if (goalCountError) {
-            this.addGoalsAiError.set(goalCountError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI goal proposal applied to the Step 2 model.');
-          this.isAddGoalsAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addGoalsAiError.set('Failed to generate goals with AI.');
-          console.error('Failed to generate Step 2 goals via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddGoalsAiRunning.set(value),
+      setError: (message) => this.addGoalsAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid goal patch payload.',
+      requestFailureMessage: 'Failed to generate goals with AI.',
+      successMessage: 'AI goal proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddGoalsAiModalOpen.set(false),
+      validatePatch: (parsedPatch) => this.validateAiGoalPatchCount(currentModel, parsedPatch, minGoalsToAdd, maxGoalsToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 goals'
+    });
   }
 
   submitAddQualityAiRequest(): void {
@@ -807,48 +818,21 @@ export class IstarModelsPageComponent {
     const question = this.buildAddQualityAiPrompt(currentModel, minQualitiesToAdd, maxQualitiesToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddQualityAiRunning.set(true);
-    this.addQualityAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddQualityAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addQualityAiError.set('AI returned an invalid quality patch payload.');
-            return;
-          }
-
-          const qualityCountError = this.validateAiQualityPatchCount(currentModel, parsedPatch, minQualitiesToAdd, maxQualitiesToAdd);
-          if (qualityCountError) {
-            this.addQualityAiError.set(qualityCountError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI quality proposal applied to the Step 2 model.');
-          this.isAddQualityAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addQualityAiError.set('Failed to generate qualities with AI.');
-          console.error('Failed to generate Step 2 qualities via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddQualityAiRunning.set(value),
+      setError: (message) => this.addQualityAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid quality patch payload.',
+      requestFailureMessage: 'Failed to generate qualities with AI.',
+      successMessage: 'AI quality proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddQualityAiModalOpen.set(false),
+      validatePatch: (parsedPatch) =>
+        this.validateAiQualityPatchCount(currentModel, parsedPatch, minQualitiesToAdd, maxQualitiesToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 qualities'
+    });
   }
 
   submitAddResourceAiRequest(): void {
@@ -874,48 +858,21 @@ export class IstarModelsPageComponent {
     const question = this.buildAddResourceAiPrompt(currentModel, minResourcesToAdd, maxResourcesToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddResourceAiRunning.set(true);
-    this.addResourceAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddResourceAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addResourceAiError.set('AI returned an invalid resource patch payload.');
-            return;
-          }
-
-          const resourceCountError = this.validateAiResourcePatchCount(currentModel, parsedPatch, minResourcesToAdd, maxResourcesToAdd);
-          if (resourceCountError) {
-            this.addResourceAiError.set(resourceCountError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI resource proposal applied to the Step 2 model.');
-          this.isAddResourceAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addResourceAiError.set('Failed to generate resources with AI.');
-          console.error('Failed to generate Step 2 resources via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddResourceAiRunning.set(value),
+      setError: (message) => this.addResourceAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid resource patch payload.',
+      requestFailureMessage: 'Failed to generate resources with AI.',
+      successMessage: 'AI resource proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddResourceAiModalOpen.set(false),
+      validatePatch: (parsedPatch) =>
+        this.validateAiResourcePatchCount(currentModel, parsedPatch, minResourcesToAdd, maxResourcesToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 resources'
+    });
   }
 
   submitAddSafetyGoalAiRequest(): void {
@@ -941,48 +898,21 @@ export class IstarModelsPageComponent {
     const question = this.buildAddSafetyGoalAiPrompt(currentModel, minSafetyGoalsToAdd, maxSafetyGoalsToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddSafetyGoalAiRunning.set(true);
-    this.addSafetyGoalAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddSafetyGoalAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addSafetyGoalAiError.set('AI returned an invalid safety goal patch payload.');
-            return;
-          }
-
-          const countError = this.validateAiSafetyGoalPatchCount(currentModel, parsedPatch, minSafetyGoalsToAdd, maxSafetyGoalsToAdd);
-          if (countError) {
-            this.addSafetyGoalAiError.set(countError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI safety goal proposal applied to the Step 2 model.');
-          this.isAddSafetyGoalAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addSafetyGoalAiError.set('Failed to generate safety goals with AI.');
-          console.error('Failed to generate Step 2 safety goals via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddSafetyGoalAiRunning.set(value),
+      setError: (message) => this.addSafetyGoalAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid safety goal patch payload.',
+      requestFailureMessage: 'Failed to generate safety goals with AI.',
+      successMessage: 'AI safety goal proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddSafetyGoalAiModalOpen.set(false),
+      validatePatch: (parsedPatch) =>
+        this.validateAiSafetyGoalPatchCount(currentModel, parsedPatch, minSafetyGoalsToAdd, maxSafetyGoalsToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 safety goals'
+    });
   }
 
   submitAddHazardAiRequest(): void {
@@ -1008,48 +938,21 @@ export class IstarModelsPageComponent {
     const question = this.buildAddHazardAiPrompt(currentModel, minHazardsToAdd, maxHazardsToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddHazardAiRunning.set(true);
-    this.addHazardAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddHazardAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addHazardAiError.set('AI returned an invalid hazard patch payload.');
-            return;
-          }
-
-          const countError = this.validateAiHazardPatchCount(currentModel, parsedPatch, minHazardsToAdd, maxHazardsToAdd);
-          if (countError) {
-            this.addHazardAiError.set(countError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI hazard proposal applied to the Step 2 model.');
-          this.isAddHazardAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addHazardAiError.set('Failed to generate hazards with AI.');
-          console.error('Failed to generate Step 2 hazards via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddHazardAiRunning.set(value),
+      setError: (message) => this.addHazardAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid hazard patch payload.',
+      requestFailureMessage: 'Failed to generate hazards with AI.',
+      successMessage: 'AI hazard proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddHazardAiModalOpen.set(false),
+      validatePatch: (parsedPatch) =>
+        this.validateAiHazardPatchCount(currentModel, parsedPatch, minHazardsToAdd, maxHazardsToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 hazards'
+    });
   }
 
   submitAddSafetyTaskAiRequest(): void {
@@ -1075,48 +978,21 @@ export class IstarModelsPageComponent {
     const question = this.buildAddSafetyTaskAiPrompt(currentModel, minSafetyTasksToAdd, maxSafetyTasksToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddSafetyTaskAiRunning.set(true);
-    this.addSafetyTaskAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddSafetyTaskAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addSafetyTaskAiError.set('AI returned an invalid safety task patch payload.');
-            return;
-          }
-
-          const countError = this.validateAiSafetyTaskPatchCount(currentModel, parsedPatch, minSafetyTasksToAdd, maxSafetyTasksToAdd);
-          if (countError) {
-            this.addSafetyTaskAiError.set(countError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI safety task proposal applied to the Step 2 model.');
-          this.isAddSafetyTaskAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addSafetyTaskAiError.set('Failed to generate safety tasks with AI.');
-          console.error('Failed to generate Step 2 safety tasks via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddSafetyTaskAiRunning.set(value),
+      setError: (message) => this.addSafetyTaskAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid safety task patch payload.',
+      requestFailureMessage: 'Failed to generate safety tasks with AI.',
+      successMessage: 'AI safety task proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddSafetyTaskAiModalOpen.set(false),
+      validatePatch: (parsedPatch) =>
+        this.validateAiSafetyTaskPatchCount(currentModel, parsedPatch, minSafetyTasksToAdd, maxSafetyTasksToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 safety tasks'
+    });
   }
 
   submitAddSafetyResourceAiRequest(): void {
@@ -1142,53 +1018,21 @@ export class IstarModelsPageComponent {
     const question = this.buildAddSafetyResourceAiPrompt(currentModel, minSafetyResourcesToAdd, maxSafetyResourcesToAdd, promptInstructions);
     const context = JSON.stringify(currentModel, null, 2);
 
-    this.isAddSafetyResourceAiRunning.set(true);
-    this.addSafetyResourceAiError.set(null);
-    this.stepTwoSaveMessage.set(null);
-
-    this.aiAssistant
-      .ask({ question, context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => this.isAddSafetyResourceAiRunning.set(false))
-      )
-      .subscribe({
-        next: (response) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(response);
-          if (!parsedPatch) {
-            this.addSafetyResourceAiError.set('AI returned an invalid safety resource patch payload.');
-            return;
-          }
-
-          const countError = this.validateAiSafetyResourcePatchCount(
-            currentModel,
-            parsedPatch,
-            minSafetyResourcesToAdd,
-            maxSafetyResourcesToAdd
-          );
-          if (countError) {
-            this.addSafetyResourceAiError.set(countError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(currentModel, parsedPatch, {
-            allowExistingActorUpdates: true
-          });
-          const mergedModel = this.mergePistarModels(currentModel, normalizedPatch);
-          const serialized = JSON.stringify(mergedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(mergedModel);
-          this.applyModelObjectToPistar(mergedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set('AI safety resource proposal applied to the Step 2 model.');
-          this.isAddSafetyResourceAiModalOpen.set(false);
-        },
-        error: (error) => {
-          this.addSafetyResourceAiError.set('Failed to generate safety resources with AI.');
-          console.error('Failed to generate Step 2 safety resources via /api/ai/ask', error);
-        }
-      });
+    this.runPistarAiRequest({
+      currentModel,
+      question,
+      context,
+      setRunning: (value) => this.isAddSafetyResourceAiRunning.set(value),
+      setError: (message) => this.addSafetyResourceAiError.set(message),
+      invalidPayloadMessage: 'AI returned an invalid safety resource patch payload.',
+      requestFailureMessage: 'Failed to generate safety resources with AI.',
+      successMessage: 'AI safety resource proposal applied to the Step 2 model.',
+      closeModal: () => this.isAddSafetyResourceAiModalOpen.set(false),
+      validatePatch: (parsedPatch) =>
+        this.validateAiSafetyResourcePatchCount(currentModel, parsedPatch, minSafetyResourcesToAdd, maxSafetyResourcesToAdd),
+      mergeOptions: { allowExistingActorUpdates: true },
+      errorLogLabel: 'Failed to generate Step 2 safety resources'
+    });
   }
 
   removeActorDefinition(actorId: string): void {
@@ -1537,7 +1381,11 @@ export class IstarModelsPageComponent {
         next: (response) => {
           this.hydrateFromStepTwoInformation(this.extractStepTwoInformationFromApiResponse(response));
           this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set(continueAfterSave ? 'Step 2 saved. Opening the next step.' : 'Step 2 saved successfully.');
+          const successMessage = continueAfterSave
+            ? 'Step 2 saved. Opening the next step.'
+            : 'Step 2 saved successfully.';
+          this.stepTwoSaveMessage.set(successMessage);
+          this.aiFeedback.showSuccess(successMessage);
 
           if (continueAfterSave) {
             this.router.navigate(['/control-structure'], { queryParams: { projectId } });

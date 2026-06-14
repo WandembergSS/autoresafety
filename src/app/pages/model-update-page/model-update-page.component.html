@@ -3,7 +3,14 @@
   <div class="page-header__title-row">
     <h2>Update iStar4Safety Models</h2>
     <button type="button" class="button button--ai" [disabled]="isGeneratingStepSixAi()" (click)="generateStepSixWithAi()">
-      {{ isGeneratingStepSixAi() ? 'Generating...' : '🤖 Generate with AI' }}
+      <span class="button__icon" aria-hidden="true">
+        @if (isGeneratingStepSixAi()) {
+          <span class="button__spinner"></span>
+        } @else {
+          🤖
+        }
+      </span>
+      <span>{{ isGeneratingStepSixAi() ? 'Generating...' : 'Generate with AI' }}</span>
     </button>
   </div>
   <p>

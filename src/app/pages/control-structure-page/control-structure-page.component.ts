@@ -5,6 +5,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { EMPTY, catchError, finalize, forkJoin, of, switchMap, tap } from 'rxjs';
 import { AiAssistantService } from '../../services/ai-assistant.service';
+import { AiFeedbackService } from '../../services/ai-feedback.service';
 
 import {
   ProjectService,
@@ -157,6 +158,7 @@ export class ControlStructurePageComponent {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly aiAssistant = inject(AiAssistantService);
+  private readonly aiFeedback = inject(AiFeedbackService);
   private readonly destroyRef = inject(DestroyRef);
   readonly currentProjectId = signal<number | null>(null);
   readonly isBpmnModelModalOpen = signal(false);
@@ -483,25 +485,30 @@ export class ControlStructurePageComponent {
     this.stepThreeSaveError.set(null);
 
     this.aiAssistant
-      .ask({ question, context })
+      .askWithSummary({ question, context })
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isGeneratingStepThreeAi.set(false))
       )
       .subscribe({
-        next: (response) => {
-          const draft = this.parseStepThreeAiDraft(response);
+        next: ({ payload, summary }) => {
+          const draft = this.parseStepThreeAiDraft(payload);
           if (!draft) {
-            this.stepThreeSaveError.set('AI returned an invalid Step 3 payload.');
+            const message = 'AI returned an invalid Step 3 payload.';
+            this.stepThreeSaveError.set(message);
+            this.aiFeedback.showError(message);
             return;
           }
 
           this.applyStepThreeAiDraft(draft);
           this.stepThreeSaveMessage.set('AI proposal applied to Step 3. Review and save when ready.');
+          this.aiFeedback.showSummary(summary);
         },
         error: (error) => {
+          const message = 'Failed to generate Step 3 content with AI.';
           this.stepThreeSaveMessage.set(null);
-          this.stepThreeSaveError.set('Failed to generate Step 3 content with AI.');
+          this.stepThreeSaveError.set(message);
+          this.aiFeedback.showError(message);
           console.error('Failed to generate Step 3 content via /api/ai/ask', error);
         }
       });
@@ -791,9 +798,11 @@ export class ControlStructurePageComponent {
             );
           }
           this.stepThreeSaveError.set(null);
-          this.stepThreeSaveMessage.set(
-            continueAfterSave ? 'Step 3 saved. Opening the next step.' : 'Step 3 saved successfully.'
-          );
+          const successMessage = continueAfterSave
+            ? 'Step 3 saved. Opening the next step.'
+            : 'Step 3 saved successfully.';
+          this.stepThreeSaveMessage.set(successMessage);
+          this.aiFeedback.showSuccess(successMessage);
 
           if (continueAfterSave) {
             this.router.navigate(['/ucas'], { queryParams: { projectId } });

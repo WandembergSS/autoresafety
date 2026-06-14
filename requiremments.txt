@@ -74,3 +74,6 @@ falar dissertacao sobre UX e inspiracao mobile com uso de modais
 
 dar o exemplo da implementacao do botao de reviewd step no step 6, para explicar como AI é usada no desenvolvimento
 
+mudar icone de robo que parece maça
+
+pagina para envio de sugestoes

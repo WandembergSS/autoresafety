@@ -5,7 +5,14 @@
       <h2>Identify Unsafe Control Actions (UCAs)</h2>
       <div class="page__header-actions">
         <button type="button" class="button button--ai" [disabled]="isGeneratingStepFourAi()" (click)="generateStepFourWithAi()" aria-label="Generate with AI">
-          {{ isGeneratingStepFourAi() ? 'Generating...' : '🤖 Generate with AI' }}
+          <span class="button__icon" aria-hidden="true">
+            @if (isGeneratingStepFourAi()) {
+              <span class="button__spinner"></span>
+            } @else {
+              🤖
+            }
+          </span>
+          <span>{{ isGeneratingStepFourAi() ? 'Generating...' : 'Generate with AI' }}</span>
         </button>
       </div>
     </div>
