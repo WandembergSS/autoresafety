@@ -211,6 +211,13 @@ section {
   gap: 1rem;
 }
 
+.step-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 10.5rem;
+}
+
 .step-card__ref {
   display: inline-block;
   margin-bottom: 0.35rem;
@@ -247,17 +254,59 @@ section {
   justify-content: center;
   min-height: 2.5rem;
   padding: 0.7rem 1rem;
+  border: 0;
   border-radius: 0.75rem;
   background: #2563eb;
   color: #fff;
   font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .step-link:hover,
 .step-link:focus-visible {
   background: #1d4ed8;
+}
+
+.step-link[disabled] {
+  background: #cbd5e1;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.review-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.5rem;
+  padding: 0.7rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid #fdba74;
+  background: #fff7ed;
+  color: #9a3412;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.review-toggle--reviewed {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.review-toggle--pending {
+  border-color: #fdba74;
+  background: #fff7ed;
+  color: #9a3412;
+}
+
+.review-toggle--saving,
+.review-toggle[disabled] {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #475569;
+  cursor: progress;
 }
 
 app-resafety-artifacts-page {

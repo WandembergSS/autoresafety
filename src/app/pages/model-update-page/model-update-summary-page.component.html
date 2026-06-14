@@ -102,9 +102,13 @@
       <div class="card__heading">
         <div>
           <h3>Previous steps summary</h3>
-          <p>Each card resumes what has already been filled and links back to the original step.</p>
+          <p>Each card resumes what has already been filled, tracks review completion, and links back to the original step while it remains pending review.</p>
         </div>
       </div>
+
+      @if (reviewUpdateError(); as errorMessage) {
+        <span class="status-chip status-chip--error">{{ errorMessage }}</span>
+      }
 
       <div class="steps-grid">
         @for (step of previousStepSummaries(); track step.route) {
@@ -114,7 +118,30 @@
                 <span class="step-card__ref">Step {{ step.number }}</span>
                 <h4>{{ step.title }}</h4>
               </div>
-              <a class="step-link" [routerLink]="step.route" [queryParams]="projectQueryParams()">Open step</a>
+              <div class="step-card__actions">
+                <button
+                  type="button"
+                  class="step-link"
+                  [routerLink]="step.route"
+                  [queryParams]="projectQueryParams()"
+                  [disabled]="step.reviewed"
+                >
+                  Open step
+                </button>
+                <button
+                  type="button"
+                  class="review-toggle"
+                  [class.review-toggle--reviewed]="step.reviewed"
+                  [class.review-toggle--pending]="!step.reviewed"
+                  [class.review-toggle--saving]="isReviewUpdateInProgress(step.updatedStepKey)"
+                  [attr.aria-pressed]="step.reviewed"
+                  [attr.title]="getReviewButtonTitle(step)"
+                  [disabled]="isReviewUpdateInProgress(step.updatedStepKey)"
+                  (click)="toggleReviewStatus(step)"
+                >
+                  {{ getReviewButtonLabel(step) }}
+                </button>
+              </div>
             </header>
             <p class="step-card__description">{{ step.description }}</p>
             <ul class="metric-list">

@@ -328,6 +328,28 @@ export interface StepSixProjectUpdatePayload {
   };
 }
 
+export type StepSevenUpdatedStepKey = 'step1' | 'step2' | 'step3' | 'step4' | 'step5';
+
+export interface StepSevenUpdatedSteps {
+  step1?: boolean;
+  step2?: boolean;
+  step3?: boolean;
+  step4?: boolean;
+  step5?: boolean;
+}
+
+export interface StepSevenModelUpdate {
+  updatedSteps?: StepSevenUpdatedSteps | null;
+  modelChanges?: unknown[];
+  validationTasks?: unknown[];
+  integrationNotes?: unknown[] | string | null;
+}
+
+export interface StepSevenUpdatedStepsUpdatePayload {
+  id: number;
+  updatedSteps: StepSevenUpdatedSteps;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
   private readonly http = inject(HttpClient);
@@ -347,6 +369,7 @@ export class ProjectService {
   private readonly stepFiveUpdateUrl = `${environment.backendApiUrl}/projects/step_five_project_update`;
   private readonly stepSixInfoUrl = `${environment.backendApiUrl}/projects/step_six_project_information`;
   private readonly stepSixUpdateUrl = `${environment.backendApiUrl}/projects/step_six_project_update`;
+  private readonly stepSevenUpdatedStepsUpdateUrl = `${environment.backendApiUrl}/projects/step_seven_updated_steps_update`;
 
   /**
    * Returns only non-complete projects with basic fields (Quarkus: GET /api/project-resume).
@@ -486,6 +509,14 @@ export class ProjectService {
    */
   updateStepSixInformation(payload: StepSixProjectUpdatePayload): Observable<StepSixProjectInformation> {
     return this.http.post<StepSixProjectInformation>(this.stepSixUpdateUrl, payload);
+  }
+
+  /**
+   * Updates the Step 6 review status flags stored under step7ModelUpdate.updatedSteps.
+   * POST /api/projects/step_seven_updated_steps_update
+   */
+  updateStepSevenUpdatedSteps(payload: StepSevenUpdatedStepsUpdatePayload): Observable<StepSevenModelUpdate> {
+    return this.http.post<StepSevenModelUpdate>(this.stepSevenUpdatedStepsUpdateUrl, payload);
   }
 
   /**
