@@ -77,3 +77,4 @@ dar o exemplo da implementacao do botao de reviewd step no step 6, para explicar
 mudar icone de robo que parece maça
 
 pagina para envio de sugestoes
+avaliacao ia no step 2
