@@ -3,7 +3,22 @@
     <p class="step">Step 2</p>
     <div class="page__title-row">
       <h2>Define the iStar4Safety Models</h2>
-      <button type="button" class="button button--ai" aria-label="Generate with AI"><span class="ai-robot-icon" aria-hidden="true"></span> Generate with AI</button>
+      <button
+        type="button"
+        class="button button--ai"
+        [disabled]="isAnyStepTwoAiActionRunning()"
+        (click)="generateStepTwoWithAi()"
+        aria-label="Generate with AI"
+      >
+        <span class="button__icon" aria-hidden="true">
+          @if (isGeneratingStepTwoAi()) {
+            <span class="button__spinner"></span>
+          } @else {
+            <span class="ai-robot-icon" aria-hidden="true"></span>
+          }
+        </span>
+        <span>{{ isGeneratingStepTwoAi() ? 'Generating...' : 'Generate with AI' }}</span>
+      </button>
     </div>
     <p class="page__subtitle">
       Use the five structured stages below to build your iStar4Safety SD and SR models.
@@ -57,7 +72,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddActors() || isAddActorsAiRunning()"
+                [disabled]="!canAiAddActors() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddActorsAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -68,7 +83,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddGoals() || isAddGoalsAiRunning()"
+                [disabled]="!canAiAddGoals() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddGoalsAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -79,7 +94,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddQuality() || isAddQualityAiRunning()"
+                [disabled]="!canAiAddQuality() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddQualityAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -90,7 +105,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddResource() || isAddResourceAiRunning()"
+                [disabled]="!canAiAddResource() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddResourceAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -101,7 +116,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddSafetyGoal() || isAddSafetyGoalAiRunning()"
+                [disabled]="!canAiAddSafetyGoal() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddSafetyGoalAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -112,7 +127,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddHazard() || isAddHazardAiRunning()"
+                [disabled]="!canAiAddHazard() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddHazardAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -123,7 +138,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddSafetyTask() || isAddSafetyTaskAiRunning()"
+                [disabled]="!canAiAddSafetyTask() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddSafetyTaskAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -134,7 +149,7 @@
               <button
                 type="button"
                 class="button button--ai modeller__ai-action"
-                [disabled]="!canAiAddSafetyResource() || isAddSafetyResourceAiRunning()"
+                [disabled]="!canAiAddSafetyResource() || isAnyStepTwoAiActionRunning()"
                 (click)="openAddSafetyResourceAiModal()"
               >
                 <span class="ai-robot-icon" aria-hidden="true"></span>
@@ -625,6 +640,41 @@
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  }
+
+  @if (isStepTwoSaveConfirmationModalOpen()) {
+    <div class="modal-backdrop" (click)="closeStepTwoSaveConfirmationModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="step-two-save-confirmation-title">
+        <header class="modal__header">
+          <h4 id="step-two-save-confirmation-title">Save Step 2 with validation errors?</h4>
+          <button type="button" class="modal__close" [disabled]="isSavingStepTwo()" (click)="closeStepTwoSaveConfirmationModal()">×</button>
+        </header>
+
+        <div class="modal__content">
+          <p class="modal__message">
+            The current SR model still violates one or more validation rules. If you continue, the current Step 2 model will still be sent to the backend.
+          </p>
+
+          <div class="validation validation--error">
+            <h4>Validation Errors</h4>
+            <ul>
+              @for (error of stepTwoSaveConfirmationErrors(); track error) {
+                <li>{{ error }}</li>
+              }
+            </ul>
+          </div>
+        </div>
+
+        <div class="ai-modal__actions">
+          <button type="button" class="button button--secondary" [disabled]="isSavingStepTwo()" (click)="closeStepTwoSaveConfirmationModal()">
+            Cancel
+          </button>
+          <button type="button" class="button" [disabled]="isSavingStepTwo()" (click)="confirmStepTwoSaveDespiteErrors()">
+            {{ isSavingStepTwo() ? 'Saving...' : (stepTwoSaveContinueAfterConfirm() ? 'Save and Continue Anyway' : 'Save Anyway') }}
+          </button>
+        </div>
       </div>
     </div>
   }

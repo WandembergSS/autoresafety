@@ -96,6 +96,427 @@ describe('IstarModelsPageComponent', () => {
     expect(getSubmitButton()).toBeNull();
   });
 
+  it('runs the Step 2 header AI button through the existing AI actions sequentially and keeps the title button pending', () => {
+    const fixture = TestBed.createComponent(IstarModelsPageComponent);
+    const component = fixture.componentInstance;
+    const responses = [
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: []
+            },
+            {
+              id: 'actor-002',
+              text: 'Operations Center',
+              type: 'istar.Role',
+              x: 520,
+              y: 140,
+              customProperties: {},
+              nodes: []
+            },
+            {
+              id: 'actor-003',
+              text: 'Roadside Sensor Network',
+              type: 'istar.Agent',
+              x: 880,
+              y: 180,
+              customProperties: {},
+              nodes: []
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added the main system actor.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'goal-001',
+                  text: 'Provide passenger transport',
+                  type: 'istar.Goal',
+                  x: 220,
+                  y: 160,
+                  customProperties: {}
+                },
+                {
+                  id: 'goal-002',
+                  text: 'Coordinate route execution',
+                  type: 'istar.Goal',
+                  x: 260,
+                  y: 230,
+                  customProperties: {}
+                },
+                {
+                  id: 'goal-003',
+                  text: 'Maintain timely service',
+                  type: 'istar.Goal',
+                  x: 300,
+                  y: 300,
+                  customProperties: {}
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a top-level operational goal.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'quality-001',
+                  text: 'Fast service',
+                  type: 'istar.Quality',
+                  x: 250,
+                  y: 210,
+                  customProperties: {}
+                },
+                {
+                  id: 'quality-002',
+                  text: 'Reliable coordination',
+                  type: 'istar.Quality',
+                  x: 320,
+                  y: 250,
+                  customProperties: {}
+                },
+                {
+                  id: 'quality-003',
+                  text: 'Predictable availability',
+                  type: 'istar.Quality',
+                  x: 380,
+                  y: 290,
+                  customProperties: {}
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a softgoal.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'sg-001',
+                  text: 'Prevent collisions',
+                  type: 'istar.SafetyGoal',
+                  x: 280,
+                  y: 260,
+                  customProperties: {
+                    safetyType: 'SafetyGoal',
+                    traceabilityId: 'SC-01',
+                    accidentLevel: 'L2',
+                    safetyGoalKind: 'Safety Constraint'
+                  }
+                },
+                {
+                  id: 'sg-002',
+                  text: 'Maintain safe braking distance',
+                  type: 'istar.SafetyGoal',
+                  x: 340,
+                  y: 330,
+                  customProperties: {
+                    safetyType: 'SafetyGoal',
+                    traceabilityId: 'SC-02',
+                    accidentLevel: 'L2',
+                    safetyGoalKind: 'Safety Constraint'
+                  }
+                },
+                {
+                  id: 'sg-003',
+                  text: 'Avoid loss of situational awareness',
+                  type: 'istar.SafetyGoal',
+                  x: 400,
+                  y: 390,
+                  customProperties: {
+                    safetyType: 'SafetyGoal',
+                    traceabilityId: 'SC-03',
+                    accidentLevel: 'L3',
+                    safetyGoalKind: 'Safety Constraint'
+                  }
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a safety goal.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'haz-001',
+                  text: 'Fails to detect obstacle',
+                  type: 'istar.Hazard',
+                  x: 340,
+                  y: 320,
+                  customProperties: {
+                    safetyType: 'Hazard',
+                    traceabilityId: 'H1',
+                    obstructsSafetyGoalIds: ['sg-001']
+                  }
+                },
+                {
+                  id: 'haz-002',
+                  text: 'Braking issued too late',
+                  type: 'istar.Hazard',
+                  x: 410,
+                  y: 360,
+                  customProperties: {
+                    safetyType: 'Hazard',
+                    traceabilityId: 'H2',
+                    obstructsSafetyGoalIds: ['sg-002']
+                  }
+                },
+                {
+                  id: 'haz-003',
+                  text: 'Telemetry blackout during maneuver',
+                  type: 'istar.Hazard',
+                  x: 470,
+                  y: 420,
+                  customProperties: {
+                    safetyType: 'Hazard',
+                    traceabilityId: 'H3',
+                    obstructsSafetyGoalIds: ['sg-003']
+                  }
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a hazard.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'st-001',
+                  text: 'Trigger emergency braking',
+                  type: 'istar.SafetyTask',
+                  x: 390,
+                  y: 370,
+                  customProperties: {
+                    safetyType: 'SafetyTask',
+                    traceabilityId: 'R-01'
+                  }
+                },
+                {
+                  id: 'st-002',
+                  text: 'Verify obstacle classification',
+                  type: 'istar.SafetyTask',
+                  x: 450,
+                  y: 430,
+                  customProperties: {
+                    safetyType: 'SafetyTask',
+                    traceabilityId: 'R-02'
+                  }
+                },
+                {
+                  id: 'st-003',
+                  text: 'Switch to degraded safe mode',
+                  type: 'istar.SafetyTask',
+                  x: 520,
+                  y: 490,
+                  customProperties: {
+                    safetyType: 'SafetyTask',
+                    traceabilityId: 'R-03'
+                  }
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a safety task.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'resource-001',
+                  text: 'Obstacle map',
+                  type: 'istar.Resource',
+                  x: 430,
+                  y: 220,
+                  customProperties: {}
+                },
+                {
+                  id: 'resource-002',
+                  text: 'Route schedule',
+                  type: 'istar.Resource',
+                  x: 500,
+                  y: 260,
+                  customProperties: {}
+                },
+                {
+                  id: 'resource-003',
+                  text: 'Vehicle diagnostics stream',
+                  type: 'istar.Resource',
+                  x: 560,
+                  y: 300,
+                  customProperties: {}
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a standard resource.'
+      },
+      {
+        payload: {
+          actors: [
+            {
+              id: 'actor-001',
+              text: 'Autonomous Shuttle',
+              type: 'istar.Actor',
+              x: 120,
+              y: 120,
+              customProperties: {},
+              nodes: [
+                {
+                  id: 'sr-001',
+                  text: 'Redundant proximity sensor data',
+                  type: 'istar.SafetyResource',
+                  x: 450,
+                  y: 420,
+                  customProperties: {
+                    safetyType: 'SafetyResource',
+                    traceabilityId: 'SC-02'
+                  }
+                },
+                {
+                  id: 'sr-002',
+                  text: 'Certified braking status channel',
+                  type: 'istar.SafetyResource',
+                  x: 520,
+                  y: 470,
+                  customProperties: {
+                    safetyType: 'SafetyResource',
+                    traceabilityId: 'SC-04'
+                  }
+                },
+                {
+                  id: 'sr-003',
+                  text: 'Fallback safety ruleset',
+                  type: 'istar.SafetyResource',
+                  x: 590,
+                  y: 520,
+                  customProperties: {
+                    safetyType: 'SafetyResource',
+                    traceabilityId: 'SC-05'
+                  }
+                }
+              ]
+            }
+          ],
+          links: [],
+          display: {},
+          diagram: { name: 'project' }
+        },
+        summary: 'Added a safety resource.'
+      }
+    ];
+
+    aiAssistant.askWithSummary.and.returnValues(...responses.map((response) => of(response)));
+    spyOn<any>(component, 'applyModelObjectToPistar');
+
+    fixture.detectChanges();
+
+    const headerButton = fixture.nativeElement.querySelector('.page__title-row .button--ai') as HTMLButtonElement;
+    expect(headerButton.textContent).toContain('Generate with AI');
+
+    component.generateStepTwoWithAi();
+    fixture.detectChanges();
+
+    expect(aiAssistant.askWithSummary).toHaveBeenCalledTimes(8);
+    expect(component.isGeneratingStepTwoAi()).toBeFalse();
+    expect(component.actors().length).toBe(3);
+    expect(component.standardIntentionalElements().filter((element) => element.type === 'Goal').length).toBe(3);
+    expect(component.standardIntentionalElements().filter((element) => element.type === 'Quality').length).toBe(3);
+    expect(component.standardIntentionalElements().filter((element) => element.type === 'Resource').length).toBe(3);
+    expect(component.safetyIntentionalElements().filter((element) => element.type === 'SafetyGoal').length).toBe(3);
+    expect(component.safetyIntentionalElements().filter((element) => element.type === 'Hazard').length).toBe(3);
+    expect(component.safetyIntentionalElements().filter((element) => element.type === 'SafetyTask').length).toBe(3);
+    expect(component.safetyIntentionalElements().filter((element) => element.type === 'SafetyResource').length).toBe(3);
+    expect(aiFeedback.showSummary).toHaveBeenCalledTimes(8);
+    expect(aiFeedback.showSuccess).toHaveBeenCalledWith('Step 2 AI sequence completed successfully.', 7000);
+  });
+
   it('accepts wrapped hazard AI patches and normalizes safety nodes to piStar safety types', () => {
     const fixture = TestBed.createComponent(IstarModelsPageComponent);
     const component = fixture.componentInstance;
@@ -489,5 +910,48 @@ describe('IstarModelsPageComponent', () => {
     expect(component.stepTwoSaveMessage()).toBe('Step 2 saved successfully.');
     expect(aiFeedback.showSuccess).toHaveBeenCalledWith('Step 2 saved successfully.');
     expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  it('asks for confirmation before saving Step 2 when validation errors exist', () => {
+    const fixture = TestBed.createComponent(IstarModelsPageComponent);
+    const component = fixture.componentInstance;
+
+    spyOn<any>(component, 'pullModelFromPistar');
+    spyOn<any>(component, 'validateModelDefinition').and.returnValue(['A safety goal is missing an obstructing hazard.']);
+
+    fixture.detectChanges();
+    component.currentProjectId.set(2);
+    component.saveStepTwo(true);
+
+    expect(projectService.updateStepTwoInformation).not.toHaveBeenCalled();
+    expect(component.isStepTwoSaveConfirmationModalOpen()).toBeTrue();
+    expect(component.stepTwoSaveConfirmationErrors()).toEqual(['A safety goal is missing an obstructing hazard.']);
+    expect(component.stepTwoSaveContinueAfterConfirm()).toBeTrue();
+  });
+
+  it('saves Step 2 after the user confirms saving with validation errors', () => {
+    const fixture = TestBed.createComponent(IstarModelsPageComponent);
+    const component = fixture.componentInstance;
+    projectService.updateStepTwoInformation.and.returnValue(of({} as Record<string, unknown>));
+
+    spyOn<any>(component, 'pullModelFromPistar');
+    spyOn<any>(component, 'validateModelDefinition').and.returnValue(['A safety goal is missing an obstructing hazard.']);
+    spyOn<any>(component, 'buildStepTwoInformationPayload').and.returnValue({
+      modelName: 'project',
+      actors: [],
+      dependencies: []
+    });
+    spyOn<any>(component, 'extractStepTwoInformationFromApiResponse').and.returnValue({} as Record<string, unknown>);
+    spyOn<any>(component, 'hydrateFromStepTwoInformation');
+
+    fixture.detectChanges();
+    component.currentProjectId.set(2);
+    component.saveStepTwo(true);
+    component.confirmStepTwoSaveDespiteErrors();
+
+    expect(projectService.updateStepTwoInformation).toHaveBeenCalled();
+    expect(component.isStepTwoSaveConfirmationModalOpen()).toBeFalse();
+    expect(component.stepTwoSaveMessage()).toBe('Step 2 saved. Opening the next step.');
+    expect(router.navigate).toHaveBeenCalledWith(['/control-structure'], { queryParams: { projectId: 2 } });
   });
 });

@@ -3,8 +3,8 @@ import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, ViewChild, 
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { EMPTY } from 'rxjs';
-import { catchError, finalize, switchMap, tap } from 'rxjs/operators';
+import { EMPTY, Observable, of } from 'rxjs';
+import { catchError, concatMap, finalize, map, switchMap, tap } from 'rxjs/operators';
 import { AiAssistantService } from '../../services/ai-assistant.service';
 import { AiFeedbackService } from '../../services/ai-feedback.service';
 import { ProjectService, StepTwoProjectUpdatePayload } from '../../services/project.service';
@@ -206,6 +206,44 @@ interface PistarModelPatch {
   diagram?: Partial<PistarModel['diagram']>;
 }
 
+type StepTwoAiActionId =
+  | 'actors'
+  | 'goals'
+  | 'quality'
+  | 'resource'
+  | 'safetyGoal'
+  | 'hazard'
+  | 'safetyTask'
+  | 'safetyResource';
+
+interface StepTwoAiSequenceStep {
+  id: StepTwoAiActionId;
+  min: number;
+  max: number;
+  instructions: string;
+}
+
+interface StepTwoAiSequenceResult {
+  succeeded: StepTwoAiActionId[];
+  failed: StepTwoAiActionId[];
+}
+
+interface StepTwoAiRequestOptions {
+  currentModel: PistarModel;
+  question: string;
+  context: string;
+  setRunning: (value: boolean) => void;
+  setError: (message: string | null) => void;
+  invalidPayloadMessage: string;
+  requestFailureMessage: string;
+  successMessage: string;
+  closeModal: () => void;
+  validatePatch?: (patch: PistarModelPatch) => string | null;
+  preparePatch?: (patch: PistarModelPatch, currentModel: PistarModel) => PistarModelPatch;
+  mergeOptions?: { allowExistingActorUpdates?: boolean };
+  errorLogLabel: string;
+}
+
 @Component({
   selector: 'app-istar-models-page',
   standalone: true,
@@ -352,6 +390,11 @@ export class IstarModelsPageComponent {
   readonly addSafetyResourceAiError = signal<string | null>(null);
   readonly isCorrectingModelWithAi = signal(false);
   readonly correctModelAiError = signal<string | null>(null);
+  readonly isGeneratingStepTwoAi = signal(false);
+  readonly activeStepTwoAiAction = signal<StepTwoAiActionId | null>(null);
+  readonly isStepTwoSaveConfirmationModalOpen = signal(false);
+  readonly stepTwoSaveConfirmationErrors = signal<string[]>([]);
+  readonly stepTwoSaveContinueAfterConfirm = signal(false);
   readonly isSavingStepTwo = signal(false);
   readonly stepTwoSaveMessage = signal<string | null>(null);
   readonly stepTwoSaveError = signal<string | null>(null);
@@ -381,6 +424,18 @@ export class IstarModelsPageComponent {
     () =>
       this.actors().length > 0 &&
       this.getAllElements().some((element) => element.type === 'Task' || element.type === 'SafetyTask' || element.type === 'Hazard')
+  );
+  readonly isAnyStepTwoAiActionRunning = computed(
+    () =>
+      this.isGeneratingStepTwoAi() ||
+      this.isAddActorsAiRunning() ||
+      this.isAddGoalsAiRunning() ||
+      this.isAddQualityAiRunning() ||
+      this.isAddResourceAiRunning() ||
+      this.isAddSafetyGoalAiRunning() ||
+      this.isAddHazardAiRunning() ||
+      this.isAddSafetyTaskAiRunning() ||
+      this.isAddSafetyResourceAiRunning()
   );
 
   private actorSeq = 0;
@@ -656,74 +711,425 @@ export class IstarModelsPageComponent {
     this.addSafetyResourceAiError.set(null);
   }
 
-  private runPistarAiRequest(options: {
-    currentModel: PistarModel;
-    question: string;
-    context: string;
-    setRunning: (value: boolean) => void;
-    setError: (message: string | null) => void;
-    invalidPayloadMessage: string;
-    requestFailureMessage: string;
-    successMessage: string;
-    closeModal: () => void;
-    validatePatch?: (patch: PistarModelPatch) => string | null;
-    preparePatch?: (patch: PistarModelPatch, currentModel: PistarModel) => PistarModelPatch;
-    mergeOptions?: { allowExistingActorUpdates?: boolean };
-    errorLogLabel: string;
-  }): void {
+  private runPistarAiRequest(options: StepTwoAiRequestOptions): void {
+    this.runPistarAiRequest$(options)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe();
+  }
+
+  private runPistarAiRequest$(options: StepTwoAiRequestOptions): Observable<void> {
     options.setRunning(true);
     options.setError(null);
     this.stepTwoSaveMessage.set(null);
 
-    this.aiAssistant
-      .askWithSummary({ question: options.question, context: options.context })
-      .pipe(
-        takeUntilDestroyed(this.destroyRef),
-        finalize(() => options.setRunning(false))
-      )
-      .subscribe({
-        next: ({ payload, summary }) => {
-          const parsedPatch = this.parsePistarModelFromAiResponse(payload);
-          if (!parsedPatch) {
-            options.setError(options.invalidPayloadMessage);
-            this.aiFeedback.showError(options.invalidPayloadMessage);
-            return;
-          }
+    return this.aiAssistant.askWithSummary({ question: options.question, context: options.context }).pipe(
+      tap(({ payload, summary }) => {
+        const parsedPatch = this.parsePistarModelFromAiResponse(payload);
+        if (!parsedPatch) {
+          throw new Error(options.invalidPayloadMessage);
+        }
 
-          const preparedPatch = options.preparePatch
-            ? options.preparePatch(parsedPatch, options.currentModel)
-            : parsedPatch;
+        const preparedPatch = options.preparePatch ? options.preparePatch(parsedPatch, options.currentModel) : parsedPatch;
+        const validationError = options.validatePatch?.(preparedPatch) ?? null;
+        if (validationError) {
+          throw new Error(validationError);
+        }
 
-          const validationError = options.validatePatch?.(preparedPatch) ?? null;
-          if (validationError) {
-            options.setError(validationError);
-            this.aiFeedback.showError(validationError);
-            return;
-          }
-
-          const normalizedPatch = this.normalizeAiModelPatchForMerge(
-            options.currentModel,
-            preparedPatch,
-            options.mergeOptions
-          );
-          const mergedModel = this.mergePistarModels(options.currentModel, normalizedPatch);
-          const sanitizedModel = this.sanitizePistarModelForImport(mergedModel);
-          const serialized = JSON.stringify(sanitizedModel);
-          this.lastPulledModelSnapshot = serialized;
-          this.lastPushedModelSnapshot = serialized;
-          this.syncFormsFromPistarModel(sanitizedModel);
-          this.applyModelObjectToPistar(sanitizedModel);
-          this.stepTwoSaveError.set(null);
-          this.stepTwoSaveMessage.set(options.successMessage);
-          options.closeModal();
-          this.aiFeedback.showSummary(summary);
-        },
-        error: (error) => {
-          options.setError(options.requestFailureMessage);
-          this.aiFeedback.showError(options.requestFailureMessage);
+        const normalizedPatch = this.normalizeAiModelPatchForMerge(
+          options.currentModel,
+          preparedPatch,
+          options.mergeOptions
+        );
+        const mergedModel = this.mergePistarModels(options.currentModel, normalizedPatch);
+        const sanitizedModel = this.sanitizePistarModelForImport(mergedModel);
+        const serialized = JSON.stringify(sanitizedModel);
+        this.lastPulledModelSnapshot = serialized;
+        this.lastPushedModelSnapshot = serialized;
+        this.syncFormsFromPistarModel(sanitizedModel);
+        this.applyModelObjectToPistar(sanitizedModel);
+        this.stepTwoSaveError.set(null);
+        this.stepTwoSaveMessage.set(options.successMessage);
+        options.closeModal();
+        this.aiFeedback.showSummary(summary);
+      }),
+      map(() => void 0),
+      catchError((error) => {
+        const message = error instanceof Error && error.message ? error.message : options.requestFailureMessage;
+        options.setError(message);
+        this.aiFeedback.showError(message);
+        if (message === options.requestFailureMessage) {
           console.error(`${options.errorLogLabel} via /api/ai/ask`, error);
         }
+        throw error;
+      }),
+      finalize(() => options.setRunning(false))
+    );
+  }
+
+  generateStepTwoWithAi(): void {
+    if (this.isGeneratingStepTwoAi() || this.isAnyStepTwoAiActionRunning()) {
+      return;
+    }
+
+    this.isGeneratingStepTwoAi.set(true);
+    this.stepTwoSaveMessage.set(null);
+    this.stepTwoSaveError.set(null);
+
+    this.runStepTwoAiSequence$()
+      .pipe(
+        switchMap((firstPass) => {
+          if (firstPass.failed.length === 0) {
+            this.showStepTwoAiSequenceOutcome(firstPass);
+            return of(void 0);
+          }
+
+          this.aiFeedback.showWarning(`Step 2 AI retrying failed actions: ${firstPass.failed.join(', ')}.`);
+
+          return this.runStepTwoAiSequence$(new Set<StepTwoAiActionId>(firstPass.failed)).pipe(
+            tap((retryPass) => {
+              const finalResult = this.mergeStepTwoAiResults(firstPass, retryPass);
+              this.showStepTwoAiSequenceOutcome(finalResult);
+            }),
+            map(() => void 0)
+          );
+        }),
+        finalize(() => {
+          this.isGeneratingStepTwoAi.set(false);
+          this.activeStepTwoAiAction.set(null);
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        error: (error) => {
+          console.error('Failed to run full Step 2 sequential AI generation via /api/ai/ask', error);
+        }
       });
+  }
+
+  private runStepTwoAiSequence$(retryOnlyFailed: Set<StepTwoAiActionId> | null = null): Observable<StepTwoAiSequenceResult> {
+    const result: StepTwoAiSequenceResult = { succeeded: [], failed: [] };
+
+    return this.buildStepTwoAiSequencePlan().pipe(
+      switchMap((steps) =>
+        steps.reduce(
+          (stream, step) =>
+            stream.pipe(
+              concatMap(() =>
+                this.executeStepTwoAiAction$(step, retryOnlyFailed).pipe(
+                  tap((succeeded) => {
+                    if (succeeded) {
+                      result.succeeded.push(step.id);
+                    } else {
+                      result.failed.push(step.id);
+                    }
+                  }),
+                  map(() => void 0)
+                )
+              )
+            ),
+          of(void 0)
+        )
+      ),
+      map(() => ({
+        succeeded: this.sortStepTwoAiActions(result.succeeded),
+        failed: this.sortStepTwoAiActions(result.failed)
+      }))
+    );
+  }
+
+  private buildStepTwoAiSequencePlan(): Observable<StepTwoAiSequenceStep[]> {
+    return of([
+      {
+        id: 'actors',
+        min: 3,
+        max: 3,
+        instructions:
+          'Step 2.1 Actor boundary and top-level context: define the main actor boundaries first. Create actors, agents, or roles only when they are missing or materially incomplete. Favor the primary system under analysis plus any external actors required for later dependencies.'
+      },
+      {
+        id: 'goals',
+        min: 3,
+        max: 4,
+        instructions:
+          'Step 2.1 top-level intentions and Step 2.3 means-end framing: add the main standard goals inside the existing actor boundaries. Include top-level functional objectives and, when useful, operational standard tasks that decompose those goals through valid refinement or needed-by links.'
+      },
+      {
+        id: 'quality',
+        min: 3,
+        max: 3,
+        instructions:
+          'Step 2.1 softgoals: add standard qualities that express non-functional concerns such as timeliness, robustness, or usability, and qualify or receive contributions from the relevant existing goals, tasks, or resources.'
+      },
+      {
+        id: 'safetyGoal',
+        min: 3,
+        max: 4,
+        instructions:
+          'Step 2.1 safety goals: add SafetyGoal nodes for the critical safety objectives that prevent accidents. Prefer Safety Constraint entries with SC-xx traceability unless a responsibility is clearly more appropriate.'
+      },
+      {
+        id: 'hazard',
+        min: 3,
+        max: 4,
+        instructions:
+          'Step 2.2 threat identification: add Hazards as anti-goals that explicitly threaten the existing safety goals. Each new hazard must obstruct at least one concrete SafetyGoal already in the model.'
+      },
+      {
+        id: 'safetyTask',
+        min: 3,
+        max: 4,
+        instructions:
+          'Step 2.4 hazard mitigation: add SafetyTask nodes that mitigate, monitor, or prevent the identified hazards or operationalize safety responsibilities. Connect them coherently to the surrounding safety reasoning using valid internal links.'
+      },
+      {
+        id: 'resource',
+        min: 3,
+        max: 4,
+        instructions:
+          'Step 2.5 prerequisites and external dependencies: add standard resources needed by the existing standard tasks or goals, and use dependencies when those resources or dependums must be fulfilled by another actor outside the current boundary.'
+      },
+      {
+        id: 'safetyResource',
+        min: 3,
+        max: 3,
+        instructions:
+          'Step 2.5 safety prerequisites and Step 2.6 external dependencies: add safety resources that are strictly necessary to perform the current safety tasks or support hazard control, and use dependencies when the safety resource must be provided externally.'
+      }
+    ]);
+  }
+
+  private executeStepTwoAiAction$(
+    step: StepTwoAiSequenceStep,
+    retryOnlyFailed: Set<StepTwoAiActionId> | null
+  ): Observable<boolean> {
+    if (retryOnlyFailed && !retryOnlyFailed.has(step.id)) {
+      return of(true);
+    }
+
+    if (!this.canRunStepTwoAiAction(step.id)) {
+      return of(false);
+    }
+
+    this.activeStepTwoAiAction.set(step.id);
+
+    return this.runStepTwoAiActionRequest$(step).pipe(
+      map(() => true),
+      catchError(() => of(false)),
+      finalize(() => {
+        if (this.activeStepTwoAiAction() === step.id) {
+          this.activeStepTwoAiAction.set(null);
+        }
+      })
+    );
+  }
+
+  private runStepTwoAiActionRequest$(step: StepTwoAiSequenceStep): Observable<void> {
+    const currentModel = this.getCurrentPistarModelForAi();
+
+    switch (step.id) {
+      case 'actors': {
+        const question = this.buildAddActorsAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddActorsAiRunning.set(value),
+          setError: (message) => this.addActorsAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid model payload.',
+          requestFailureMessage: 'Failed to generate actors with AI.',
+          successMessage: 'AI actor proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddActorsAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiActorPatchCount(parsedPatch, step.min, step.max),
+          errorLogLabel: 'Failed to generate Step 2 actors'
+        });
+      }
+      case 'goals': {
+        const question = this.buildAddGoalsAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddGoalsAiRunning.set(value),
+          setError: (message) => this.addGoalsAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid goal patch payload.',
+          requestFailureMessage: 'Failed to generate goals with AI.',
+          successMessage: 'AI goal proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddGoalsAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiGoalPatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 goals'
+        });
+      }
+      case 'quality': {
+        const question = this.buildAddQualityAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddQualityAiRunning.set(value),
+          setError: (message) => this.addQualityAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid quality patch payload.',
+          requestFailureMessage: 'Failed to generate qualities with AI.',
+          successMessage: 'AI quality proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddQualityAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiQualityPatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 qualities'
+        });
+      }
+      case 'resource': {
+        const question = this.buildAddResourceAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddResourceAiRunning.set(value),
+          setError: (message) => this.addResourceAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid resource patch payload.',
+          requestFailureMessage: 'Failed to generate resources with AI.',
+          successMessage: 'AI resource proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddResourceAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiResourcePatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 resources'
+        });
+      }
+      case 'safetyGoal': {
+        const question = this.buildAddSafetyGoalAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddSafetyGoalAiRunning.set(value),
+          setError: (message) => this.addSafetyGoalAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid safety goal patch payload.',
+          requestFailureMessage: 'Failed to generate safety goals with AI.',
+          successMessage: 'AI safety goal proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddSafetyGoalAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiSafetyGoalPatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 safety goals'
+        });
+      }
+      case 'hazard': {
+        const question = this.buildAddHazardAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddHazardAiRunning.set(value),
+          setError: (message) => this.addHazardAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid hazard patch payload.',
+          requestFailureMessage: 'Failed to generate hazards with AI.',
+          successMessage: 'AI hazard proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddHazardAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiHazardPatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 hazards'
+        });
+      }
+      case 'safetyTask': {
+        const question = this.buildAddSafetyTaskAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddSafetyTaskAiRunning.set(value),
+          setError: (message) => this.addSafetyTaskAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid safety task patch payload.',
+          requestFailureMessage: 'Failed to generate safety tasks with AI.',
+          successMessage: 'AI safety task proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddSafetyTaskAiModalOpen.set(false),
+          validatePatch: (parsedPatch) => this.validateAiSafetyTaskPatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 safety tasks'
+        });
+      }
+      case 'safetyResource': {
+        const question = this.buildAddSafetyResourceAiPrompt(currentModel, step.min, step.max, step.instructions);
+        return this.runPistarAiRequest$({
+          currentModel,
+          question,
+          context: JSON.stringify(currentModel, null, 2),
+          setRunning: (value) => this.isAddSafetyResourceAiRunning.set(value),
+          setError: (message) => this.addSafetyResourceAiError.set(message),
+          invalidPayloadMessage: 'AI returned an invalid safety resource patch payload.',
+          requestFailureMessage: 'Failed to generate safety resources with AI.',
+          successMessage: 'AI safety resource proposal applied to the Step 2 model.',
+          closeModal: () => this.isAddSafetyResourceAiModalOpen.set(false),
+          preparePatch: (parsedPatch, baseModel) => this.coerceSafetyResourceAiPatch(baseModel, parsedPatch),
+          validatePatch: (parsedPatch) =>
+            this.validateAiSafetyResourcePatchCount(currentModel, parsedPatch, step.min, step.max),
+          mergeOptions: { allowExistingActorUpdates: true },
+          errorLogLabel: 'Failed to generate Step 2 safety resources'
+        });
+      }
+    }
+  }
+
+  private canRunStepTwoAiAction(actionId: StepTwoAiActionId): boolean {
+    switch (actionId) {
+      case 'actors':
+        return this.canAiAddActors();
+      case 'goals':
+        return this.canAiAddGoals();
+      case 'quality':
+        return this.canAiAddQuality();
+      case 'resource':
+        return this.canAiAddResource();
+      case 'safetyGoal':
+        return this.canAiAddSafetyGoal();
+      case 'hazard':
+        return this.canAiAddHazard();
+      case 'safetyTask':
+        return this.canAiAddSafetyTask();
+      case 'safetyResource':
+        return this.canAiAddSafetyResource();
+    }
+  }
+
+  private sortStepTwoAiActions(actions: StepTwoAiActionId[]): StepTwoAiActionId[] {
+    const order: StepTwoAiActionId[] = [
+      'actors',
+      'goals',
+      'quality',
+      'resource',
+      'safetyGoal',
+      'hazard',
+      'safetyTask',
+      'safetyResource'
+    ];
+
+    return [...new Set(actions)].sort((left, right) => order.indexOf(left) - order.indexOf(right));
+  }
+
+  private mergeStepTwoAiResults(
+    firstPass: StepTwoAiSequenceResult,
+    retryPass: StepTwoAiSequenceResult
+  ): StepTwoAiSequenceResult {
+    const succeeded = new Set<StepTwoAiActionId>(firstPass.succeeded);
+    for (const action of retryPass.succeeded) {
+      succeeded.add(action);
+    }
+
+    return {
+      succeeded: this.sortStepTwoAiActions([...succeeded]),
+      failed: this.sortStepTwoAiActions(retryPass.failed)
+    };
+  }
+
+  private showStepTwoAiSequenceOutcome(result: StepTwoAiSequenceResult): void {
+    if (result.failed.length === 0) {
+      this.aiFeedback.showSuccess('Step 2 AI sequence completed successfully.', 7000);
+      return;
+    }
+
+    if (result.failed.length === 8) {
+      this.aiFeedback.showError(`Step 2 AI sequence failed. Actions: ${result.failed.join(', ')}.`);
+      return;
+    }
+
+    this.aiFeedback.showPartial(`Step 2 AI partial success. Failed actions: ${result.failed.join(', ')}.`);
   }
 
   submitAddActorsAiRequest(): void {
@@ -1418,6 +1824,26 @@ export class IstarModelsPageComponent {
   }
 
   saveStepTwo(continueAfterSave = false): void {
+    this.attemptStepTwoSave(continueAfterSave, false);
+  }
+
+  confirmStepTwoSaveDespiteErrors(): void {
+    const continueAfterSave = this.stepTwoSaveContinueAfterConfirm();
+    this.closeStepTwoSaveConfirmationModal();
+    this.attemptStepTwoSave(continueAfterSave, true);
+  }
+
+  closeStepTwoSaveConfirmationModal(): void {
+    if (this.isSavingStepTwo()) {
+      return;
+    }
+
+    this.isStepTwoSaveConfirmationModalOpen.set(false);
+    this.stepTwoSaveConfirmationErrors.set([]);
+    this.stepTwoSaveContinueAfterConfirm.set(false);
+  }
+
+  private attemptStepTwoSave(continueAfterSave: boolean, allowValidationErrors: boolean): void {
     const projectId = this.currentProjectId();
 
     if (!projectId || projectId <= 0) {
@@ -1437,11 +1863,23 @@ export class IstarModelsPageComponent {
     const { errors } = this.collectCurrentValidationState();
     this.validationErrors.set(errors);
 
-    if (errors.length > 0) {
+    if (errors.length > 0 && !allowValidationErrors) {
       this.payloadPreview.set('');
-      this.stepTwoSaveError.set('Fix validation errors before saving Step 2.');
-      console.warn('Step 2 validation failed. Fix model issues before saving.', errors);
+      this.stepTwoSaveError.set('Step 2 still has validation errors. Review them and confirm if you want to save anyway.');
+      this.stepTwoSaveConfirmationErrors.set(errors);
+      this.stepTwoSaveContinueAfterConfirm.set(continueAfterSave);
+      this.isStepTwoSaveConfirmationModalOpen.set(true);
+      console.warn('Step 2 validation failed. Waiting for user confirmation before saving.', errors);
       return;
+    }
+
+    if (allowValidationErrors) {
+      this.isStepTwoSaveConfirmationModalOpen.set(false);
+      this.stepTwoSaveConfirmationErrors.set([]);
+      this.stepTwoSaveContinueAfterConfirm.set(false);
+      this.stepTwoSaveError.set(
+        errors.length > 0 ? 'Saving Step 2 with validation errors after user confirmation.' : null
+      );
     }
 
     const payload: StepTwoProjectUpdatePayload = {

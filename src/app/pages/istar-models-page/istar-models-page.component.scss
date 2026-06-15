@@ -500,6 +500,20 @@
   width: min(720px, 100%);
 }
 
+.modal__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+  overflow: auto;
+}
+
+.modal__message {
+  margin: 0;
+  color: #334155;
+  line-height: 1.5;
+}
+
 .ai-modal__form {
   display: flex;
   flex-direction: column;

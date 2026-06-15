@@ -78,3 +78,4 @@ mudar icone de robo que parece maça
 
 pagina para envio de sugestoes
 avaliacao ia no step 2
+mitigar pre carregamento modelo step 2
