@@ -111,4 +111,142 @@ describe('LossScenariosPageComponent', () => {
     expect(aiFeedback.showSuccess).toHaveBeenCalledWith('Step 5 saved. Opening the next step.');
     expect(router.navigate).toHaveBeenCalledWith(['/model-update'], { queryParams: { projectId: 5 } });
   });
+
+  it('opens the Step 5 AI config modal and sends a prompt that reflects the configured ranges', () => {
+    const fixture = TestBed.createComponent(LossScenariosPageComponent);
+    const component = fixture.componentInstance;
+    const response$ = new Subject<{ payload: unknown; summary: string }>();
+    aiAssistant.askWithSummary.and.returnValue(response$.asObservable());
+
+    fixture.detectChanges();
+    component.unsafeBehaviorCatalog.set([
+      {
+        id: 'UCA-01',
+        type: 'UCA',
+        title: 'Brake command omitted',
+        description: 'The braking command is omitted during wheel slip.',
+        hazards: ['Loss of braking stability']
+      } as never
+    ]);
+    fixture.detectChanges();
+
+    component.openStepFiveAiModal();
+    fixture.detectChanges();
+
+    expect(component.isStepFiveAiModalOpen()).toBeTrue();
+    expect(fixture.nativeElement.querySelector('.modal--ai')).not.toBeNull();
+    expect(aiAssistant.askWithSummary).not.toHaveBeenCalled();
+
+    component.stepFiveAiConfigForm.setValue({
+      minLossScenarios: 1,
+      maxLossScenarios: 2,
+      minSafetyRequirements: 0,
+      maxSafetyRequirements: 1,
+      promptInstructions: 'Highlight latency.'
+    });
+    component.submitStepFiveAiRequest();
+    fixture.detectChanges();
+
+    expect(aiAssistant.askWithSummary).toHaveBeenCalledTimes(1);
+    const question = aiAssistant.askWithSummary.calls.mostRecent().args[0].question as string;
+    expect(question).toContain('between 1 and 2 NEW loss scenarios');
+    expect(question).toContain('between 0 and 1 NEW safety requirements');
+    expect(question).toContain('Highlight latency.');
+
+    response$.next({
+      payload: {
+        lossScenarios: [
+          {
+            description: 'Brake support is not issued during a slip event, allowing instability to grow unchecked.',
+            associatedUnsafeBehaviorIds: ['UCA-01'],
+            sourceRationale: 'Sensor latency delays the braking response.'
+          }
+        ]
+      },
+      summary: 'Adds one loss scenario.'
+    });
+    response$.complete();
+    fixture.detectChanges();
+
+    expect(component.isStepFiveAiModalOpen()).toBeFalse();
+    expect(component.lossScenarios().length).toBe(1);
+  });
+
+  it('preserves existing Step 5 data and remaps AI ids when applying a proposal (additive merge)', () => {
+    const fixture = TestBed.createComponent(LossScenariosPageComponent);
+    const component = fixture.componentInstance;
+    const response$ = new Subject<{ payload: unknown; summary: string }>();
+    aiAssistant.askWithSummary.and.returnValue(response$.asObservable());
+
+    fixture.detectChanges();
+    component.unsafeBehaviorCatalog.set([
+      {
+        id: 'UCA-01',
+        type: 'UCA',
+        title: 'Brake command omitted',
+        description: 'The braking command is omitted during wheel slip.',
+        hazards: ['Loss of braking stability']
+      } as never
+    ]);
+    component.lossScenarios.set([
+      {
+        id: 'LS-01',
+        description: 'Existing loss scenario describing an unmitigated slip event.',
+        associatedUnsafeBehaviorIds: ['UCA-01'],
+        sourceRationale: 'Existing rationale.'
+      }
+    ] as never);
+    component.safetyRequirements.set([
+      {
+        id: 'SR-01',
+        description: 'Existing safety requirement covering the slip event.',
+        addressedLossScenarioIds: ['LS-01']
+      }
+    ] as never);
+    fixture.detectChanges();
+
+    component.generateStepFiveWithAi();
+    response$.next({
+      payload: {
+        lossScenarios: [
+          {
+            id: 'LS-01',
+            description: 'Existing loss scenario describing an unmitigated slip event.',
+            associatedUnsafeBehaviorIds: ['UCA-01'],
+            sourceRationale: 'Duplicate rationale.'
+          },
+          {
+            id: 'LS-99',
+            description: 'A brand new loss scenario describing a delayed actuator response.',
+            associatedUnsafeBehaviorIds: ['UCA-01'],
+            sourceRationale: 'New rationale.'
+          }
+        ],
+        safetyRequirements: [
+          {
+            id: 'SR-99',
+            description: 'A brand new safety requirement addressing the delayed actuator response.',
+            addressedLossScenarioIds: ['LS-99', 'LS-01']
+          }
+        ]
+      },
+      summary: 'Adds one loss scenario and one safety requirement.'
+    });
+    response$.complete();
+    fixture.detectChanges();
+
+    expect(component.lossScenarios().length).toBe(2);
+    expect(component.lossScenarios()[0]?.id).toBe('LS-01');
+    expect(component.lossScenarios()[0]?.description).toBe('Existing loss scenario describing an unmitigated slip event.');
+    expect(component.lossScenarios()[1]?.id).toBe('LS-02');
+    expect(component.lossScenarios()[1]?.description).toBe(
+      'A brand new loss scenario describing a delayed actuator response.'
+    );
+
+    expect(component.safetyRequirements().length).toBe(2);
+    expect(component.safetyRequirements()[0]?.id).toBe('SR-01');
+    expect(component.safetyRequirements()[1]?.id).toBe('SR-02');
+    expect(component.safetyRequirements()[1]?.addressedLossScenarioIds).toEqual(['LS-02', 'LS-01']);
+    expect(aiFeedback.showError).not.toHaveBeenCalled();
+  });
 });

@@ -2,9 +2,13 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
-import { catchError, map, of, switchMap, tap } from 'rxjs';
+import { catchError, firstValueFrom, map, of, switchMap, tap } from 'rxjs';
 
+import { AuthService } from '../../services/auth.service';
 import { ProjectService } from '../../services/project.service';
+import { buildControlStructureSketchSvg } from '../../shared/diagram/control-structure-sketch.builder';
+import { DiagramImage, captureIstarModelPng, rasterizeSvgToPng } from '../../shared/diagram/diagram-image.util';
+import { buildPistarModelFromStepTwoPayload } from '../../shared/diagram/pistar-model.builder';
 
 interface ArtifactDocumentSection {
   key: string;
@@ -14,12 +18,64 @@ interface ArtifactDocumentSection {
   markdown: string;
 }
 
-type RenderLineKind = 'h1' | 'h2' | 'h3' | 'bullet' | 'numbered' | 'paragraph' | 'blank';
+type DocBlockType = 'h1' | 'h2' | 'h3' | 'paragraph' | 'bullet' | 'numbered' | 'table' | 'image';
 
-interface RenderLine {
-  kind: RenderLineKind;
-  text: string;
+interface DocBlock {
+  type: DocBlockType;
+  text?: string;
+  tableHeaders?: string[];
+  tableRows?: string[][];
+  imageKey?: string;
 }
+
+interface PdfContext {
+  doc: any;
+  pageWidth: number;
+  pageHeight: number;
+  margin: number;
+  contentWidth: number;
+  topY: number;
+  bottomY: number;
+  y: number;
+  section: ArtifactDocumentSection;
+}
+
+/** Image placeholder tokens embedded in section markdown, resolved to PNGs at export time. */
+const ISTAR_MODEL_IMAGE_KEY = 'istar-model';
+const CONTROL_STRUCTURE_IMAGE_KEY = 'control-structure-sketch';
+const ISTAR_MODEL_IMAGE_TOKEN = `@@IMAGE:${ISTAR_MODEL_IMAGE_KEY}@@`;
+const CONTROL_STRUCTURE_IMAGE_TOKEN = `@@IMAGE:${CONTROL_STRUCTURE_IMAGE_KEY}@@`;
+const IMAGE_TOKEN_PATTERN = /^@@IMAGE:([a-z0-9-]+)@@$/i;
+
+/** Branding for the professional report template. */
+const REPORT_TITLE = 'ReSafety Safety Analysis Report';
+const REPORT_METHODOLOGY = 'iStar4Safety · STPA-Integrated Safety Documentation';
+const REPORT_ORGANIZATION = 'Federal University of Pernambuco — UFPE';
+
+/** Deep navy + slate palette (RGB tuples) used by the PDF exporter. */
+const PDF_COLORS = {
+  navy: [15, 23, 42] as [number, number, number],
+  navySoft: [30, 41, 59] as [number, number, number],
+  slate: [71, 85, 105] as [number, number, number],
+  slateSoft: [100, 116, 139] as [number, number, number],
+  mist: [226, 232, 240] as [number, number, number],
+  paper: [248, 250, 252] as [number, number, number],
+  white: [255, 255, 255] as [number, number, number],
+  accent: [37, 99, 235] as [number, number, number]
+};
+
+/** Matching palette (hex, no #) used by the DOCX exporter. */
+const DOCX_COLORS = {
+  navy: '0F172A',
+  navySoft: '1E293B',
+  slate: '475569',
+  slateSoft: '64748B',
+  mist: 'E2E8F0',
+  paper: 'F1F5F9',
+  accent: '2563EB',
+  text: '1F2933',
+  white: 'FFFFFF'
+};
 
 interface Step1Resource {
   id: number;
@@ -131,6 +187,7 @@ export class ResafetyArtifactsPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly projectService = inject(ProjectService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly authService = inject(AuthService);
 
   readonly embedded = input(false);
   readonly projectPayloadInput = input<Record<string, unknown> | null>(null);
@@ -235,50 +292,589 @@ export class ResafetyArtifactsPageComponent implements OnInit {
 
   async downloadPdf(section: ArtifactDocumentSection): Promise<void> {
     await this.runExport(`${section.key}-pdf`, async () => {
+      const exportSection = await this.prepareSectionForExport(section);
+      const images = await this.resolveSectionImages(exportSection);
+      const blocks = this.parseDocBlocks(exportSection.markdown);
+
       const module = await import('jspdf');
       const { jsPDF } = module;
       const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 48;
-      const lineHeight = 15;
-      let y = margin;
+      const margin = 52;
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text(section.title, margin, y);
-      y += 24;
+      const meta = this.buildReportMeta();
+      this.drawPdfCover(doc, pageWidth, pageHeight, margin, exportSection, meta);
 
-      const renderedLines = this.renderMarkdownToLines(section.markdown);
+      const context: PdfContext = {
+        doc,
+        pageWidth,
+        pageHeight,
+        margin,
+        contentWidth: pageWidth - margin * 2,
+        topY: margin + 26,
+        bottomY: pageHeight - margin - 18,
+        y: margin + 26,
+        section: exportSection
+      };
 
-      for (const renderedLine of renderedLines) {
-        if (renderedLine.kind === 'blank') {
-          y += lineHeight * 0.5;
-          continue;
-        }
+      this.startPdfContentPage(context);
 
-        const style = this.getPdfLineStyle(renderedLine.kind);
-        const indent = renderedLine.kind === 'bullet' || renderedLine.kind === 'numbered' ? 16 : 0;
-        const content = renderedLine.kind === 'bullet' ? `• ${renderedLine.text}` : renderedLine.text;
-        const wrappedLines = doc.splitTextToSize(content, pageWidth - margin * 2 - indent) as string[];
-
-        doc.setFont('helvetica', style.bold ? 'bold' : 'normal');
-        doc.setFontSize(style.size);
-
-        for (const wrappedLine of wrappedLines) {
-          if (y > pageHeight - margin) {
-            doc.addPage();
-            y = margin;
-          }
-          doc.text(wrappedLine, margin + indent, y);
-          y += style.lineHeight;
-        }
-
-        y += style.afterSpacing;
+      for (const block of blocks) {
+        this.renderPdfBlock(context, block, images);
       }
 
-      doc.save(`${section.fileBaseName}.pdf`);
+      this.drawPdfFooters(doc, pageWidth, pageHeight, margin, meta);
+
+      doc.save(`${exportSection.fileBaseName}.pdf`);
     });
+  }
+
+  private buildReportMeta(): { author: string; generatedAt: string; projectName: string } {
+    const author = (this.authService.getCurrentUsername() ?? '').trim() || 'ReSafety Analyst';
+    const projectName = (this.projectNameInput() ?? '').trim() || this.projectName();
+    return {
+      author,
+      generatedAt: this.formatExportDate(new Date()),
+      projectName: projectName || 'Untitled project'
+    };
+  }
+
+  private formatExportDate(date: Date): string {
+    try {
+      return new Intl.DateTimeFormat('en-GB', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(date);
+    } catch {
+      return date.toISOString();
+    }
+  }
+
+  private drawPdfCover(
+    doc: any,
+    pageWidth: number,
+    pageHeight: number,
+    margin: number,
+    section: ArtifactDocumentSection,
+    meta: { author: string; generatedAt: string; projectName: string }
+  ): void {
+    const bandHeight = 196;
+
+    // Navy header band.
+    doc.setFillColor(...PDF_COLORS.navy);
+    doc.rect(0, 0, pageWidth, bandHeight, 'F');
+    doc.setFillColor(...PDF_COLORS.navySoft);
+    doc.rect(0, bandHeight - 8, pageWidth, 8, 'F');
+    doc.setFillColor(...PDF_COLORS.accent);
+    doc.rect(0, bandHeight, pageWidth, 4, 'F');
+
+    doc.setTextColor(...PDF_COLORS.mist);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(REPORT_ORGANIZATION.toUpperCase(), margin, 56);
+
+    doc.setTextColor(...PDF_COLORS.white);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(30);
+    const titleLines = doc.splitTextToSize(REPORT_TITLE, pageWidth - margin * 2) as string[];
+    let titleY = 102;
+    for (const line of titleLines) {
+      doc.text(line, margin, titleY);
+      titleY += 34;
+    }
+
+    doc.setTextColor(...PDF_COLORS.mist);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text(REPORT_METHODOLOGY, margin, Math.min(titleY + 4, bandHeight - 26));
+
+    // Section identity.
+    let y = bandHeight + 64;
+    doc.setTextColor(...PDF_COLORS.slateSoft);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('REPORT SECTION', margin, y);
+
+    y += 26;
+    doc.setTextColor(...PDF_COLORS.navy);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    const sectionLines = doc.splitTextToSize(section.title, pageWidth - margin * 2) as string[];
+    for (const line of sectionLines) {
+      doc.text(line, margin, y);
+      y += 28;
+    }
+
+    y += 4;
+    doc.setTextColor(...PDF_COLORS.slate);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    const descriptionLines = doc.splitTextToSize(section.description, pageWidth - margin * 2) as string[];
+    for (const line of descriptionLines) {
+      doc.text(line, margin, y);
+      y += 17;
+    }
+
+    // Metadata card.
+    const cardTop = Math.max(y + 28, pageHeight - 320);
+    const cardHeight = 196;
+    const cardWidth = pageWidth - margin * 2;
+    doc.setFillColor(...PDF_COLORS.paper);
+    doc.setDrawColor(...PDF_COLORS.mist);
+    doc.setLineWidth(1);
+    doc.roundedRect(margin, cardTop, cardWidth, cardHeight, 10, 10, 'FD');
+    doc.setFillColor(...PDF_COLORS.navy);
+    doc.roundedRect(margin, cardTop, 6, cardHeight, 3, 3, 'F');
+
+    const rows: Array<[string, string]> = [
+      ['Prepared by', meta.author],
+      ['Generated on', meta.generatedAt],
+      ['Project', meta.projectName],
+      ['Methodology', 'RESafety Process'],
+      ['Document ID', section.fileBaseName]
+    ];
+
+    const labelX = margin + 28;
+    const valueX = margin + 168;
+    let rowY = cardTop + 34;
+    for (const [label, value] of rows) {
+      doc.setTextColor(...PDF_COLORS.slateSoft);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text(label.toUpperCase(), labelX, rowY);
+
+      doc.setTextColor(...PDF_COLORS.navySoft);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      const valueLines = doc.splitTextToSize(value, cardWidth - (valueX - margin) - 24) as string[];
+      doc.text(valueLines[0] ?? '-', valueX, rowY);
+      rowY += 30;
+    }
+
+    doc.setTextColor(...PDF_COLORS.slateSoft);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.text(
+      'Generated automatically by the ReSafety platform. Review against the source models before distribution.',
+      pageWidth / 2,
+      pageHeight - margin + 6,
+      { align: 'center' }
+    );
+  }
+
+  private drawPdfHeader(context: PdfContext): void {
+    const { doc, pageWidth, margin } = context;
+    const headerY = margin - 18;
+
+    doc.setTextColor(...PDF_COLORS.slateSoft);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.text(REPORT_TITLE.toUpperCase(), margin, headerY);
+
+    const sectionLabel = context.section.title;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...PDF_COLORS.slate);
+    doc.text(sectionLabel, pageWidth - margin, headerY, { align: 'right' });
+
+    doc.setDrawColor(...PDF_COLORS.mist);
+    doc.setLineWidth(0.8);
+    doc.line(margin, headerY + 6, pageWidth - margin, headerY + 6);
+  }
+
+  private drawPdfFooters(
+    doc: any,
+    pageWidth: number,
+    pageHeight: number,
+    margin: number,
+    meta: { author: string; generatedAt: string; projectName: string }
+  ): void {
+    const totalPages = doc.getNumberOfPages();
+    const contentPages = totalPages - 1;
+    const footerY = pageHeight - margin + 10;
+
+    for (let page = 2; page <= totalPages; page += 1) {
+      doc.setPage(page);
+
+      doc.setDrawColor(...PDF_COLORS.mist);
+      doc.setLineWidth(0.8);
+      doc.line(margin, footerY - 12, pageWidth - margin, footerY - 12);
+
+      doc.setTextColor(...PDF_COLORS.slateSoft);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text(REPORT_ORGANIZATION, margin, footerY);
+      doc.text(`Page ${page - 1} of ${contentPages}`, pageWidth / 2, footerY, { align: 'center' });
+      doc.text(meta.generatedAt, pageWidth - margin, footerY, { align: 'right' });
+    }
+  }
+
+  private startPdfContentPage(context: PdfContext): void {
+    context.doc.addPage();
+    this.drawPdfHeader(context);
+    context.y = context.topY;
+  }
+
+  private ensurePdfSpace(context: PdfContext, needed: number): void {
+    if (context.y + needed > context.bottomY) {
+      this.startPdfContentPage(context);
+    }
+  }
+
+  private renderPdfBlock(context: PdfContext, block: DocBlock, images: Map<string, DiagramImage>): void {
+    switch (block.type) {
+      case 'h1':
+        this.renderPdfHeading(context, block.text ?? '', 17, 14, true);
+        break;
+      case 'h2':
+        this.renderPdfBandHeading(context, block.text ?? '');
+        break;
+      case 'h3':
+        this.renderPdfHeading(context, block.text ?? '', 12.5, 8, false);
+        break;
+      case 'bullet':
+        this.renderPdfListItem(context, block.text ?? '', '•');
+        break;
+      case 'numbered':
+        this.renderPdfListItem(context, block.text ?? '', null);
+        break;
+      case 'table':
+        this.renderPdfTable(context, block.tableHeaders ?? [], block.tableRows ?? []);
+        break;
+      case 'image':
+        this.renderPdfImage(context, images.get(block.imageKey ?? ''));
+        break;
+      default:
+        this.renderPdfParagraph(context, block.text ?? '');
+    }
+  }
+
+  private renderPdfHeading(context: PdfContext, text: string, size: number, gapAfter: number, underline: boolean): void {
+    const { doc, contentWidth, margin } = context;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(text, contentWidth) as string[];
+    const lineHeight = size + 4;
+
+    this.ensurePdfSpace(context, lineHeight * lines.length + gapAfter + 6);
+    context.y += 8;
+    doc.setTextColor(...PDF_COLORS.navy);
+
+    for (const line of lines) {
+      doc.text(line, margin, context.y);
+      context.y += lineHeight;
+    }
+
+    if (underline) {
+      doc.setDrawColor(...PDF_COLORS.accent);
+      doc.setLineWidth(1.4);
+      doc.line(margin, context.y - lineHeight + 6, margin + 60, context.y - lineHeight + 6);
+    }
+
+    context.y += gapAfter;
+  }
+
+  private renderPdfBandHeading(context: PdfContext, text: string): void {
+    const { doc, contentWidth, margin } = context;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13.5);
+    const lines = doc.splitTextToSize(text, contentWidth - 28) as string[];
+    const lineHeight = 17;
+    const bandHeight = lineHeight * lines.length + 16;
+
+    this.ensurePdfSpace(context, bandHeight + 14);
+    context.y += 10;
+
+    doc.setFillColor(...PDF_COLORS.paper);
+    doc.setDrawColor(...PDF_COLORS.mist);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(margin, context.y, contentWidth, bandHeight, 6, 6, 'FD');
+    doc.setFillColor(...PDF_COLORS.navy);
+    doc.rect(margin, context.y, 5, bandHeight, 'F');
+
+    doc.setTextColor(...PDF_COLORS.navy);
+    let textY = context.y + 20;
+    for (const line of lines) {
+      doc.text(line, margin + 18, textY);
+      textY += lineHeight;
+    }
+
+    context.y += bandHeight + 12;
+  }
+
+  private renderPdfParagraph(context: PdfContext, text: string): void {
+    if (!text.trim()) {
+      context.y += 4;
+      return;
+    }
+
+    const { doc, contentWidth, margin } = context;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(...PDF_COLORS.navySoft);
+    const lines = doc.splitTextToSize(text, contentWidth) as string[];
+
+    for (const line of lines) {
+      this.ensurePdfSpace(context, 16);
+      doc.text(line, margin, context.y);
+      context.y += 15;
+    }
+
+    context.y += 4;
+  }
+
+  private renderPdfListItem(context: PdfContext, text: string, bulletGlyph: string | null): void {
+    const { doc, contentWidth, margin } = context;
+    const indent = 18;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    const lines = doc.splitTextToSize(text, contentWidth - indent) as string[];
+
+    lines.forEach((line, index) => {
+      this.ensurePdfSpace(context, 16);
+      if (index === 0 && bulletGlyph) {
+        doc.setTextColor(...PDF_COLORS.accent);
+        doc.text(bulletGlyph, margin + 4, context.y);
+      }
+      doc.setTextColor(...PDF_COLORS.navySoft);
+      doc.text(line, margin + indent, context.y);
+      context.y += 15;
+    });
+
+    context.y += 3;
+  }
+
+  private renderPdfTable(context: PdfContext, headers: string[], rows: string[][]): void {
+    if (!headers.length) {
+      return;
+    }
+
+    const { doc, contentWidth, margin } = context;
+    const columnWidths = this.computePdfColumnWidths(doc, headers, rows, contentWidth);
+    const cellPadding = 6;
+    const headerFontSize = 9.5;
+    const bodyFontSize = 9.5;
+    const lineHeight = 12;
+
+    context.y += 10;
+
+    const drawHeaderRow = () => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(headerFontSize);
+      const wrapped = headers.map((header, index) =>
+        doc.splitTextToSize(header, columnWidths[index] - cellPadding * 2) as string[]
+      );
+      const rowHeight = Math.max(...wrapped.map((cell) => cell.length)) * lineHeight + cellPadding * 2;
+
+      doc.setFillColor(...PDF_COLORS.navy);
+      doc.rect(margin, context.y, contentWidth, rowHeight, 'F');
+
+      doc.setTextColor(...PDF_COLORS.white);
+      let cellX = margin;
+      wrapped.forEach((cell, index) => {
+        let textY = context.y + cellPadding + lineHeight - 3;
+        for (const line of cell) {
+          doc.text(line, cellX + cellPadding, textY);
+          textY += lineHeight;
+        }
+        cellX += columnWidths[index];
+      });
+
+      context.y += rowHeight;
+    };
+
+    this.ensurePdfSpace(context, 60);
+    drawHeaderRow();
+
+    const dataRows = rows.length ? rows : [headers.map(() => '-')];
+
+    dataRows.forEach((row, rowIndex) => {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(bodyFontSize);
+      const wrapped = headers.map((_, index) =>
+        doc.splitTextToSize((row[index] ?? '-') || '-', columnWidths[index] - cellPadding * 2) as string[]
+      );
+      const rowHeight = Math.max(...wrapped.map((cell) => cell.length)) * lineHeight + cellPadding * 2;
+
+      if (context.y + rowHeight > context.bottomY) {
+        this.startPdfContentPage(context);
+        context.y += 10;
+        drawHeaderRow();
+      }
+
+      doc.setFillColor(...(rowIndex % 2 === 0 ? PDF_COLORS.white : PDF_COLORS.paper));
+      doc.rect(margin, context.y, contentWidth, rowHeight, 'F');
+
+      doc.setDrawColor(...PDF_COLORS.mist);
+      doc.setLineWidth(0.6);
+      doc.line(margin, context.y + rowHeight, margin + contentWidth, context.y + rowHeight);
+
+      doc.setTextColor(...PDF_COLORS.navySoft);
+      let cellX = margin;
+      wrapped.forEach((cell, index) => {
+        let textY = context.y + cellPadding + lineHeight - 3;
+        for (const line of cell) {
+          doc.text(line, cellX + cellPadding, textY);
+          textY += lineHeight;
+        }
+        cellX += columnWidths[index];
+      });
+
+      context.y += rowHeight;
+    });
+
+    // Outer border.
+    doc.setDrawColor(...PDF_COLORS.slate);
+    doc.setLineWidth(0.9);
+    doc.rect(margin, context.y, contentWidth, 0, 'S');
+
+    context.y += 12;
+  }
+
+  private computePdfColumnWidths(doc: any, headers: string[], rows: string[][], totalWidth: number): number[] {
+    const sampleRows = rows.slice(0, 40);
+    const weights = headers.map((header, index) => {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9.5);
+      let maxWidth = doc.getTextWidth(header);
+      doc.setFont('helvetica', 'normal');
+      for (const row of sampleRows) {
+        const value = (row[index] ?? '').toString();
+        const sample = value.length > 80 ? value.slice(0, 80) : value;
+        maxWidth = Math.max(maxWidth, doc.getTextWidth(sample));
+      }
+      return Math.min(Math.max(maxWidth + 16, 48), 280);
+    });
+
+    const weightSum = weights.reduce((sum, value) => sum + value, 0) || 1;
+    return weights.map((weight) => (weight / weightSum) * totalWidth);
+  }
+
+  private renderPdfImage(context: PdfContext, image: DiagramImage | undefined): void {
+    const { doc, contentWidth, margin } = context;
+
+    if (!image) {
+      this.renderPdfParagraph(
+        context,
+        'Diagram preview is unavailable for this export. Open the model in the editor to capture the latest view.'
+      );
+      return;
+    }
+
+    const aspect = image.height / image.width;
+    let drawWidth = contentWidth;
+    let drawHeight = drawWidth * aspect;
+    const maxHeight = context.bottomY - context.topY - 24;
+
+    if (drawHeight > maxHeight) {
+      drawHeight = maxHeight;
+      drawWidth = drawHeight / aspect;
+    }
+
+    const framePadding = 10;
+    const frameHeight = drawHeight + framePadding * 2;
+
+    if (context.y + frameHeight > context.bottomY) {
+      this.startPdfContentPage(context);
+    }
+
+    context.y += 8;
+    const frameX = margin + (contentWidth - drawWidth) / 2 - framePadding;
+    const imageX = margin + (contentWidth - drawWidth) / 2;
+
+    doc.setFillColor(...PDF_COLORS.white);
+    doc.setDrawColor(...PDF_COLORS.mist);
+    doc.setLineWidth(0.9);
+    doc.roundedRect(frameX, context.y, drawWidth + framePadding * 2, frameHeight, 6, 6, 'FD');
+
+    doc.addImage(image.dataUrl, 'PNG', imageX, context.y + framePadding, drawWidth, drawHeight, undefined, 'FAST');
+
+    context.y += frameHeight + 12;
+  }
+
+  private parseDocBlocks(markdown: string): DocBlock[] {
+    const lines = markdown.split('\n');
+    const blocks: DocBlock[] = [];
+
+    let index = 0;
+    while (index < lines.length) {
+      const rawLine = lines[index];
+      const currentLine = rawLine.trim();
+
+      if (!currentLine) {
+        index += 1;
+        continue;
+      }
+
+      if (currentLine.startsWith('|')) {
+        const tableLines: string[] = [];
+        while (index < lines.length && lines[index].trim().startsWith('|')) {
+          tableLines.push(lines[index]);
+          index += 1;
+        }
+        const table = this.toDocTableBlock(tableLines);
+        if (table) {
+          blocks.push(table);
+        }
+        continue;
+      }
+
+      const imageMatch = currentLine.match(IMAGE_TOKEN_PATTERN);
+      if (imageMatch) {
+        blocks.push({ type: 'image', imageKey: imageMatch[1].toLowerCase() });
+        index += 1;
+        continue;
+      }
+
+      const headingMatch = currentLine.match(/^(#{1,6})\s+(.+)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        blocks.push({ type: level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3', text: headingMatch[2].trim() });
+        index += 1;
+        continue;
+      }
+
+      const bulletMatch = currentLine.match(/^-\s+(.+)$/);
+      if (bulletMatch) {
+        blocks.push({ type: 'bullet', text: bulletMatch[1].trim() });
+        index += 1;
+        continue;
+      }
+
+      const numberedMatch = currentLine.match(/^(\d+\.)\s+(.+)$/);
+      if (numberedMatch) {
+        blocks.push({ type: 'numbered', text: `${numberedMatch[1]} ${numberedMatch[2].trim()}` });
+        index += 1;
+        continue;
+      }
+
+      blocks.push({ type: 'paragraph', text: currentLine });
+      index += 1;
+    }
+
+    return blocks;
+  }
+
+  private toDocTableBlock(tableLines: string[]): DocBlock | null {
+    if (!tableLines.length) {
+      return null;
+    }
+
+    const rows = tableLines.map((line) => this.parseMarkdownTableRow(line));
+    if (!rows.length) {
+      return null;
+    }
+
+    const headers = rows[0];
+    const hasSeparator =
+      rows.length > 1 && rows[1].every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, '')));
+    const dataRows = rows.slice(hasSeparator ? 2 : 1).map((row) => headers.map((_, index) => row[index] ?? ''));
+
+    return { type: 'table', tableHeaders: headers, tableRows: dataRows };
   }
 
   async downloadDocx(section: ArtifactDocumentSection): Promise<void> {
@@ -287,54 +883,201 @@ export class ResafetyArtifactsPageComponent implements OnInit {
         throw new Error('DOCX export is only available in the browser runtime.');
       }
 
+      const exportSection = await this.prepareSectionForExport(section);
+      const images = await this.resolveSectionImages(exportSection);
+      const meta = this.buildReportMeta();
+
       const [{ marked }, docxModule] = await Promise.all([import('marked'), import('docx')]);
-      const { AlignmentType, Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } =
-        docxModule;
-      const htmlContent = await marked.parse(section.markdown);
+      const docx = docxModule;
+      const { Document, Packer } = docxModule;
+
+      const htmlContent = await marked.parse(exportSection.markdown);
       const parser = new DOMParser();
       const htmlDocument = parser.parseFromString(`<div>${htmlContent}</div>`, 'text/html');
       const container = htmlDocument.body.firstElementChild;
-      const children = this.buildDocxChildrenFromHtml(
-        container,
-        {
-          AlignmentType,
-          HeadingLevel,
-          Paragraph,
-          Table,
-          TableCell,
-          TableRow,
-          TextRun,
-          WidthType
-        }
-      );
+
+      const coverChildren = this.buildDocxCover(docx, exportSection, meta);
+      const contentChildren = this.buildDocxChildrenFromHtml(container, docx, images);
 
       const doc = new Document({
         sections: [
           {
             properties: {
               page: {
-                margin: {
-                  top: 1440,
-                  right: 1440,
-                  bottom: 1440,
-                  left: 1440
-                }
+                margin: { top: 1134, right: 1134, bottom: 1134, left: 1134 }
               }
             },
-            children: children as any
+            children: coverChildren as any
+          },
+          {
+            properties: {
+              page: {
+                margin: { top: 1440, right: 1134, bottom: 1276, left: 1134 },
+                pageNumbers: { start: 1 }
+              }
+            },
+            headers: { default: this.buildDocxHeader(docx, exportSection) },
+            footers: { default: this.buildDocxFooter(docx, meta) },
+            children: contentChildren as any
           }
         ]
       });
 
       const blob = await Packer.toBlob(doc);
-      this.saveBlob(blob, `${section.fileBaseName}.docx`);
+      this.saveBlob(blob, `${exportSection.fileBaseName}.docx`);
     });
   }
 
-  private buildDocxChildrenFromHtml(
-    container: Element | null,
-    docx: any
+  private buildDocxCover(
+    docx: any,
+    section: ArtifactDocumentSection,
+    meta: { author: string; generatedAt: string; projectName: string }
   ): any[] {
+    const { AlignmentType, BorderStyle, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } = docx;
+
+    const metadataRows: Array<[string, string]> = [
+      ['Prepared by', meta.author],
+      ['Generated on', meta.generatedAt],
+      ['Project', meta.projectName],
+      ['Methodology', 'RESafety Process'],
+      ['Document ID', section.fileBaseName]
+    ];
+
+    const metadataTable = new Table({
+      width: { size: 100, type: WidthType['PERCENTAGE'] },
+      borders: {
+        top: { style: BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+        bottom: { style: BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+        left: { style: BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+        right: { style: BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+        insideHorizontal: { style: BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+        insideVertical: { style: BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist }
+      },
+      rows: metadataRows.map(
+        ([label, value]) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 32, type: WidthType['PERCENTAGE'] },
+                shading: { fill: DOCX_COLORS.paper },
+                margins: { top: 90, bottom: 90, left: 140, right: 120 },
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: label.toUpperCase(),
+                        bold: true,
+                        size: 18,
+                        font: 'Arial',
+                        color: DOCX_COLORS.slateSoft
+                      })
+                    ]
+                  })
+                ]
+              }),
+              new TableCell({
+                width: { size: 68, type: WidthType['PERCENTAGE'] },
+                margins: { top: 90, bottom: 90, left: 140, right: 140 },
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: value, size: 22, font: 'Arial', color: DOCX_COLORS.navySoft })]
+                  })
+                ]
+              })
+            ]
+          })
+      )
+    });
+
+    return [
+      new Paragraph({
+        spacing: { before: 480, after: 60 },
+        children: [
+          new TextRun({ text: REPORT_ORGANIZATION.toUpperCase(), bold: true, size: 20, font: 'Arial', color: DOCX_COLORS.slate })
+        ]
+      }),
+      new Paragraph({
+        spacing: { before: 60, after: 60 },
+        children: [new TextRun({ text: REPORT_TITLE, bold: true, size: 56, font: 'Arial', color: DOCX_COLORS.navy })]
+      }),
+      new Paragraph({
+        spacing: { before: 40, after: 220 },
+        border: { bottom: { style: BorderStyle['SINGLE'], size: 18, color: DOCX_COLORS.accent, space: 6 } },
+        children: [new TextRun({ text: REPORT_METHODOLOGY, size: 24, font: 'Arial', color: DOCX_COLORS.slate })]
+      }),
+      new Paragraph({
+        spacing: { before: 600, after: 80 },
+        children: [
+          new TextRun({ text: 'REPORT SECTION', bold: true, size: 20, font: 'Arial', color: DOCX_COLORS.slateSoft })
+        ]
+      }),
+      new Paragraph({
+        spacing: { before: 40, after: 80 },
+        children: [new TextRun({ text: section.title, bold: true, size: 40, font: 'Arial', color: DOCX_COLORS.navy })]
+      }),
+      new Paragraph({
+        spacing: { before: 20, after: 360 },
+        children: [new TextRun({ text: section.description, size: 24, font: 'Arial', color: DOCX_COLORS.slate })]
+      }),
+      metadataTable,
+      new Paragraph({
+        spacing: { before: 360 },
+        alignment: AlignmentType['CENTER'],
+        children: [
+          new TextRun({
+            text: 'Generated automatically by the ReSafety platform. Review against the source models before distribution.',
+            italics: true,
+            size: 17,
+            font: 'Arial',
+            color: DOCX_COLORS.slateSoft
+          })
+        ]
+      })
+    ];
+  }
+
+  private buildDocxHeader(docx: any, section: ArtifactDocumentSection): any {
+    const { AlignmentType, BorderStyle, Header, Paragraph, TabStopType, TextRun } = docx;
+    return new Header({
+      children: [
+        new Paragraph({
+          tabStops: [{ type: TabStopType['RIGHT'], position: 9072 }],
+          border: { bottom: { style: BorderStyle['SINGLE'], size: 6, color: DOCX_COLORS.mist, space: 4 } },
+          children: [
+            new TextRun({ text: REPORT_TITLE.toUpperCase(), bold: true, size: 15, font: 'Arial', color: DOCX_COLORS.slateSoft }),
+            new TextRun({ text: '\t' }),
+            new TextRun({ text: section.title, size: 15, font: 'Arial', color: DOCX_COLORS.slate })
+          ],
+          alignment: AlignmentType['LEFT']
+        })
+      ]
+    });
+  }
+
+  private buildDocxFooter(docx: any, meta: { author: string; generatedAt: string; projectName: string }): any {
+    const { BorderStyle, Footer, PageNumber, Paragraph, TabStopType, TextRun } = docx;
+    return new Footer({
+      children: [
+        new Paragraph({
+          tabStops: [
+            { type: TabStopType['CENTER'], position: 4536 },
+            { type: TabStopType['RIGHT'], position: 9072 }
+          ],
+          border: { top: { style: BorderStyle['SINGLE'], size: 6, color: DOCX_COLORS.mist, space: 4 } },
+          children: [
+            new TextRun({ text: REPORT_ORGANIZATION, size: 15, font: 'Arial', color: DOCX_COLORS.slateSoft }),
+            new TextRun({ text: '\t' }),
+            new TextRun({ text: 'Page ', size: 15, font: 'Arial', color: DOCX_COLORS.slateSoft }),
+            new TextRun({ children: [PageNumber['CURRENT']], size: 15, font: 'Arial', color: DOCX_COLORS.slateSoft }),
+            new TextRun({ text: '\t' }),
+            new TextRun({ text: meta.generatedAt, size: 15, font: 'Arial', color: DOCX_COLORS.slateSoft })
+          ]
+        })
+      ]
+    });
+  }
+
+  private buildDocxChildrenFromHtml(container: Element | null, docx: any, images: Map<string, DiagramImage>): any[] {
     if (!container) {
       return [this.createDocxParagraph(docx, 'No content available.', 'paragraph')];
     }
@@ -353,7 +1096,14 @@ export class ResafetyArtifactsPageComponent implements OnInit {
       }
 
       if (tag === 'p') {
-        blocks.push(this.createDocxParagraph(docx, element.textContent?.trim() ?? '', 'paragraph'));
+        const text = element.textContent?.trim() ?? '';
+        const imageMatch = text.match(IMAGE_TOKEN_PATTERN);
+        if (imageMatch) {
+          const image = images.get(imageMatch[1].toLowerCase());
+          blocks.push(...this.buildDocxImageBlocks(docx, image));
+          continue;
+        }
+        blocks.push(this.createDocxParagraph(docx, text, 'paragraph'));
         continue;
       }
 
@@ -381,25 +1131,38 @@ export class ResafetyArtifactsPageComponent implements OnInit {
                     new docx.TextRun({
                       text: cell.textContent?.trim() ?? '',
                       bold: rowIndex === 0,
-                      size: 22,
+                      size: 20,
                       font: 'Arial',
-                      color: rowIndex === 0 ? '2F2A24' : '333333'
+                      color: rowIndex === 0 ? DOCX_COLORS.white : DOCX_COLORS.text
                     })
                   ],
                   spacing: { before: 20, after: 20 }
                 })
               ],
-              shading: rowIndex === 0 ? { fill: 'EFE7DD' } : undefined,
-              margins: { top: 90, bottom: 90, left: 110, right: 110 }
+              shading:
+                rowIndex === 0
+                  ? { fill: DOCX_COLORS.navy }
+                  : rowIndex % 2 === 0
+                    ? { fill: DOCX_COLORS.paper }
+                    : undefined,
+              margins: { top: 80, bottom: 80, left: 110, right: 110 }
             })
           );
 
-          return new docx.TableRow({ children: cells });
+          return new docx.TableRow({ children: cells, tableHeader: rowIndex === 0 });
         });
 
         blocks.push(
           new docx.Table({
             width: { size: 100, type: docx.WidthType['PERCENTAGE'] },
+            borders: {
+              top: { style: docx.BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+              bottom: { style: docx.BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+              left: { style: docx.BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+              right: { style: docx.BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+              insideHorizontal: { style: docx.BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist },
+              insideVertical: { style: docx.BorderStyle['SINGLE'], size: 4, color: DOCX_COLORS.mist }
+            },
             rows: tableRows,
             margins: { top: 40, bottom: 120, left: 0, right: 0 }
           })
@@ -413,6 +1176,51 @@ export class ResafetyArtifactsPageComponent implements OnInit {
     return blocks;
   }
 
+  private buildDocxImageBlocks(docx: any, image: DiagramImage | undefined): any[] {
+    const { AlignmentType, ImageRun, Paragraph, TextRun } = docx;
+
+    if (!image) {
+      return [
+        new Paragraph({
+          spacing: { before: 80, after: 120 },
+          children: [
+            new TextRun({
+              text: 'Diagram preview is unavailable for this export. Open the model in the editor to capture the latest view.',
+              italics: true,
+              size: 20,
+              font: 'Arial',
+              color: DOCX_COLORS.slateSoft
+            })
+          ]
+        })
+      ];
+    }
+
+    const maxWidth = 600;
+    const maxHeight = 760;
+    const aspect = image.height / image.width;
+    let width = Math.min(maxWidth, image.width);
+    let height = width * aspect;
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height / aspect;
+    }
+
+    return [
+      new Paragraph({
+        spacing: { before: 160, after: 200 },
+        alignment: AlignmentType['CENTER'],
+        children: [
+          new ImageRun({
+            type: 'png',
+            data: this.dataUrlToUint8Array(image.dataUrl),
+            transformation: { width: Math.round(width), height: Math.round(height) }
+          })
+        ]
+      })
+    ];
+  }
+
   private createDocxParagraph(
     docx: any,
     text: string,
@@ -423,10 +1231,10 @@ export class ResafetyArtifactsPageComponent implements OnInit {
     if (kind === 'h1') {
       return new docx.Paragraph({
         heading: docx.HeadingLevel['HEADING_1'],
-        children: [new docx.TextRun({ text: safeText, bold: true, size: 42, font: 'Arial', color: '2E241A' })],
-        spacing: { before: 120, after: 260 },
+        children: [new docx.TextRun({ text: safeText, bold: true, size: 36, font: 'Arial', color: DOCX_COLORS.navy })],
+        spacing: { before: 160, after: 220 },
         border: {
-          bottom: { color: 'C6B8A6', space: 1, size: 6 }
+          bottom: { color: DOCX_COLORS.accent, space: 4, size: 12, style: docx.BorderStyle['SINGLE'] }
         }
       });
     }
@@ -434,24 +1242,25 @@ export class ResafetyArtifactsPageComponent implements OnInit {
     if (kind === 'h2') {
       return new docx.Paragraph({
         heading: docx.HeadingLevel['HEADING_2'],
-        children: [new docx.TextRun({ text: safeText, bold: true, size: 30, font: 'Arial', color: '2F2A24' })],
+        children: [new docx.TextRun({ text: safeText, bold: true, size: 28, font: 'Arial', color: DOCX_COLORS.navy })],
         spacing: { before: 260, after: 140 },
-        shading: { fill: 'EFE7DD' },
-        indent: { left: 90, right: 90 }
+        shading: { fill: DOCX_COLORS.paper },
+        border: { left: { color: DOCX_COLORS.navy, space: 8, size: 18, style: docx.BorderStyle['SINGLE'] } },
+        indent: { left: 120, right: 90 }
       });
     }
 
     if (kind === 'h3') {
       return new docx.Paragraph({
         heading: docx.HeadingLevel['HEADING_3'],
-        children: [new docx.TextRun({ text: safeText, bold: true, size: 25, font: 'Arial', color: '3F372F' })],
+        children: [new docx.TextRun({ text: safeText, bold: true, size: 24, font: 'Arial', color: DOCX_COLORS.navySoft })],
         spacing: { before: 180, after: 80 }
       });
     }
 
     if (kind === 'bullet') {
       return new docx.Paragraph({
-        children: [new docx.TextRun({ text: safeText, size: 22, font: 'Arial', color: '333333' })],
+        children: [new docx.TextRun({ text: safeText, size: 22, font: 'Arial', color: DOCX_COLORS.text })],
         bullet: { level: 0 },
         spacing: { before: 30, after: 50 }
       });
@@ -459,7 +1268,7 @@ export class ResafetyArtifactsPageComponent implements OnInit {
 
     if (kind === 'numbered') {
       return new docx.Paragraph({
-        children: [new docx.TextRun({ text: safeText, size: 22, font: 'Arial', color: '333333' })],
+        children: [new docx.TextRun({ text: safeText, size: 22, font: 'Arial', color: DOCX_COLORS.text })],
         spacing: { before: 30, after: 50 },
         indent: { left: 180 },
         alignment: docx.AlignmentType['LEFT']
@@ -467,7 +1276,7 @@ export class ResafetyArtifactsPageComponent implements OnInit {
     }
 
     return new docx.Paragraph({
-      children: [new docx.TextRun({ text: safeText, size: 22, font: 'Arial', color: '333333' })],
+      children: [new docx.TextRun({ text: safeText, size: 22, font: 'Arial', color: DOCX_COLORS.text })],
       spacing: { before: 30, after: 100 }
     });
   }
@@ -502,7 +1311,7 @@ export class ResafetyArtifactsPageComponent implements OnInit {
         title: '3. System Safety Control Structure',
         description: 'Controllers, controlled processes, and control actions.',
         fileBaseName: `${projectSlug}-03-system-safety-control-structure`,
-        markdown: this.buildControlStructureDocument(controlStructure)
+        markdown: this.buildControlStructureDocument(controlStructure, scope)
       },
       {
         key: '04-ucas-hcs-controller-constraints',
@@ -643,115 +1452,9 @@ export class ResafetyArtifactsPageComponent implements OnInit {
     };
   }
 
-  private renderMarkdownToLines(markdown: string): RenderLine[] {
-    const lines = markdown.split('\n');
-    const rendered: RenderLine[] = [];
-
-    let index = 0;
-    while (index < lines.length) {
-      const currentLine = lines[index].trim();
-
-      if (!currentLine) {
-        rendered.push({ kind: 'blank', text: '' });
-        index += 1;
-        continue;
-      }
-
-      if (currentLine.startsWith('|')) {
-        const tableLines: string[] = [];
-        while (index < lines.length && lines[index].trim().startsWith('|')) {
-          tableLines.push(lines[index]);
-          index += 1;
-        }
-        rendered.push(...this.renderMarkdownTable(tableLines));
-        continue;
-      }
-
-      const headingMatch = currentLine.match(/^(#{1,6})\s+(.+)$/);
-      if (headingMatch) {
-        const level = headingMatch[1].length;
-        const text = headingMatch[2].trim();
-        rendered.push({
-          kind: level === 1 ? 'h1' : level === 2 ? 'h2' : 'h3',
-          text
-        });
-        index += 1;
-        continue;
-      }
-
-      const bulletMatch = currentLine.match(/^-\s+(.+)$/);
-      if (bulletMatch) {
-        rendered.push({ kind: 'bullet', text: bulletMatch[1].trim() });
-        index += 1;
-        continue;
-      }
-
-      const numberedMatch = currentLine.match(/^(\d+\.)\s+(.+)$/);
-      if (numberedMatch) {
-        rendered.push({ kind: 'numbered', text: `${numberedMatch[1]} ${numberedMatch[2].trim()}` });
-        index += 1;
-        continue;
-      }
-
-      rendered.push({ kind: 'paragraph', text: currentLine });
-      index += 1;
-    }
-
-    return rendered;
-  }
-
-  private renderMarkdownTable(tableLines: string[]): RenderLine[] {
-    if (!tableLines.length) {
-      return [];
-    }
-
-    const rows = tableLines.map((line) => this.parseMarkdownTableRow(line));
-    if (!rows.length) {
-      return [];
-    }
-
-    const headers = rows[0];
-    const hasSeparator =
-      rows.length > 1 && rows[1].every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, '')));
-    const dataRows = rows.slice(hasSeparator ? 2 : 1);
-
-    const rendered: RenderLine[] = [];
-    rendered.push({ kind: 'h3', text: headers.join(' | ') });
-
-    if (!dataRows.length) {
-      rendered.push({ kind: 'paragraph', text: 'No entries informed.' });
-      return rendered;
-    }
-
-    for (const row of dataRows) {
-      const rowText = headers
-        .map((header, idx) => `${header}: ${row[idx] && row[idx].trim() ? row[idx].trim() : '-'}`)
-        .join(' | ');
-      rendered.push({ kind: 'bullet', text: rowText });
-    }
-
-    return rendered;
-  }
-
   private parseMarkdownTableRow(line: string): string[] {
     const trimmed = line.trim().replace(/^\|/, '').replace(/\|$/, '');
     return trimmed.split('|').map((cell) => cell.replace(/\\\|/g, '|').trim());
-  }
-
-  private getPdfLineStyle(kind: RenderLineKind): { size: number; bold: boolean; lineHeight: number; afterSpacing: number } {
-    if (kind === 'h1') {
-      return { size: 15, bold: true, lineHeight: 18, afterSpacing: 6 };
-    }
-
-    if (kind === 'h2') {
-      return { size: 13, bold: true, lineHeight: 16, afterSpacing: 4 };
-    }
-
-    if (kind === 'h3') {
-      return { size: 12, bold: true, lineHeight: 15, afterSpacing: 2 };
-    }
-
-    return { size: 11, bold: false, lineHeight: 14, afterSpacing: 1 };
   }
 
   private normalizeStep1Resource(resource: unknown, index: number): Step1Resource {
@@ -942,12 +1645,153 @@ export class ResafetyArtifactsPageComponent implements OnInit {
     };
   }
 
-  private normalizeStep3Data(step3: Record<string, unknown> | null): Step3Data {
+  private normalizeStep3Data(step3: Record<string, unknown> | null, step1Scope: Record<string, unknown> | null = null): Step3Data {
     const safeStep3 = step3 ?? {};
+    const currentData = this.pickFirstObject(safeStep3, ['currentData']) ?? {};
+    const availableInputs = this.pickFirstObject(safeStep3, ['availableInputs']) ?? {};
+    const step1 = this.normalizeStep1Data(step1Scope);
+
+    const stepThreeEntityCandidates = this.toObjectArray(this.pickFirstArray(availableInputs, ['entityCandidates']) ?? []);
+    const stepOneEntityCandidates = step1.systemComponents.map((component, index) => ({
+      id: `step1-component-${index + 1}`,
+      name: component.name,
+      label: component.name,
+      sourceType: 'systemComponent',
+      sourceStep: '1.1.5',
+      sourceRefId: String(component.id)
+    }));
+    const entityCandidateMap = new Map<string, Record<string, unknown>>();
+    for (const candidate of [...stepThreeEntityCandidates, ...stepOneEntityCandidates]) {
+      const candidateId = this.readObjectText(candidate, ['id'], '').trim();
+      if (candidateId) {
+        entityCandidateMap.set(candidateId, candidate);
+      }
+    }
+
+    const stepThreeResponsibilities = this.toObjectArray(this.pickFirstArray(availableInputs, ['responsibilities']) ?? []);
+    const stepOneResponsibilities = step1.componentResponsibilities.map((responsibility, index) => ({
+      id: `step1-responsibility-${index + 1}`,
+      text: responsibility.responsibility,
+      label: [responsibility.component, responsibility.responsibility].filter((item) => item.trim().length > 0).join(' - ')
+    }));
+    const responsibilityMap = new Map<string, string>();
+    for (const responsibility of [...stepThreeResponsibilities, ...stepOneResponsibilities]) {
+      const responsibilityId = this.readObjectText(responsibility, ['id'], '').trim();
+      if (!responsibilityId) {
+        continue;
+      }
+
+      const label = this.readObjectText(responsibility, ['label', 'text', 'responsibility', 'name'], '').trim();
+      responsibilityMap.set(responsibilityId, label || responsibilityId);
+    }
+
+    const externalSources = this.toObjectArray(this.pickFirstArray(availableInputs, ['externalSources']) ?? []);
+    const externalSourceMap = new Map<string, string>();
+    for (const source of externalSources) {
+      const sourceId = this.readObjectText(source, ['id'], '').trim();
+      const sourceLabel = this.readObjectText(source, ['label', 'name'], '').trim();
+      if (sourceId && sourceLabel) {
+        externalSourceMap.set(sourceId, sourceLabel);
+      }
+    }
+
+    const rawEntities = this.toObjectArray(
+      this.pickFirstArray(safeStep3, ['entities', 'controllers', 'controlledProcesses']) ??
+        this.pickFirstArray(currentData, ['entities']) ??
+        []
+    );
+
+    const entities = (rawEntities.length > 0
+      ? rawEntities.map((entity, index) => {
+          const entityId = this.readObjectText(entity, ['id'], '').trim() || `entity-${index + 1}`;
+          const candidateId = this.readObjectText(entity, ['entityCandidateId'], '').trim();
+          const candidate = candidateId ? entityCandidateMap.get(candidateId) ?? null : null;
+          const name =
+            this.readObjectText(entity, ['name', 'entityName', 'label'], '').trim() ||
+            this.readObjectText(candidate ?? {}, ['name', 'label'], '').trim() ||
+            entityId;
+
+          return {
+            ...entity,
+            id: entityId,
+            entityCandidateId: candidateId || entityId,
+            name
+          };
+        })
+      : stepOneEntityCandidates.map((candidate, index) => ({
+          id: this.readObjectText(candidate, ['id'], '').trim() || `entity-${index + 1}`,
+          entityCandidateId: this.readObjectText(candidate, ['id'], '').trim() || `entity-${index + 1}`,
+          name: this.readObjectText(candidate, ['name', 'label'], '').trim() || `Entity ${index + 1}`,
+          roles: []
+        }))) as Record<string, unknown>[];
+
+    const entityMap = new Map<string, Record<string, unknown>>();
+    for (const entity of entities) {
+      const entityId = this.readObjectText(entity, ['id'], '').trim();
+      if (entityId) {
+        entityMap.set(entityId, entity);
+      }
+    }
+
+    const controlActions = this.toObjectArray(
+      this.pickFirstArray(safeStep3, ['controlActions']) ?? this.pickFirstArray(currentData, ['controlActions']) ?? []
+    ).map((action, index) => {
+      const sourceEntityId = this.readObjectText(action, ['sourceEntityId'], '').trim();
+      const targetEntityId = this.readObjectText(action, ['targetEntityId'], '').trim();
+      const responsibilityId = this.readObjectText(action, ['responsibilityId'], '').trim();
+
+      return {
+        ...action,
+        id: this.readObjectText(action, ['id', 'ref'], '').trim() || `control-action-${index + 1}`,
+        source:
+          this.readObjectText(entityMap.get(sourceEntityId) ?? {}, ['name', 'entityName', 'label'], '').trim() ||
+          this.readObjectText(action, ['source', 'sourceActor', 'sourceEntityId'], '-'),
+        target:
+          this.readObjectText(entityMap.get(targetEntityId) ?? {}, ['name', 'entityName', 'label'], '').trim() ||
+          this.readObjectText(action, ['target', 'targetActor', 'targetEntityId'], '-'),
+        responsibility: responsibilityMap.get(responsibilityId) || this.readObjectText(action, ['responsibility', 'responsibilityId'], '-')
+      };
+    });
+
+    const feedbackLoops = this.toObjectArray(
+      this.pickFirstArray(safeStep3, ['feedbackLoops', 'feedbacks']) ??
+        this.pickFirstArray(currentData, ['feedbackLoops', 'feedbacks', 'optionalElements']) ??
+        []
+    ).map((feedback, index) => {
+      const sourceKind = this.readObjectText(feedback, ['sourceKind'], '').trim();
+      const destinationKind = this.readObjectText(feedback, ['destinationKind'], '').trim();
+      const sourceEntityId = this.readObjectText(feedback, ['sourceEntityId'], '').trim();
+      const destinationEntityId = this.readObjectText(feedback, ['destinationEntityId', 'targetEntityId'], '').trim();
+      const sourceExternalId = this.readObjectText(feedback, ['sourceExternalId'], '').trim();
+      const destinationExternalId = this.readObjectText(feedback, ['destinationExternalId', 'targetExternalId'], '').trim();
+      const responsibilityId = this.readObjectText(feedback, ['responsibilityId'], '').trim();
+      const type = this.readObjectText(feedback, ['type'], '').trim();
+      const details =
+        this.readObjectText(feedback, ['description', 'details'], '').trim() ||
+        [type, responsibilityMap.get(responsibilityId) ?? ''].filter((item) => item.trim().length > 0).join(' - ');
+
+      return {
+        ...feedback,
+        id: this.readObjectText(feedback, ['id', 'ref'], '').trim() || `feedback-${index + 1}`,
+        feedback: this.readObjectText(feedback, ['feedback', 'name', 'action'], '').trim() || type || 'Feedback',
+        source:
+          sourceKind === 'external'
+            ? externalSourceMap.get(sourceExternalId) || this.readObjectText(feedback, ['source'], 'External source')
+            : this.readObjectText(entityMap.get(sourceEntityId) ?? {}, ['name', 'entityName', 'label'], '').trim() ||
+              this.readObjectText(feedback, ['source', 'sourceActor', 'sourceEntityId'], '-'),
+        target:
+          destinationKind === 'external'
+            ? externalSourceMap.get(destinationExternalId) || this.readObjectText(feedback, ['target', 'destination'], 'External destination')
+            : this.readObjectText(entityMap.get(destinationEntityId) ?? {}, ['name', 'entityName', 'label'], '').trim() ||
+              this.readObjectText(feedback, ['target', 'destination', 'targetActor', 'destinationEntityId'], '-'),
+        details: details || '-'
+      };
+    });
+
     return {
-      entities: this.toObjectArray(this.pickFirstArray(safeStep3, ['entities', 'controllers', 'controlledProcesses']) ?? []),
-      controlActions: this.toObjectArray(this.pickFirstArray(safeStep3, ['controlActions']) ?? []),
-      feedbackLoops: this.toObjectArray(this.pickFirstArray(safeStep3, ['feedbackLoops', 'feedbacks']) ?? [])
+      entities,
+      controlActions,
+      feedbackLoops
     };
   }
 
@@ -968,9 +1812,16 @@ export class ResafetyArtifactsPageComponent implements OnInit {
 
   private normalizeStep6Data(step6: Record<string, unknown> | null): Step6Data {
     const safeStep6 = step6 ?? {};
+    const currentData = this.pickFirstObject(safeStep6, ['currentData']) ?? {};
     return {
-      lossScenarios: this.toObjectArray(this.pickFirstArray(safeStep6, ['lossScenarios']) ?? []),
-      safetyRequirements: this.toObjectArray(this.pickFirstArray(safeStep6, ['safetyRequirements']) ?? [])
+      lossScenarios: this.toObjectArray(
+        this.pickFirstArray(safeStep6, ['lossScenarios']) ?? this.pickFirstArray(currentData, ['lossScenarios']) ?? []
+      ),
+      safetyRequirements: this.toObjectArray(
+        this.pickFirstArray(safeStep6, ['safetyRequirements']) ??
+          this.pickFirstArray(currentData, ['safetyRequirements']) ??
+          []
+      )
     };
   }
 
@@ -1015,19 +1866,25 @@ export class ResafetyArtifactsPageComponent implements OnInit {
       '',
       '### Actors Identified',
       actorsTable,
-      '- Diagram: Export from iStar4Safety tool if available.',
       '',
       '## 2.2 Strategic Rationale (SR) Model (Initial)',
       '- Model Context: Internal rationale for actors, goals, and safety responsibilities.',
       '',
       '### Goal / Dependency Mapping',
       goalLinksTable,
-      '- Diagram: Export from iStar4Safety tool if available.',
+      '',
+      '## 2.3 iStar4Safety Model Diagram',
+      'Faithful rendering of the saved Step 2 model, generated with the iStar4Safety (piStar) engine.',
+      '',
+      ISTAR_MODEL_IMAGE_TOKEN
     ].join('\n');
   }
 
-  private buildControlStructureDocument(controlStructure: Record<string, unknown> | null): string {
-    const step3 = this.normalizeStep3Data(controlStructure);
+  private buildControlStructureDocument(
+    controlStructure: Record<string, unknown> | null,
+    step1Scope: Record<string, unknown> | null
+  ): string {
+    const step3 = this.normalizeStep3Data(controlStructure, step1Scope);
     const entitiesTable = this.buildMarkdownTable(
       ['ID', 'Entity', 'Role(s)'],
       step3.entities.map((entity) => [
@@ -1075,7 +1932,9 @@ export class ResafetyArtifactsPageComponent implements OnInit {
       feedbackTable,
       '',
       '## 3.3 Control Structure Diagram',
-      '- Diagram: Export image or JSON from control structure editor.'
+      'Hierarchical control-structure sketch derived from the saved Step 3 data: controllers on top, controlled processes below, control actions flowing downward and feedback flowing upward.',
+      '',
+      CONTROL_STRUCTURE_IMAGE_TOKEN
     ].join('\n');
   }
 
@@ -1222,6 +2081,119 @@ export class ResafetyArtifactsPageComponent implements OnInit {
       this.isExporting.set(false);
       this.exportingKey.set(null);
     }
+  }
+
+  private async prepareSectionForExport(section: ArtifactDocumentSection): Promise<ArtifactDocumentSection> {
+    if (section.key !== '05-loss-scenarios-safety-requirements') {
+      return section;
+    }
+
+    const payload = this.getFullDocumentPayload();
+    const projectId = this.resolvedProjectId();
+    if (!payload || !projectId) {
+      return section;
+    }
+
+    try {
+      const stepFiveInformation = await firstValueFrom(this.projectService.getStepFiveInformation(projectId));
+      return {
+        ...section,
+        markdown: this.buildLossScenariosDocument(stepFiveInformation as unknown as Record<string, unknown>)
+      };
+    } catch (error) {
+      console.error(
+        `Failed to fetch Step 5 information via GET /api/projects/step_five_project_information/${projectId} for artifact export`,
+        error
+      );
+      return section;
+    }
+  }
+
+  private async resolveSectionImages(section: ArtifactDocumentSection): Promise<Map<string, DiagramImage>> {
+    const images = new Map<string, DiagramImage>();
+
+    if (typeof window === 'undefined') {
+      return images;
+    }
+
+    const tokens = this.collectImageKeys(section.markdown);
+    if (!tokens.size) {
+      return images;
+    }
+
+    const payload = this.getFullDocumentPayload();
+    if (!payload) {
+      return images;
+    }
+
+    if (tokens.has(ISTAR_MODEL_IMAGE_KEY)) {
+      const modelImage = await this.buildIstarModelImage(payload.step2Istar ?? null);
+      if (modelImage) {
+        images.set(ISTAR_MODEL_IMAGE_KEY, modelImage);
+      }
+    }
+
+    if (tokens.has(CONTROL_STRUCTURE_IMAGE_KEY)) {
+      const sketchImage = await this.buildControlStructureImage(payload.step3ControlStructure ?? null);
+      if (sketchImage) {
+        images.set(CONTROL_STRUCTURE_IMAGE_KEY, sketchImage);
+      }
+    }
+
+    return images;
+  }
+
+  private collectImageKeys(markdown: string): Set<string> {
+    const keys = new Set<string>();
+    for (const line of markdown.split('\n')) {
+      const match = line.trim().match(IMAGE_TOKEN_PATTERN);
+      if (match) {
+        keys.add(match[1].toLowerCase());
+      }
+    }
+    return keys;
+  }
+
+  private getFullDocumentPayload(): FullProjectDocumentPayload | null {
+    const payload = this.projectPayloadInput() ?? this.projectPayload();
+    return payload ? (payload as FullProjectDocumentPayload) : null;
+  }
+
+  private async buildIstarModelImage(step2: Record<string, unknown> | null): Promise<DiagramImage | null> {
+    try {
+      const result = buildPistarModelFromStepTwoPayload(step2);
+      if (!result) {
+        return null;
+      }
+      const modelJson = JSON.stringify(result.model);
+      return await captureIstarModelPng(modelJson);
+    } catch (error) {
+      console.error('Failed to build the Step 2 iStar4Safety model image.', error);
+      return null;
+    }
+  }
+
+  private async buildControlStructureImage(step3: Record<string, unknown> | null): Promise<DiagramImage | null> {
+    try {
+      const sketch = buildControlStructureSketchSvg(step3);
+      if (!sketch) {
+        return null;
+      }
+      return await rasterizeSvgToPng(sketch.svg, { width: sketch.width, height: sketch.height, scale: 2 });
+    } catch (error) {
+      console.error('Failed to build the Step 3 control structure image.', error);
+      return null;
+    }
+  }
+
+  private dataUrlToUint8Array(dataUrl: string): Uint8Array {
+    const base64 = dataUrl.split(',')[1] ?? '';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+    return bytes;
   }
 
   private saveBlob(blob: Blob, fileName: string): void {

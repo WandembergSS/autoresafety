@@ -837,6 +837,35 @@ button:hover {
   max-height: 80vh;
 }
 
+.modal--ai {
+  width: min(640px, 100%);
+  overflow: auto;
+}
+
+.modal--ai .grid {
+  margin-top: 1rem;
+}
+
+.modal__intro {
+  margin: 0.5rem 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.modal__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.85rem;
+}
+
+.ai-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
 .modal__body {
   overflow: auto;
   padding-right: 0.25rem;

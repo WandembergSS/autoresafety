@@ -132,6 +132,16 @@ interface StepFourAiDraft {
   }>;
 }
 
+export interface StepFourAiRequestOptions {
+  minUcas: number;
+  maxUcas: number;
+  minHazardousConditions: number;
+  maxHazardousConditions: number;
+  minControllerConstraints: number;
+  maxControllerConstraints: number;
+  promptInstructions: string;
+}
+
 @Component({
   selector: 'app-ucas-page',
   standalone: true,
@@ -157,6 +167,8 @@ export class UcasPageComponent {
   readonly stepFourSaveMessage = signal<string | null>(null);
   readonly stepFourSaveError = signal<string | null>(null);
   readonly isBpmnModelModalOpen = signal(false);
+  readonly isStepFourAiModalOpen = signal(false);
+  readonly stepFourAiConfigError = signal<string | null>(null);
   readonly ucaModalMode = signal<'create' | 'edit' | null>(null);
   readonly editingUcaId = signal<number | null>(null);
   readonly controlActionCatalog = signal<ControlActionOption[]>([]);
@@ -211,6 +223,16 @@ export class UcasPageComponent {
     context: [''],
     consequence: [''],
     rationale: ['']
+  });
+
+  readonly stepFourAiConfigForm = this.fb.group({
+    minUcas: [2, [Validators.required, Validators.min(1)]],
+    maxUcas: [4, [Validators.required, Validators.min(1)]],
+    minHazardousConditions: [1, [Validators.required, Validators.min(0)]],
+    maxHazardousConditions: [3, [Validators.required, Validators.min(0)]],
+    minControllerConstraints: [1, [Validators.required, Validators.min(0)]],
+    maxControllerConstraints: [3, [Validators.required, Validators.min(0)]],
+    promptInstructions: ['']
   });
 
   private sequence = 0;
@@ -316,18 +338,64 @@ export class UcasPageComponent {
     this.isBpmnModelModalOpen.set(false);
   }
 
-  generateStepFourWithAi(): void {
+  openStepFourAiModal(): void {
+    this.stepFourAiConfigError.set(null);
+    this.stepFourAiConfigForm.reset({
+      minUcas: 2,
+      maxUcas: 4,
+      minHazardousConditions: 1,
+      maxHazardousConditions: 3,
+      minControllerConstraints: 1,
+      maxControllerConstraints: 3,
+      promptInstructions: ''
+    });
+    this.isStepFourAiModalOpen.set(true);
+  }
+
+  closeStepFourAiModal(): void {
     if (this.isGeneratingStepFourAi()) {
       return;
     }
 
-    if (this.controlActionCatalog().length === 0 || this.availableResponsibilities().length === 0) {
-      this.stepFourSaveMessage.set(null);
-      this.stepFourSaveError.set('Load the Step 4 catalogs before generating with AI.');
+    this.isStepFourAiModalOpen.set(false);
+    this.stepFourAiConfigError.set(null);
+  }
+
+  submitStepFourAiRequest(): void {
+    if (this.isGeneratingStepFourAi()) {
       return;
     }
 
-    const question = this.buildStepFourAiPrompt();
+    if (this.stepFourAiConfigForm.invalid) {
+      this.stepFourAiConfigForm.markAllAsTouched();
+      return;
+    }
+
+    const options = this.getStepFourAiRequestOptionsFromForm();
+    if (options.minUcas > options.maxUcas) {
+      this.stepFourAiConfigError.set('Minimum number of UCAs cannot be greater than the maximum.');
+      return;
+    }
+
+    if (options.minHazardousConditions > options.maxHazardousConditions) {
+      this.stepFourAiConfigError.set('Minimum number of hazardous conditions cannot be greater than the maximum.');
+      return;
+    }
+
+    if (options.minControllerConstraints > options.maxControllerConstraints) {
+      this.stepFourAiConfigError.set('Minimum number of controller constraints cannot be greater than the maximum.');
+      return;
+    }
+
+    this.generateStepFourWithAi(options);
+  }
+
+  generateStepFourWithAi(options: StepFourAiRequestOptions = this.buildDefaultStepFourAiRequestOptions()): void {
+    if (this.isGeneratingStepFourAi()) {
+      return;
+    }
+
+    const question = this.buildStepFourAiPrompt(options);
     const context = JSON.stringify(
       {
         controlActions: this.controlActionCatalog(),
@@ -363,6 +431,8 @@ export class UcasPageComponent {
             return;
           }
 
+          this.isStepFourAiModalOpen.set(false);
+          this.stepFourAiConfigError.set(null);
           this.applyStepFourAiDraft(draft);
           this.stepFourSaveMessage.set('AI proposal applied to Step 4. Review and save when ready.');
           this.aiFeedback.showSummary(summary);
@@ -931,6 +1001,32 @@ export class UcasPageComponent {
     return Array.from(new Set(values.filter((item) => item.trim().length > 0)));
   }
 
+  private stepFourUcaKey(
+    controlActionRef: string | null | undefined,
+    category: string | null | undefined,
+    context: string | null | undefined
+  ): string {
+    return [
+      (controlActionRef ?? '').trim().toLowerCase(),
+      (category ?? '').trim().toLowerCase(),
+      (context ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+    ].join('|');
+  }
+
+  private stepFourHcKey(description: string | null | undefined, responsibility: string | null | undefined): string {
+    return [
+      (description ?? '').trim().toLowerCase().replace(/\s+/g, ' '),
+      (responsibility ?? '').trim().toLowerCase()
+    ].join('|');
+  }
+
+  private stepFourConstraintKey(sourceRef: string | null | undefined, constraint: string | null | undefined): string {
+    return [
+      (sourceRef ?? '').trim().toLowerCase(),
+      (constraint ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+    ].join('|');
+  }
+
   private categoryVerb(category: UcaCategory): string {
     switch (category) {
       case 'Not provided':
@@ -1360,6 +1456,8 @@ export class UcasPageComponent {
     this.nextConstraintIdValue.set('CC-01');
     this.stepFourSaveMessage.set(null);
     this.stepFourSaveError.set(null);
+    this.isStepFourAiModalOpen.set(false);
+    this.stepFourAiConfigError.set(null);
     this.ucaForm.reset({
       refCode: this.getDefaultUcaRefCode(),
       controlActionRef: '',
@@ -1829,8 +1927,36 @@ export class UcasPageComponent {
     return 'Failed to save Step 4 due to an unexpected error.';
   }
 
-  private buildStepFourAiPrompt(): string {
-    return `You are generating a complete Step 4 STPA analysis draft.
+  private buildDefaultStepFourAiRequestOptions(): StepFourAiRequestOptions {
+    return {
+      minUcas: 2,
+      maxUcas: 4,
+      minHazardousConditions: 1,
+      maxHazardousConditions: 3,
+      minControllerConstraints: 1,
+      maxControllerConstraints: 3,
+      promptInstructions: ''
+    };
+  }
+
+  private getStepFourAiRequestOptionsFromForm(): StepFourAiRequestOptions {
+    return {
+      minUcas: Number(this.stepFourAiConfigForm.controls.minUcas.value ?? 2),
+      maxUcas: Number(this.stepFourAiConfigForm.controls.maxUcas.value ?? 4),
+      minHazardousConditions: Number(this.stepFourAiConfigForm.controls.minHazardousConditions.value ?? 1),
+      maxHazardousConditions: Number(this.stepFourAiConfigForm.controls.maxHazardousConditions.value ?? 3),
+      minControllerConstraints: Number(this.stepFourAiConfigForm.controls.minControllerConstraints.value ?? 1),
+      maxControllerConstraints: Number(this.stepFourAiConfigForm.controls.maxControllerConstraints.value ?? 3),
+      promptInstructions: (this.stepFourAiConfigForm.controls.promptInstructions.value ?? '').trim()
+    };
+  }
+
+  private buildStepFourAiPrompt(options: StepFourAiRequestOptions): string {
+    const additionalDirectives = options.promptInstructions
+      ? `\n#### Additional directives from the analyst:\n${options.promptInstructions}`
+      : '';
+
+    return `You are extending an existing Step 4 STPA analysis draft.
 
 Return JSON only. Do not include markdown fences or commentary.
 
@@ -1864,18 +1990,55 @@ Rules:
 - Use only hazards from the provided hazards catalog, either by label or code.
 - Use only responsibility labels from the provided responsibilities catalog.
 - Categories must be one of: Not provided, Provided, Incorrect duration, Incorrect timing.
-- Generate a concise but complete set of UCAs, hazardous conditions, and controller constraints.
-- Preserve valid existing currentData when possible and fill missing analysis data.
-- Avoid duplicates.`;
+- Add between ${options.minUcas} and ${options.maxUcas} NEW unsafe control actions that are not already present in currentData, and keep all existing ones.
+- Add between ${options.minHazardousConditions} and ${options.maxHazardousConditions} NEW hazardous conditions that are not already present in currentData, and keep all existing ones.
+- Add between ${options.minControllerConstraints} and ${options.maxControllerConstraints} NEW controller constraints that are not already present in currentData, and keep all existing ones.
+- Every controller constraint sourceRef must reference a UCA or hazardous condition that exists in currentData or that you are adding now.
+- Preserve all valid existing currentData; only add to it.
+- Avoid duplicates.${additionalDirectives}`;
   }
 
   private parseStepFourAiDraft(response: unknown): StepFourAiDraft | null {
     const parsed = this.parseAiJsonResponse(response);
-    if (!parsed || typeof parsed !== 'object') {
+    return this.extractStepFourAiDraft(parsed);
+  }
+
+  private extractStepFourAiDraft(value: unknown): StepFourAiDraft | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return null;
     }
 
-    return parsed as StepFourAiDraft;
+    const candidate = value as Record<string, unknown>;
+    const hasDraftArrays =
+      Array.isArray(candidate['unsafeControlActions']) ||
+      Array.isArray(candidate['hazardousConditions']) ||
+      Array.isArray(candidate['controllerConstraints']);
+
+    if (hasDraftArrays) {
+      return candidate as StepFourAiDraft;
+    }
+
+    const content = candidate['content'];
+    if (content && typeof content === 'object' && !Array.isArray(content)) {
+      const nestedDraft = this.extractStepFourAiDraft(content);
+      if (nestedDraft) {
+        return nestedDraft;
+      }
+    }
+
+    if (typeof content === 'string' && content.trim()) {
+      const nestedFromContent = this.extractStepFourAiDraft(this.parseAiJsonResponse(content));
+      if (nestedFromContent) {
+        return nestedFromContent;
+      }
+    }
+
+    const answer = candidate['answer'];
+    if (typeof answer === 'string' && answer.trim()) {
+      return this.extractStepFourAiDraft(this.parseAiJsonResponse(answer));
+    }
+
+    return null;
   }
 
   private applyStepFourAiDraft(draft: StepFourAiDraft): void {
@@ -1890,8 +2053,12 @@ Rules:
       'Incorrect duration'
     ]);
 
-    let nextUcaId = 0;
-    const normalizedUcas = (draft.unsafeControlActions ?? [])
+    const existingUcas = this.ucas();
+    const existingUcaKeys = new Set(
+      existingUcas.map((item) => this.stepFourUcaKey(item.controlActionRef, item.category, item.context))
+    );
+    let nextUcaId = existingUcas.reduce((maxId, item) => Math.max(maxId, item.id), 0);
+    const newUcas = (draft.unsafeControlActions ?? [])
       .map((item) => {
         const controlActionRef = (item.controlActionRef ?? '').trim();
         const controlAction = controlActionMap.get(controlActionRef);
@@ -1907,6 +2074,12 @@ Rules:
         const category = allowedCategories.has(item.category as UcaCategory)
           ? (item.category as UcaCategory)
           : 'Not provided';
+        const context = (item.context ?? '').trim();
+        const key = this.stepFourUcaKey(controlActionRef, category, context);
+        if (existingUcaKeys.has(key)) {
+          return null;
+        }
+        existingUcaKeys.add(key);
 
         nextUcaId += 1;
         return {
@@ -1924,25 +2097,36 @@ Rules:
           safetyConstraint: responsibility.safetyConstraint,
           hazard: hazards,
           category,
-          context: (item.context ?? '').trim(),
+          context,
           consequence: (item.consequence ?? '').trim(),
           rationale: (item.rationale ?? '').trim()
         } as UnsafeControlAction;
       })
-      .filter((item): item is UnsafeControlAction => !!item)
-      .filter((item, index, items) => items.findIndex((candidate) => candidate.controlActionRef === item.controlActionRef && candidate.category === item.category) === index);
+      .filter((item): item is UnsafeControlAction => !!item);
+    const normalizedUcas = [...existingUcas, ...newUcas];
 
-    let nextHcId = 0;
-    const normalizedHazardousConditions = (draft.hazardousConditions ?? [])
+    const existingHazardousConditions = this.hazardousConditions();
+    const existingHcKeys = new Set(
+      existingHazardousConditions.map((item) => this.stepFourHcKey(item.description, item.responsibility))
+    );
+    let nextHcId = existingHazardousConditions.reduce((maxId, item) => Math.max(maxId, item.id), 0);
+    const newHazardousConditions = (draft.hazardousConditions ?? [])
       .map((item) => {
         const responsibility = responsibilityByLabel.get((item.responsibility ?? '').trim());
         const linkedHazards = this.uniqueValues(
           [...(item.linkedHazards ?? []), ...(item.linkedHazardRefs ?? [])].map((hazard) => hazardLabelByCode.get(hazard) ?? hazard)
         ).filter((hazard) => hazardLabelSet.has(hazard));
 
-        if (!responsibility || linkedHazards.length === 0 || !(item.description ?? '').trim()) {
+        const description = (item.description ?? '').trim();
+        if (!responsibility || linkedHazards.length === 0 || !description) {
           return null;
         }
+
+        const key = this.stepFourHcKey(description, responsibility.responsibility);
+        if (existingHcKeys.has(key)) {
+          return null;
+        }
+        existingHcKeys.add(key);
 
         nextHcId += 1;
         return {
@@ -1952,12 +2136,13 @@ Rules:
           safetyConstraintId: responsibility.safetyConstraintId,
           responsibility: responsibility.responsibility,
           safetyConstraint: responsibility.safetyConstraint,
-          description: (item.description ?? '').trim(),
+          description,
           linkedHazards,
           coverageGap: (item.coverageGap ?? '').trim()
         } as HazardousCondition;
       })
       .filter((item): item is HazardousCondition => !!item);
+    const normalizedHazardousConditions = [...existingHazardousConditions, ...newHazardousConditions];
 
     const sourceEntries: Array<[string, ConstraintSourceOption]> = [
       ...normalizedUcas.map(
@@ -1985,10 +2170,17 @@ Rules:
     ];
     const sourceMap = new Map<string, ConstraintSourceOption>(sourceEntries);
 
+    const existingConstraints = this.controllerConstraints();
+    const existingConstraintKeys = new Set(
+      existingConstraints.map((item) => this.stepFourConstraintKey(item.sourceRef, item.constraint))
+    );
     const allowedStatuses = new Set<ControllerConstraint['status']>(['Draft', 'Approved', 'Pending Review']);
-    const constraintIdPrefix = this.extractConstraintIdPrefix([], this.nextConstraintIdValue());
-    let nextConstraintId = 0;
-    let normalizedConstraints = (draft.controllerConstraints ?? [])
+    const constraintIdPrefix = this.extractConstraintIdPrefix(
+      existingConstraints.map((item) => item.constraintId),
+      this.nextConstraintIdValue()
+    );
+    let nextConstraintId = existingConstraints.reduce((maxId, item) => Math.max(maxId, item.id), 0);
+    const newConstraints = (draft.controllerConstraints ?? [])
       .map((item) => {
         const sourceRef = this.normalizeConstraintSourceRef(item.sourceRef ?? '');
         const source = sourceMap.get(sourceRef);
@@ -1997,6 +2189,12 @@ Rules:
         if (!source || !constraint || !enforcementMechanism) {
           return null;
         }
+
+        const key = this.stepFourConstraintKey(sourceRef, constraint);
+        if (existingConstraintKeys.has(key)) {
+          return null;
+        }
+        existingConstraintKeys.add(key);
 
         nextConstraintId += 1;
         return {
@@ -2013,6 +2211,7 @@ Rules:
         } as ControllerConstraint;
       })
       .filter((item): item is ControllerConstraint => !!item);
+    let normalizedConstraints = [...existingConstraints, ...newConstraints];
 
     if (normalizedConstraints.length === 0) {
       normalizedConstraints = Array.from(sourceMap.values()).map((source, index) => ({
@@ -2025,16 +2224,17 @@ Rules:
         enforcementMechanism: 'Controller logic, monitoring, and review workflow.',
         status: 'Draft' as const
       }));
+      nextConstraintId = normalizedConstraints.length;
     }
 
     this.ucas.set(normalizedUcas);
     this.hazardousConditions.set(normalizedHazardousConditions);
     this.controllerConstraints.set(normalizedConstraints);
-    this.sequence = normalizedUcas.length;
-    this.hcSequence = normalizedHazardousConditions.length;
-    this.nextUcaRefValue.set(this.formatUcaRef(normalizedUcas.length + 1));
-    this.nextHcRefValue.set(this.formatHcRef(normalizedHazardousConditions.length + 1));
-    this.nextConstraintIdValue.set(`${constraintIdPrefix}${String(normalizedConstraints.length + 1).padStart(2, '0')}`);
+    this.sequence = nextUcaId;
+    this.hcSequence = nextHcId;
+    this.nextUcaRefValue.set(this.formatUcaRef(nextUcaId + 1));
+    this.nextHcRefValue.set(this.formatHcRef(nextHcId + 1));
+    this.nextConstraintIdValue.set(`${constraintIdPrefix}${String(nextConstraintId + 1).padStart(2, '0')}`);
     this.hcDecision.set(normalizedHazardousConditions.length > 0 ? 'yes' : 'no');
     this.ucaForm.patchValue({ refCode: this.getDefaultUcaRefCode() });
   }

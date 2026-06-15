@@ -42,6 +42,74 @@ export class AuthService {
     );
   }
 
+  /**
+   * Best-effort display name for the currently authenticated user, decoded from the JWT claims.
+   * Returns `null` when no token is available or no name-like claim can be resolved.
+   */
+  getCurrentUsername(): string | null {
+    const claims = this.decodeAccessTokenClaims();
+    if (!claims) {
+      return null;
+    }
+
+    const candidateClaims = ['name', 'preferred_username', 'username', 'upn', 'unique_name', 'email', 'sub'];
+    for (const claim of candidateClaims) {
+      const value = claims[claim];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+
+    const givenName = typeof claims['given_name'] === 'string' ? claims['given_name'].trim() : '';
+    const familyName = typeof claims['family_name'] === 'string' ? claims['family_name'].trim() : '';
+    const fullName = `${givenName} ${familyName}`.trim();
+    return fullName.length > 0 ? fullName : null;
+  }
+
+  private decodeAccessTokenClaims(): Record<string, unknown> | null {
+    const token = this.getAccessToken();
+    if (!token) {
+      return null;
+    }
+
+    const segments = token.split('.');
+    if (segments.length < 2) {
+      return null;
+    }
+
+    try {
+      const base64 = segments[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+      const decoded = this.decodeBase64(padded);
+      if (!decoded) {
+        return null;
+      }
+
+      const parsed = JSON.parse(decoded) as unknown;
+      return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private decodeBase64(value: string): string | null {
+    try {
+      if (typeof atob === 'function') {
+        // Decode base64 and then interpret the bytes as UTF-8 so accented names survive.
+        const binary = atob(value);
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+        if (typeof TextDecoder === 'function') {
+          return new TextDecoder('utf-8').decode(bytes);
+        }
+        return binary;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
   private isBrowser(): boolean {
     return typeof window !== 'undefined';
   }

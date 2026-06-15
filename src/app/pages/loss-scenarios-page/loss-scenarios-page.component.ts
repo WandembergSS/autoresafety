@@ -55,6 +55,14 @@ interface StepFiveAiDraft {
   }>;
 }
 
+export interface StepFiveAiRequestOptions {
+  minLossScenarios: number;
+  maxLossScenarios: number;
+  minSafetyRequirements: number;
+  maxSafetyRequirements: number;
+  promptInstructions: string;
+}
+
 function requireSelection(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     const value = control.value;
@@ -87,6 +95,8 @@ export class LossScenariosPageComponent {
   readonly stepFiveSaveMessage = signal<string | null>(null);
   readonly stepFiveSaveError = signal<string | null>(null);
   readonly isBpmnModelModalOpen = signal(false);
+  readonly isStepFiveAiModalOpen = signal(false);
+  readonly stepFiveAiConfigError = signal<string | null>(null);
   readonly lossScenarioModalMode = signal<'create' | 'edit' | null>(null);
   readonly editingLossScenarioId = signal<string | null>(null);
   readonly safetyRequirementModalMode = signal<'create' | 'edit' | null>(null);
@@ -107,6 +117,14 @@ export class LossScenariosPageComponent {
     id: ['SR-01', [Validators.required, Validators.pattern(/^SR-\d{2}$/)]],
     description: ['', [Validators.required, Validators.minLength(20), Validators.maxLength(600)]],
     addressedLossScenarioIds: [[] as string[], [requireSelection()]]
+  });
+
+  readonly stepFiveAiConfigForm = this.fb.group({
+    minLossScenarios: [2, [Validators.required, Validators.min(1)]],
+    maxLossScenarios: [4, [Validators.required, Validators.min(1)]],
+    minSafetyRequirements: [1, [Validators.required, Validators.min(0)]],
+    maxSafetyRequirements: [3, [Validators.required, Validators.min(0)]],
+    promptInstructions: ['']
   });
 
   readonly lossScenarios = signal<LossScenario[]>([]);
@@ -300,7 +318,52 @@ export class LossScenariosPageComponent {
     this.resetSafetyRequirementForm();
   }
 
-  generateStepFiveWithAi(): void {
+  openStepFiveAiModal(): void {
+    this.stepFiveAiConfigError.set(null);
+    this.stepFiveAiConfigForm.reset({
+      minLossScenarios: 2,
+      maxLossScenarios: 4,
+      minSafetyRequirements: 1,
+      maxSafetyRequirements: 3,
+      promptInstructions: ''
+    });
+    this.isStepFiveAiModalOpen.set(true);
+  }
+
+  closeStepFiveAiModal(): void {
+    if (this.isGeneratingStepFiveAi()) {
+      return;
+    }
+
+    this.isStepFiveAiModalOpen.set(false);
+    this.stepFiveAiConfigError.set(null);
+  }
+
+  submitStepFiveAiRequest(): void {
+    if (this.isGeneratingStepFiveAi()) {
+      return;
+    }
+
+    if (this.stepFiveAiConfigForm.invalid) {
+      this.stepFiveAiConfigForm.markAllAsTouched();
+      return;
+    }
+
+    const options = this.getStepFiveAiRequestOptionsFromForm();
+    if (options.minLossScenarios > options.maxLossScenarios) {
+      this.stepFiveAiConfigError.set('Minimum number of loss scenarios cannot be greater than the maximum.');
+      return;
+    }
+
+    if (options.minSafetyRequirements > options.maxSafetyRequirements) {
+      this.stepFiveAiConfigError.set('Minimum number of safety requirements cannot be greater than the maximum.');
+      return;
+    }
+
+    this.generateStepFiveWithAi(options);
+  }
+
+  generateStepFiveWithAi(options: StepFiveAiRequestOptions = this.buildDefaultStepFiveAiRequestOptions()): void {
     if (this.isGeneratingStepFiveAi()) {
       return;
     }
@@ -311,7 +374,7 @@ export class LossScenariosPageComponent {
       return;
     }
 
-    const question = this.buildStepFiveAiPrompt();
+    const question = this.buildStepFiveAiPrompt(options);
     const context = JSON.stringify(
       {
         unsafeBehaviors: this.unsafeBehaviorCatalog(),
@@ -344,6 +407,8 @@ export class LossScenariosPageComponent {
             return;
           }
 
+          this.isStepFiveAiModalOpen.set(false);
+          this.stepFiveAiConfigError.set(null);
           this.applyStepFiveAiDraft(draft);
           this.stepFiveSaveMessage.set('AI proposal applied to Step 5. Review and save when ready.');
           this.aiFeedback.showSummary(summary);
@@ -636,6 +701,8 @@ export class LossScenariosPageComponent {
     this.nextSafetyRequirementId.set('SR-01');
     this.stepFiveSaveMessage.set(null);
     this.stepFiveSaveError.set(null);
+    this.isStepFiveAiModalOpen.set(false);
+    this.stepFiveAiConfigError.set(null);
 
     this.closeLossScenarioModal();
     this.closeSafetyRequirementModal();
@@ -717,8 +784,32 @@ export class LossScenariosPageComponent {
     return 'Failed to save Step 5 due to an unexpected error.';
   }
 
-  private buildStepFiveAiPrompt(): string {
-    return `You are generating a complete Step 5 loss-scenario and safety-requirement draft.
+  private buildDefaultStepFiveAiRequestOptions(): StepFiveAiRequestOptions {
+    return {
+      minLossScenarios: 2,
+      maxLossScenarios: 4,
+      minSafetyRequirements: 1,
+      maxSafetyRequirements: 3,
+      promptInstructions: ''
+    };
+  }
+
+  private getStepFiveAiRequestOptionsFromForm(): StepFiveAiRequestOptions {
+    return {
+      minLossScenarios: Number(this.stepFiveAiConfigForm.controls.minLossScenarios.value ?? 2),
+      maxLossScenarios: Number(this.stepFiveAiConfigForm.controls.maxLossScenarios.value ?? 4),
+      minSafetyRequirements: Number(this.stepFiveAiConfigForm.controls.minSafetyRequirements.value ?? 1),
+      maxSafetyRequirements: Number(this.stepFiveAiConfigForm.controls.maxSafetyRequirements.value ?? 3),
+      promptInstructions: (this.stepFiveAiConfigForm.controls.promptInstructions.value ?? '').trim()
+    };
+  }
+
+  private buildStepFiveAiPrompt(options: StepFiveAiRequestOptions): string {
+    const additionalDirectives = options.promptInstructions
+      ? `\n#### Additional directives from the analyst:\n${options.promptInstructions}`
+      : '';
+
+    return `You are extending an existing Step 5 loss-scenario and safety-requirement draft.
 
 Return JSON only. Do not include markdown fences or commentary.
 
@@ -740,9 +831,11 @@ Return an object with this exact shape:
 Rules:
 - Use only unsafe behavior ids from the provided unsafeBehaviors catalog.
 - Every loss scenario must reference at least one unsafe behavior.
-- Every safety requirement must reference at least one generated loss scenario.
-- Preserve valid existing currentData when possible and fill missing traceability data.
-- Avoid duplicates.`;
+- Every safety requirement must reference at least one loss scenario (existing in currentData or newly added).
+- Add between ${options.minLossScenarios} and ${options.maxLossScenarios} NEW loss scenarios that are not already present in currentData, and keep all existing ones.
+- Add between ${options.minSafetyRequirements} and ${options.maxSafetyRequirements} NEW safety requirements that are not already present in currentData, and keep all existing ones.
+- Preserve all valid existing currentData; only add to it.
+- Avoid duplicates.${additionalDirectives}`;
   }
 
   private parseStepFiveAiDraft(response: unknown): StepFiveAiDraft | null {
@@ -757,18 +850,44 @@ Rules:
   private applyStepFiveAiDraft(draft: StepFiveAiDraft): void {
     const validUnsafeBehaviorIds = new Set(this.unsafeBehaviorCatalog().map((item) => item.id));
 
-    let nextLossScenarioIndex = 0;
-    const normalizedLossScenarios = (draft.lossScenarios ?? [])
+    const existingLossScenarios = this.lossScenarios();
+    const existingLossScenarioKeys = new Map(
+      existingLossScenarios.map((item) => [this.stepFiveLossScenarioKey(item.description), item.id])
+    );
+    let nextLossScenarioIndex = existingLossScenarios.reduce(
+      (maxNumber, item) => Math.max(maxNumber, this.extractIdNumber(item.id)),
+      0
+    );
+
+    const lossScenarioIdRemap = new Map<string, string>();
+    const newLossScenarios = (draft.lossScenarios ?? [])
       .map((item) => {
         const description = (item.description ?? '').trim();
-        const associatedUnsafeBehaviorIds = this.uniqueValues(item.associatedUnsafeBehaviorIds ?? []).filter((id) => validUnsafeBehaviorIds.has(id));
+        const associatedUnsafeBehaviorIds = this.uniqueValues(item.associatedUnsafeBehaviorIds ?? []).filter((id) =>
+          validUnsafeBehaviorIds.has(id)
+        );
         if (!description || associatedUnsafeBehaviorIds.length === 0) {
           return null;
         }
 
+        const key = this.stepFiveLossScenarioKey(description);
+        const existingId = existingLossScenarioKeys.get(key);
+        if (existingId) {
+          if (item.id) {
+            lossScenarioIdRemap.set(item.id, existingId);
+          }
+          return null;
+        }
+
         nextLossScenarioIndex += 1;
+        const newId = `LS-${String(nextLossScenarioIndex).padStart(2, '0')}`;
+        existingLossScenarioKeys.set(key, newId);
+        if (item.id) {
+          lossScenarioIdRemap.set(item.id, newId);
+        }
+
         return {
-          id: `LS-${String(nextLossScenarioIndex).padStart(2, '0')}`,
+          id: newId,
           description,
           associatedUnsafeBehaviorIds,
           sourceRationale: (item.sourceRationale ?? '').trim()
@@ -776,16 +895,39 @@ Rules:
       })
       .filter((item): item is LossScenario => !!item);
 
+    const normalizedLossScenarios = [...existingLossScenarios, ...newLossScenarios];
     const validLossScenarioIds = new Set(normalizedLossScenarios.map((item) => item.id));
+    const resolveLossScenarioId = (id: string): string | null => {
+      const remapped = lossScenarioIdRemap.get(id) ?? id;
+      return validLossScenarioIds.has(remapped) ? remapped : null;
+    };
 
-    let nextSafetyRequirementIndex = 0;
-    const normalizedSafetyRequirements = (draft.safetyRequirements ?? [])
+    const existingSafetyRequirements = this.safetyRequirements();
+    const existingSafetyRequirementKeys = new Set(
+      existingSafetyRequirements.map((item) => this.stepFiveSafetyRequirementKey(item.description))
+    );
+    let nextSafetyRequirementIndex = existingSafetyRequirements.reduce(
+      (maxNumber, item) => Math.max(maxNumber, this.extractIdNumber(item.id)),
+      0
+    );
+
+    const newSafetyRequirements = (draft.safetyRequirements ?? [])
       .map((item) => {
         const description = (item.description ?? '').trim();
-        const addressedLossScenarioIds = this.uniqueValues(item.addressedLossScenarioIds ?? []).filter((id) => validLossScenarioIds.has(id));
+        const addressedLossScenarioIds = this.uniqueValues(
+          (item.addressedLossScenarioIds ?? [])
+            .map((id) => resolveLossScenarioId(id))
+            .filter((id): id is string => !!id)
+        );
         if (!description || addressedLossScenarioIds.length === 0) {
           return null;
         }
+
+        const key = this.stepFiveSafetyRequirementKey(description);
+        if (existingSafetyRequirementKeys.has(key)) {
+          return null;
+        }
+        existingSafetyRequirementKeys.add(key);
 
         nextSafetyRequirementIndex += 1;
         return {
@@ -796,12 +938,22 @@ Rules:
       })
       .filter((item): item is SafetyRequirement => !!item);
 
+    const normalizedSafetyRequirements = [...existingSafetyRequirements, ...newSafetyRequirements];
+
     this.lossScenarios.set(normalizedLossScenarios);
     this.safetyRequirements.set(normalizedSafetyRequirements);
-    this.nextLossScenarioId.set(`LS-${String(normalizedLossScenarios.length + 1).padStart(2, '0')}`);
-    this.nextSafetyRequirementId.set(`SR-${String(normalizedSafetyRequirements.length + 1).padStart(2, '0')}`);
+    this.nextLossScenarioId.set(`LS-${String(nextLossScenarioIndex + 1).padStart(2, '0')}`);
+    this.nextSafetyRequirementId.set(`SR-${String(nextSafetyRequirementIndex + 1).padStart(2, '0')}`);
     this.lossScenarioForm.patchValue({ id: this.nextLossScenarioId() });
     this.safetyRequirementForm.patchValue({ id: this.nextSafetyRequirementId() });
+  }
+
+  private stepFiveLossScenarioKey(description: string | null | undefined): string {
+    return (description ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  private stepFiveSafetyRequirementKey(description: string | null | undefined): string {
+    return (description ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
   }
 
   private parseAiJsonResponse(response: unknown): unknown {

@@ -62,10 +62,6 @@ TESTAR COM NOVA INTERACAO COM IA - VERIFICAR POSSIBILIADE OU ESCREVER COMO TRABA
 
 
 
-Corrigir problema carregamento elementos opcionais step 3
-
-bt save and continue step 3 nao avanca
-
 melhorar implementacao em step 4 modelagem de HCs
 
 melhorar modelo de dados para nao haver dados repetidos

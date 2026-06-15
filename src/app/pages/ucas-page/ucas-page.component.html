@@ -4,7 +4,7 @@
     <div class="page__title-row">
       <h2>Identify Unsafe Control Actions (UCAs)</h2>
       <div class="page__header-actions">
-        <button type="button" class="button button--ai" [disabled]="isGeneratingStepFourAi()" (click)="generateStepFourWithAi()" aria-label="Generate with AI">
+        <button type="button" class="button button--ai" [disabled]="isGeneratingStepFourAi()" (click)="openStepFourAiModal()" aria-label="Generate with AI">
           <span class="button__icon" aria-hidden="true">
             @if (isGeneratingStepFourAi()) {
               <span class="button__spinner"></span>
@@ -282,6 +282,74 @@
           <div class="page-actions modal__actions">
             <button type="button" class="button button--secondary" (click)="closeEditUcaModal()">Cancel</button>
             <button type="submit" class="button" [disabled]="editUcaForm.invalid">{{ ucaModalSubmitLabel() }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isStepFourAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeStepFourAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+        <header class="modal__header">
+          <h4>Generate Step 4 with AI</h4>
+          <button type="button" class="modal__close" (click)="closeStepFourAiModal()" [disabled]="isGeneratingStepFourAi()">×</button>
+        </header>
+        <p class="modal__intro">
+          Configure how many new unsafe control actions, hazardous conditions, and controller constraints the AI should
+          propose. Existing entries are always preserved &mdash; the assistant only adds new items.
+        </p>
+        <form class="grid" [formGroup]="stepFourAiConfigForm" (ngSubmit)="submitStepFourAiRequest()">
+          <div class="field">
+            <label for="stepFourMinUcas">Minimum new UCAs</label>
+            <input id="stepFourMinUcas" type="number" min="1" formControlName="minUcas" />
+          </div>
+          <div class="field">
+            <label for="stepFourMaxUcas">Maximum new UCAs</label>
+            <input id="stepFourMaxUcas" type="number" min="1" formControlName="maxUcas" />
+          </div>
+          <div class="field">
+            <label for="stepFourMinHc">Minimum new hazardous conditions</label>
+            <input id="stepFourMinHc" type="number" min="0" formControlName="minHazardousConditions" />
+          </div>
+          <div class="field">
+            <label for="stepFourMaxHc">Maximum new hazardous conditions</label>
+            <input id="stepFourMaxHc" type="number" min="0" formControlName="maxHazardousConditions" />
+          </div>
+          <div class="field">
+            <label for="stepFourMinConstraints">Minimum new controller constraints</label>
+            <input id="stepFourMinConstraints" type="number" min="0" formControlName="minControllerConstraints" />
+          </div>
+          <div class="field">
+            <label for="stepFourMaxConstraints">Maximum new controller constraints</label>
+            <input id="stepFourMaxConstraints" type="number" min="0" formControlName="maxControllerConstraints" />
+          </div>
+          <div class="field field--full">
+            <label for="stepFourPromptInstructions">Additional instructions (optional)</label>
+            <textarea
+              id="stepFourPromptInstructions"
+              rows="3"
+              formControlName="promptInstructions"
+              placeholder="Focus on timing-related UCAs, emphasise operator handover, etc."
+            ></textarea>
+          </div>
+          @if (stepFourAiConfigError()) {
+            <p class="modal__error field--full">{{ stepFourAiConfigError() }}</p>
+          }
+          <div class="ai-modal__actions field--full">
+            <button type="button" class="button button--secondary" (click)="closeStepFourAiModal()" [disabled]="isGeneratingStepFourAi()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isGeneratingStepFourAi()">
+              <span class="button__icon" aria-hidden="true">
+                @if (isGeneratingStepFourAi()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
+                }
+              </span>
+              <span>{{ isGeneratingStepFourAi() ? 'Generating...' : 'Generate' }}</span>
+            </button>
           </div>
         </form>
       </div>

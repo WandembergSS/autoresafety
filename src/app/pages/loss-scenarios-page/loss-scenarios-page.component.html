@@ -2,7 +2,7 @@
   <p class="step">Step 5</p>
   <div class="page-header__title-row">
     <h2>Analyze Loss Scenarios and Derive Safety Requirements</h2>
-    <button type="button" class="button button--ai" [disabled]="isGeneratingStepFiveAi()" (click)="generateStepFiveWithAi()">
+    <button type="button" class="button button--ai" [disabled]="isGeneratingStepFiveAi()" (click)="openStepFiveAiModal()">
       <span class="button__icon" aria-hidden="true">
         @if (isGeneratingStepFiveAi()) {
           <span class="button__spinner"></span>
@@ -362,6 +362,65 @@
         <div class="page-actions modal__actions field--full">
           <button type="button" class="button button--secondary" (click)="closeSafetyRequirementModal()">Cancel</button>
           <button type="submit" class="button">{{ safetyRequirementModalSubmitLabel() }}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+@if (isStepFiveAiModalOpen()) {
+  <div class="modal-backdrop" (click)="closeStepFiveAiModal()">
+    <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-label="Generate Step 5 with AI">
+      <header class="modal__header">
+        <h4>Generate Step 5 with AI</h4>
+        <button type="button" class="modal__close" (click)="closeStepFiveAiModal()" [disabled]="isGeneratingStepFiveAi()">×</button>
+      </header>
+      <p class="modal__intro">
+        Configure how many new loss scenarios and safety requirements the AI should propose. Existing entries are always
+        preserved &mdash; the assistant only adds new items.
+      </p>
+      <form class="modal__body form-grid" [formGroup]="stepFiveAiConfigForm" (ngSubmit)="submitStepFiveAiRequest()">
+        <label class="field">
+          <span>Minimum new loss scenarios</span>
+          <input type="number" min="1" formControlName="minLossScenarios" />
+        </label>
+        <label class="field">
+          <span>Maximum new loss scenarios</span>
+          <input type="number" min="1" formControlName="maxLossScenarios" />
+        </label>
+        <label class="field">
+          <span>Minimum new safety requirements</span>
+          <input type="number" min="0" formControlName="minSafetyRequirements" />
+        </label>
+        <label class="field">
+          <span>Maximum new safety requirements</span>
+          <input type="number" min="0" formControlName="maxSafetyRequirements" />
+        </label>
+        <label class="field field--full">
+          <span>Additional instructions (optional)</span>
+          <textarea
+            rows="3"
+            formControlName="promptInstructions"
+            placeholder="Emphasise environmental conditions, prioritise operator-facing requirements, etc."
+          ></textarea>
+        </label>
+        @if (stepFiveAiConfigError()) {
+          <p class="modal__error field--full">{{ stepFiveAiConfigError() }}</p>
+        }
+        <div class="page-actions modal__actions ai-modal__actions field--full">
+          <button type="button" class="button button--secondary" (click)="closeStepFiveAiModal()" [disabled]="isGeneratingStepFiveAi()">
+            Cancel
+          </button>
+          <button type="submit" class="button button--ai" [disabled]="isGeneratingStepFiveAi()">
+            <span class="button__icon" aria-hidden="true">
+              @if (isGeneratingStepFiveAi()) {
+                <span class="button__spinner"></span>
+              } @else {
+                <span class="ai-robot-icon" aria-hidden="true"></span>
+              }
+            </span>
+            <span>{{ isGeneratingStepFiveAi() ? 'Generating...' : 'Generate' }}</span>
+          </button>
         </div>
       </form>
     </div>
