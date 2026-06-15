@@ -79,3 +79,7 @@ mudar icone de robo que parece maça
 pagina para envio de sugestoes
 avaliacao ia no step 2
 mitigar pre carregamento modelo step 2
+
+trabalho futuro introduzir agentes especializados em stpa e resafety, porque nao é possivel enviar prompts de tamanho ilimitado com o contexto
+
+se voce usa um modelo simples e barato de IA e pede ao menos x elementos, ele vai lhe entregar x elementos

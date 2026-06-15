@@ -91,6 +91,40 @@ interface StepThreeAiDraft {
   }>;
 }
 
+interface StepOneSystemComponentEntry {
+  id: number;
+  name: string;
+  description: string;
+}
+
+interface StepOneScopeUpdatePayload {
+  id: number;
+  lastUpdatedBy?: string;
+  generalSummary?: Record<string, unknown>;
+  objectives?: string;
+  resources?: Array<Record<string, unknown>>;
+  systemComponents?: StepOneSystemComponentEntry[];
+  accidents?: Array<Record<string, unknown>>;
+  hazards?: Array<Record<string, unknown>>;
+  safetyConstraints?: Array<Record<string, unknown>>;
+  responsibilities?: Array<Record<string, unknown>>;
+  artefacts?: Array<Record<string, unknown>>;
+}
+
+interface PendingControllerApprovalOption {
+  name: string;
+  selected: boolean;
+}
+
+interface StepThreeAiRequestOptions {
+  allowNewControllers: boolean;
+  minControlActions: number;
+  maxControlActions: number;
+  minOptionalElements: number;
+  maxOptionalElements: number;
+  promptInstructions: string;
+}
+
 interface StepThreeFlatControlAction {
   id: string | number;
   controller?: string;
@@ -116,10 +150,29 @@ interface StepThreeFlatResponse {
 interface SketchNode {
   id: string;
   label: string;
-  kind: 'controller' | 'process' | 'external';
+  kind: 'controller' | 'shared' | 'process' | 'external';
+  tier: number;
   x: number;
   y: number;
   width: number;
+  height: number;
+  lines: string[];
+}
+
+interface SketchNodeDraft {
+  id: string;
+  label: string;
+  kind: SketchNode['kind'];
+  tier: number;
+  side?: 'left' | 'right';
+  relatedLabels?: string[];
+}
+
+interface SketchTierBand {
+  id: string;
+  label: string;
+  kind: 'controller' | 'shared' | 'process';
+  y: number;
   height: number;
 }
 
@@ -134,10 +187,7 @@ interface SketchEdge {
 interface SketchEdgeGeometry {
   id: string;
   label: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
+  path: string;
   labelX: number;
   labelY: number;
   marker: string;
@@ -168,11 +218,17 @@ export class ControlStructurePageComponent {
   readonly loadError = signal<string | null>(null);
   readonly stepThreeSaveMessage = signal<string | null>(null);
   readonly stepThreeSaveError = signal<string | null>(null);
+  readonly isStepThreeAiModalOpen = signal(false);
+  readonly stepThreeAiConfigError = signal<string | null>(null);
+  readonly isControllerApprovalModalOpen = signal(false);
+  readonly isSavingPendingControllers = signal(false);
+  readonly pendingControllerApprovalOptions = signal<PendingControllerApprovalOption[]>([]);
 
   private entitySeq = 0;
   private actionSeq = 0;
   private optionalElementSeq = 0;
   private latestStepOneScope: Record<string, unknown> | null = null;
+  private pendingStepThreeAiDraft: StepThreeAiDraft | null = null;
 
   readonly entityCatalog = signal<string[]>([]);
   readonly responsibilitiesCatalog = signal<string[]>([]);
@@ -237,13 +293,27 @@ export class ControlStructurePageComponent {
     responsibility: ['', Validators.required]
   });
 
+  readonly stepThreeAiConfigForm = this.fb.group({
+    allowNewControllers: [false],
+    existingControllersOnly: [true],
+    minControlActions: [2, [Validators.required, Validators.min(1)]],
+    maxControlActions: [4, [Validators.required, Validators.min(1)]],
+    minOptionalElements: [2, [Validators.required, Validators.min(0)]],
+    maxOptionalElements: [4, [Validators.required, Validators.min(0)]],
+    promptInstructions: ['']
+  });
+
   readonly passiveTargetGuidance = signal<string | null>(null);
   readonly optionalElementError = signal<string | null>(null);
   readonly editingControlActionId = signal<string | null>(null);
+  readonly sketchPreviewMessage = signal<string | null>(null);
 
   readonly entities = signal<StructuralEntity[]>([]);
   readonly controlActions = signal<ControlAction[]>([]);
   readonly optionalElements = signal<OptionalElement[]>([]);
+  readonly sketchPreviewEntities = signal<StructuralEntity[] | null>(null);
+  readonly sketchPreviewControlActions = signal<ControlAction[] | null>(null);
+  readonly sketchPreviewOptionalElements = signal<OptionalElement[] | null>(null);
 
   readonly controllerEntities = computed(() =>
     this.entities().filter((entity) => this.hasRole(entity, 'Controller'))
@@ -261,44 +331,28 @@ export class ControlStructurePageComponent {
   );
   readonly optionalElementsCount = computed(() => this.optionalElements().length);
 
-  readonly sketchCanvasWidth = 1020;
+  readonly sketchCanvasWidth = 1320;
+  readonly sketchEntities = computed(() => this.sketchPreviewEntities() ?? this.entities());
+  readonly sketchControlActions = computed(() => this.sketchPreviewControlActions() ?? this.controlActions());
+  readonly sketchOptionalElements = computed(() => this.sketchPreviewOptionalElements() ?? this.optionalElements());
+  readonly isSketchPreviewActive = computed(
+    () =>
+      this.sketchPreviewEntities() !== null ||
+      this.sketchPreviewControlActions() !== null ||
+      this.sketchPreviewOptionalElements() !== null
+  );
 
-  readonly sketchNodes = computed<SketchNode[]>(() => {
-    const controllerNames = this.uniqueNames(this.controllerEntities().map((entity) => entity.name));
-    const processNames = this.uniqueNames(this.controllableEntities().map((entity) => entity.name));
+  readonly sketchNodes = computed<SketchNode[]>(() => this.buildSketchNodes());
 
-    const controllerNodes = this.layoutNodes(controllerNames, 'controller', 170, 920, 60);
-    const processNodes = this.layoutNodes(processNames, 'process', 170, 920, 395);
-
-    const knownNames = new Set([...controllerNames, ...processNames].map((name) => name.toLowerCase()));
-    const externalNames = this.uniqueNames(
-      this.optionalElements()
-        .flatMap((item) => [item.source, item.destination])
-        .filter((name) => !!name)
-        .map((name) => name.trim())
-        .filter((name) => !knownNames.has(name.toLowerCase()))
-    ).slice(0, 3);
-
-    const externalNodes = externalNames.map((name, index) => ({
-      id: `ext-${index + 1}`,
-      label: name,
-      kind: 'external' as const,
-      x: 760,
-      y: 165 + index * 95,
-      width: 210,
-      height: 68
-    }));
-
-    return [...controllerNodes, ...processNodes, ...externalNodes];
-  });
+  readonly sketchTierBands = computed<SketchTierBand[]>(() => this.buildSketchTierBands(this.sketchNodes()));
 
   readonly sketchEdges = computed<SketchEdge[]>(() => {
     const nodes = this.sketchNodes();
     const edges: SketchEdge[] = [];
 
-    for (const action of this.controlActions()) {
-      const source = this.findNodeByName(nodes, action.sourceController, ['controller']);
-      const destination = this.findNodeByName(nodes, action.targetProcess, ['process']);
+    for (const action of this.sketchControlActions()) {
+      const source = this.findNodeByName(nodes, action.sourceController, ['controller', 'shared']);
+      const destination = this.findNodeByName(nodes, action.targetProcess, ['shared', 'process']);
 
       if (!source || !destination) {
         continue;
@@ -313,14 +367,14 @@ export class ControlStructurePageComponent {
       });
     }
 
-    for (const element of this.optionalElements()) {
+    for (const element of this.sketchOptionalElements()) {
       const isFeedback = element.type === 'Feedback' || element.type === 'Sensor';
       const sourceKinds: Array<SketchNode['kind']> = isFeedback
-        ? ['process', 'external', 'controller']
-        : ['controller', 'process', 'external'];
+        ? ['process', 'shared', 'external', 'controller']
+        : ['controller', 'shared', 'process', 'external'];
       const destinationKinds: Array<SketchNode['kind']> = isFeedback
-        ? ['controller', 'process', 'external']
-        : ['process', 'controller', 'external'];
+        ? ['shared', 'controller', 'process', 'external']
+        : ['shared', 'process', 'controller', 'external'];
 
       const source = this.findNodeByName(nodes, element.source, sourceKinds);
       const destination = this.findNodeByName(nodes, element.destination, destinationKinds);
@@ -347,13 +401,22 @@ export class ControlStructurePageComponent {
 
   readonly sketchCanvasHeight = computed(() => {
     const nodes = this.sketchNodes();
-    const lowestPoint = nodes.reduce((max, node) => Math.max(max, node.y + node.height), 530);
-    return lowestPoint + 70;
+    const bands = this.sketchTierBands();
+    const lowestPoint = Math.max(
+      nodes.reduce((max, node) => Math.max(max, node.y + node.height), 0),
+      bands.reduce((max, band) => Math.max(max, band.y + band.height), 0),
+      560
+    );
+    return lowestPoint + 80;
   });
 
   readonly hasSketchData = computed(() =>
-    this.sketchNodes().some((node) => node.kind === 'controller') &&
-    this.sketchNodes().some((node) => node.kind === 'process')
+    this.sketchNodes().some((node) => node.kind === 'controller' || node.kind === 'shared') &&
+    this.sketchNodes().some((node) => node.kind === 'process' || node.kind === 'shared')
+  );
+
+  readonly sketchHasExternalContext = computed(() =>
+    this.sketchNodes().some((node) => node.kind === 'external')
   );
 
   readonly form1Ready = computed(() => this.entities().length > 0);
@@ -451,7 +514,163 @@ export class ControlStructurePageComponent {
     this.isBpmnModelModalOpen.set(false);
   }
 
-  generateStepThreeWithAi(): void {
+  closeControllerApprovalModal(): void {
+    if (this.isSavingPendingControllers()) {
+      return;
+    }
+
+    this.isControllerApprovalModalOpen.set(false);
+    this.pendingControllerApprovalOptions.set([]);
+    this.pendingStepThreeAiDraft = null;
+  }
+
+  togglePendingController(name: string, selected: boolean): void {
+    this.pendingControllerApprovalOptions.update((current) =>
+      current.map((item) => (item.name === name ? { ...item, selected } : item))
+    );
+  }
+
+  applyPendingControllerSelection(): void {
+    const draft = this.pendingStepThreeAiDraft;
+    if (!draft) {
+      this.closeControllerApprovalModal();
+      return;
+    }
+
+    const rejectedControllers = this.pendingControllerApprovalOptions()
+      .filter((item) => !item.selected)
+      .map((item) => item.name);
+    const selectedControllers = this.pendingControllerApprovalOptions()
+      .filter((item) => item.selected)
+      .map((item) => item.name);
+    const filteredDraft = this.filterDraftByRejectedControllers(draft, rejectedControllers);
+
+    if (selectedControllers.length === 0) {
+      this.pendingStepThreeAiDraft = null;
+      this.pendingControllerApprovalOptions.set([]);
+      this.isControllerApprovalModalOpen.set(false);
+      this.applyStepThreeAiDraft(filteredDraft);
+      this.stepThreeSaveMessage.set('AI proposal applied to Step 3. Rows that depended on rejected controllers were ignored.');
+      this.aiFeedback.showWarning('Rejected controllers were ignored.');
+      return;
+    }
+
+    const projectId = this.currentProjectId();
+    if (!projectId || projectId <= 0) {
+      const message = 'Missing valid project id. New Step 1 system components cannot be saved.';
+      this.stepThreeSaveError.set(message);
+      this.aiFeedback.showError(message);
+      return;
+    }
+
+    const stepOnePayload = this.buildStepOneScopeUpdatePayload(projectId, selectedControllers);
+
+    this.isSavingPendingControllers.set(true);
+    this.projectService
+      .updateStepOneScope(stepOnePayload)
+      .pipe(
+        takeUntilDestroyed(this.destroyRef),
+        finalize(() => this.isSavingPendingControllers.set(false))
+      )
+      .subscribe({
+        next: () => {
+          this.mergeApprovedControllersIntoStepOneScope(selectedControllers);
+
+          const refreshedEntityCandidates = this.extractStepOneEntityCandidates(this.latestStepOneScope);
+          this.entityCandidates.set(refreshedEntityCandidates);
+          this.entityCatalog.set(refreshedEntityCandidates.map((item) => item.name));
+
+          this.pendingStepThreeAiDraft = null;
+          this.pendingControllerApprovalOptions.set([]);
+          this.isControllerApprovalModalOpen.set(false);
+          this.applyStepThreeAiDraft(filteredDraft);
+
+          this.stepThreeSaveMessage.set('AI proposal applied to Step 3. Approved controllers were added to Step 1 system components.');
+          if (rejectedControllers.length > 0) {
+            this.aiFeedback.showPartial('Approved controllers were added to Step 1. Rows that depended on rejected controllers were ignored.');
+          } else {
+            this.aiFeedback.showSuccess('Approved controllers were added to Step 1 and the AI proposal was applied.');
+          }
+        },
+        error: (error) => {
+          const message = 'Failed to update Step 1 system components for the new controllers.';
+          this.stepThreeSaveError.set(message);
+          this.aiFeedback.showError(message);
+          console.error('Failed to update Step 1 scope via POST /api/projects/step_one_project_update', error);
+        }
+      });
+  }
+
+  openStepThreeAiModal(): void {
+    this.stepThreeAiConfigError.set(null);
+    this.stepThreeAiConfigForm.reset({
+      allowNewControllers: false,
+      existingControllersOnly: true,
+      minControlActions: 2,
+      maxControlActions: 4,
+      minOptionalElements: 2,
+      maxOptionalElements: 4,
+      promptInstructions: ''
+    });
+    this.isStepThreeAiModalOpen.set(true);
+  }
+
+  closeStepThreeAiModal(): void {
+    if (this.isGeneratingStepThreeAi()) {
+      return;
+    }
+
+    this.isStepThreeAiModalOpen.set(false);
+    this.stepThreeAiConfigError.set(null);
+  }
+
+  setStepThreeAiControllerMode(mode: 'allow-new' | 'existing-only', checked: boolean): void {
+    if (mode === 'allow-new') {
+      this.stepThreeAiConfigForm.patchValue(
+        {
+          allowNewControllers: checked,
+          existingControllersOnly: !checked
+        },
+        { emitEvent: false }
+      );
+    } else {
+      this.stepThreeAiConfigForm.patchValue(
+        {
+          allowNewControllers: !checked,
+          existingControllersOnly: checked
+        },
+        { emitEvent: false }
+      );
+    }
+
+    this.stepThreeAiConfigError.set(null);
+  }
+
+  submitStepThreeAiRequest(): void {
+    if (this.isGeneratingStepThreeAi()) {
+      return;
+    }
+
+    if (this.stepThreeAiConfigForm.invalid) {
+      this.stepThreeAiConfigForm.markAllAsTouched();
+      return;
+    }
+
+    const options = this.getStepThreeAiRequestOptionsFromForm();
+    if (options.minControlActions > options.maxControlActions) {
+      this.stepThreeAiConfigError.set('Minimum number of control actions cannot be greater than the maximum.');
+      return;
+    }
+
+    if (options.minOptionalElements > options.maxOptionalElements) {
+      this.stepThreeAiConfigError.set('Minimum number of optional elements cannot be greater than the maximum.');
+      return;
+    }
+
+    this.generateStepThreeWithAi(options);
+  }
+
+  generateStepThreeWithAi(options: StepThreeAiRequestOptions = this.buildDefaultStepThreeAiRequestOptions()): void {
     if (this.isGeneratingStepThreeAi()) {
       return;
     }
@@ -462,7 +681,7 @@ export class ControlStructurePageComponent {
       return;
     }
 
-    const question = this.buildStepThreeAiPrompt();
+    const question = this.buildStepThreeAiPrompt(options);
     const context = JSON.stringify(
       {
         entityCandidates: this.entityCandidates(),
@@ -497,6 +716,36 @@ export class ControlStructurePageComponent {
             const message = 'AI returned an invalid Step 3 payload.';
             this.stepThreeSaveError.set(message);
             this.aiFeedback.showError(message);
+            return;
+          }
+
+          this.isStepThreeAiModalOpen.set(false);
+          this.stepThreeAiConfigError.set(null);
+
+          const newControllers = this.collectUnknownAiControllers(draft);
+          if (!options.allowNewControllers && newControllers.length > 0) {
+            const filteredDraft = this.filterDraftByRejectedControllers(draft, newControllers);
+            this.applyStepThreeAiDraft(filteredDraft);
+            this.stepThreeSaveMessage.set(
+              'AI proposal applied to Step 3. Rows that depended on controllers outside Step 1 were ignored.'
+            );
+            this.aiFeedback.showPartial(
+              'The AI suggested controllers outside Step 1. Related rows were ignored because the request was limited to existing controllers.'
+            );
+            return;
+          }
+
+          if (newControllers.length > 0) {
+            this.pendingStepThreeAiDraft = draft;
+            this.pendingControllerApprovalOptions.set(
+              newControllers.map((name) => ({
+                name,
+                selected: true
+              }))
+            );
+            this.isControllerApprovalModalOpen.set(true);
+            this.stepThreeSaveMessage.set('Review the new controllers before applying the AI proposal to Step 3.');
+            this.aiFeedback.showWarning(summary);
             return;
           }
 
@@ -572,6 +821,7 @@ export class ControlStructurePageComponent {
       passiveEntity: false,
       dependencyRestriction: false
     });
+    this.clearSketchPreview();
   }
 
   addControlAction(): void {
@@ -626,6 +876,7 @@ export class ControlStructurePageComponent {
       targetProcess: '',
       responsibility: ''
     });
+    this.clearSketchPreview();
   }
 
   editControlAction(item: ControlAction): void {
@@ -658,6 +909,7 @@ export class ControlStructurePageComponent {
       targetProcess: '',
       responsibility: ''
     });
+    this.clearSketchPreview();
   }
 
   addOptionalElement(): void {
@@ -749,6 +1001,25 @@ export class ControlStructurePageComponent {
       destination: '',
       responsibility: ''
     });
+    this.clearSketchPreview();
+  }
+
+  updateSketchPreview(): void {
+    const previewEntities = this.buildSketchPreviewEntities();
+    const previewControlActions = this.buildSketchPreviewControlActions(previewEntities);
+    const previewOptionalElements = this.buildSketchPreviewOptionalElements(previewEntities);
+
+    this.sketchPreviewEntities.set(previewEntities);
+    this.sketchPreviewControlActions.set(previewControlActions);
+    this.sketchPreviewOptionalElements.set(previewOptionalElements);
+    this.sketchPreviewMessage.set('Sketch refreshed from the current form entries.');
+  }
+
+  clearSketchPreview(): void {
+    this.sketchPreviewEntities.set(null);
+    this.sketchPreviewControlActions.set(null);
+    this.sketchPreviewOptionalElements.set(null);
+    this.sketchPreviewMessage.set(null);
   }
 
   saveStepThree(continueAfterSave = false): void {
@@ -875,6 +1146,141 @@ export class ControlStructurePageComponent {
 
   private isKnownResponsibility(label: string): boolean {
     return this.responsibilitiesCatalog().includes(label);
+  }
+
+  private buildSketchPreviewEntities(): StructuralEntity[] {
+    const preview = this.entities().map((entity) => ({
+      ...entity,
+      roles: [...entity.roles]
+    }));
+    const roles = this.selectedEntityRoles();
+    const entityName = (this.entityForm.controls.entityName.value ?? '').trim();
+
+    if (!entityName || roles.length === 0) {
+      return preview;
+    }
+
+    const existingIndex = preview.findIndex((entity) => entity.name === entityName);
+    const draftEntity: StructuralEntity = {
+      id: existingIndex >= 0 ? preview[existingIndex].id : 'draft-sketch-entity',
+      entityCandidateId: preview[existingIndex]?.entityCandidateId,
+      name: entityName,
+      roles
+    };
+
+    if (existingIndex >= 0) {
+      preview[existingIndex] = draftEntity;
+    } else {
+      preview.unshift(draftEntity);
+    }
+
+    return preview;
+  }
+
+  private buildSketchPreviewControlActions(previewEntities: StructuralEntity[]): ControlAction[] {
+    const preview = this.controlActions().map((item) => ({ ...item }));
+    const value = this.controlActionForm.getRawValue();
+    const sourceController = (value.sourceController ?? '').trim();
+    const targetProcess = (value.targetProcess ?? '').trim();
+    const action = (value.action ?? '').trim();
+    const responsibility = (value.responsibility ?? '').trim();
+
+    if (!sourceController || !targetProcess || !action) {
+      return preview;
+    }
+
+    const targetEntity = previewEntities.find((entity) => entity.name === targetProcess);
+    if (targetEntity && this.hasRole(targetEntity, 'Passive Entity')) {
+      return preview;
+    }
+
+    const editingId = this.editingControlActionId();
+    const draftAction: ControlAction = {
+      id: editingId ?? 'draft-sketch-control-action',
+      ref:
+        (value.ref ?? this.formatControlActionRef(this.actionSeq + 1)).trim() ||
+        this.formatControlActionRef(this.actionSeq + 1),
+      action,
+      sourceController,
+      targetProcess,
+      responsibility: responsibility || 'Responsibility linkage not yet specified'
+    };
+
+    if (editingId) {
+      const existingIndex = preview.findIndex((item) => item.id === editingId);
+      if (existingIndex >= 0) {
+        preview[existingIndex] = { ...preview[existingIndex], ...draftAction };
+        return preview;
+      }
+    }
+
+    return [draftAction, ...preview.filter((item) => item.id !== draftAction.id)];
+  }
+
+  private buildSketchPreviewOptionalElements(previewEntities: StructuralEntity[]): OptionalElement[] {
+    const preview = this.optionalElements().map((item) => ({ ...item }));
+    const value = this.optionalElementForm.getRawValue();
+    const type = (value.type ?? '').toString().trim() as OptionalElementType;
+    const name = (value.name ?? '').trim();
+    const source = (value.source ?? '').trim();
+    const destination = (value.destination ?? '').trim();
+    const responsibility = (value.responsibility ?? '').trim();
+
+    if (!type || !name || !source || !destination) {
+      return this.maybeAppendPassiveTargetRedirectPreview(preview, previewEntities);
+    }
+
+    const sourceEntity = previewEntities.find((entity) => entity.name === source);
+    const destinationEntity = previewEntities.find((entity) => entity.name === destination);
+
+    const draftOptional: OptionalElement = {
+      id: 'draft-sketch-optional-element',
+      type,
+      name,
+      source,
+      destination,
+      sourceEntityId: sourceEntity?.id ?? null,
+      sourceExternalId: null,
+      destinationEntityId: destinationEntity?.id ?? null,
+      destinationExternalId: null,
+      responsibility: responsibility || 'Responsibility linkage pending refinement'
+    };
+
+    return [draftOptional, ...preview.filter((item) => item.id !== draftOptional.id)];
+  }
+
+  private maybeAppendPassiveTargetRedirectPreview(
+    preview: OptionalElement[],
+    previewEntities: StructuralEntity[]
+  ): OptionalElement[] {
+    const value = this.controlActionForm.getRawValue();
+    const sourceController = (value.sourceController ?? '').trim();
+    const targetProcess = (value.targetProcess ?? '').trim();
+    const action = (value.action ?? '').trim();
+
+    if (!sourceController || !targetProcess || !action) {
+      return preview;
+    }
+
+    const targetEntity = previewEntities.find((entity) => entity.name === targetProcess);
+    if (!targetEntity || !this.hasRole(targetEntity, 'Passive Entity')) {
+      return preview;
+    }
+
+    const draftOptional: OptionalElement = {
+      id: 'draft-sketch-passive-feedback',
+      type: 'Feedback',
+      name: action,
+      source: targetProcess,
+      destination: sourceController,
+      sourceEntityId: targetEntity.id,
+      sourceExternalId: null,
+      destinationEntityId: previewEntities.find((entity) => entity.name === sourceController)?.id ?? null,
+      destinationExternalId: null,
+      responsibility: (value.responsibility ?? '').trim() || 'Responsibility linkage pending refinement'
+    };
+
+    return [draftOptional, ...preview.filter((item) => item.id !== draftOptional.id)];
   }
 
   private formatControlActionRef(id: number): string {
@@ -1365,6 +1771,12 @@ export class ControlStructurePageComponent {
     this.optionalElementError.set(null);
     this.stepThreeSaveMessage.set(null);
     this.stepThreeSaveError.set(null);
+    this.isStepThreeAiModalOpen.set(false);
+    this.stepThreeAiConfigError.set(null);
+    this.isControllerApprovalModalOpen.set(false);
+    this.isSavingPendingControllers.set(false);
+    this.pendingControllerApprovalOptions.set([]);
+    this.pendingStepThreeAiDraft = null;
     this.entityForm.reset({
       entityName: '',
       controller: false,
@@ -1494,8 +1906,46 @@ export class ControlStructurePageComponent {
     return 'Failed to save Step 3 due to an unexpected error.';
   }
 
-  private buildStepThreeAiPrompt(): string {
-    return `You are generating a complete Step 3 STPA control structure draft for a safety analysis workflow.
+  private buildDefaultStepThreeAiRequestOptions(): StepThreeAiRequestOptions {
+    return {
+      allowNewControllers: true,
+      minControlActions: 2,
+      maxControlActions: 4,
+      minOptionalElements: 2,
+      maxOptionalElements: 4,
+      promptInstructions: ''
+    };
+  }
+
+  private getStepThreeAiRequestOptionsFromForm(): StepThreeAiRequestOptions {
+    return {
+      allowNewControllers: !!this.stepThreeAiConfigForm.controls.allowNewControllers.value,
+      minControlActions: Number(this.stepThreeAiConfigForm.controls.minControlActions.value ?? 2),
+      maxControlActions: Number(this.stepThreeAiConfigForm.controls.maxControlActions.value ?? 4),
+      minOptionalElements: Number(this.stepThreeAiConfigForm.controls.minOptionalElements.value ?? 2),
+      maxOptionalElements: Number(this.stepThreeAiConfigForm.controls.maxOptionalElements.value ?? 4),
+      promptInstructions: (this.stepThreeAiConfigForm.controls.promptInstructions.value ?? '').trim()
+    };
+  }
+
+  private buildStepThreeAiPrompt(options: StepThreeAiRequestOptions): string {
+    const controllerStrategyInstructions = options.allowNewControllers
+      ? [
+          '- You may suggest a new systemComponent that acts as a controller when the existing Step 1 controllers are insufficient.',
+          '- Reuse controllers from currentData and Step 1.1.5 system components whenever possible before inventing a new controller.',
+          '- Every new controller must appear in the entities array with role Controller and must actually be used by at least one returned control action or optional element.'
+        ].join('\n')
+      : [
+          '- Use only controllers that already exist in currentData or in the Step 1.1.5 system components returned through entityCandidates.',
+          '- Do not invent, rename, or substitute a new controller name.',
+          '- If a possible control action would require a new controller, skip that action and propose a different valid one.'
+        ].join('\n');
+
+    const additionalDirectives = options.promptInstructions
+      ? `\n#### Additional directives from the analyst:\n${options.promptInstructions}`
+      : '';
+
+    return `You are extending an existing Step 3 STPA control structure draft for a safety analysis workflow.
 
 Return JSON only. Do not include markdown fences, commentary, or explanations.
 
@@ -1506,17 +1956,29 @@ Return an object with this exact shape:
   "optionalElements": [{ "type": "Feedback", "name": "", "source": "", "destination": "", "responsibility": "" }]
 }
 
-Rules:
-- Use only roles from the provided Step 3 entityRoles catalog.
-- Use entity names from the provided entityCandidates when possible.
-- Use only responsibility labels from the provided responsibilities catalog.
-- Use only optional element types from the provided optionalElementTypes catalog.
-- sourceController must reference an entity with role Controller.
-- targetProcess must reference an entity with role Controlled Process.
-- Optional element source and destination must reference either generated entity names or provided external source labels.
-- Preserve valid existing currentData when possible and fill missing sections so the page is meaningfully populated.
+#### Entity classification (Step 3.1) belongs to the analyst:
+- Reuse the entities already present in currentData whenever possible, referring to them by their exact existing name.
+- Never rename, re-role, or remove an existing entity.
+- In the entities array, list every entity referenced by your control actions and optional elements. Include a brand-new entity (with its roles from the entityRoles catalog) only when a new control action or optional element needs a controller or process that currentData does not define yet.
+${controllerStrategyInstructions}
+
+#### Define control actions (Step 3.2) - REQUIRED:
+- Add between ${options.minControlActions} and ${options.maxControlActions} NEW control actions that are not already in currentData, and keep all existing ones.
+- sourceController must be an entity that has the Controller role.
+- targetProcess must be an entity that has the Controlled Process role.
+- Prefer responsibility labels from the provided responsibilities catalog when one fits.
+
+#### Define optional control structure elements (Steps 3.3-3.8) - REQUIRED:
+- Add between ${options.minOptionalElements} and ${options.maxOptionalElements} NEW optional elements that are not already in currentData, and keep all existing ones.
+- Use the optional element type value exactly as one of the provided optionalElementTypes catalog entries.
+- Do not invent labels such as Monitoring or Sensing. If you mean a monitoring or acknowledgement loop, use Feedback. If you mean sensing or sensor data, use Sensor.
+- source and destination must reference an entity name or a provided external source label.
+- Use feedback, sensing, actuation, or monitoring links that match the control actions.
+
+General rules:
+- Keep every existing valid control action and optional element from currentData; only add to them.
 - Avoid duplicates.
-- Prefer a concise but complete draft over placeholder text.`;
+- Prefer concrete, domain-specific names over placeholder text.${additionalDirectives}`;
   }
 
   private parseStepThreeAiDraft(response: unknown): StepThreeAiDraft | null {
@@ -1530,121 +1992,401 @@ Rules:
 
   private applyStepThreeAiDraft(draft: StepThreeAiDraft): void {
     const availableRoles = new Set(this.availableEntityRoles());
-    const responsibilityLabels = new Set(this.availableResponsibilities().map((item) => item.label));
     const optionalTypes = new Set(this.optionalElementTypes());
-    const externalLabels = new Set(this.externalSources().map((item) => item.label));
-    const existingEntityIdByName = new Map(this.entities().map((item) => [item.name.trim().toLowerCase(), item.id]));
+    const optionalTypeByKey = new Map(this.optionalElementTypes().map((item) => [item.trim().toLowerCase(), item]));
+    const externalSourceByLabel = new Map(this.externalSources().map((item) => [item.label.trim().toLowerCase(), item]));
+    const responsibilityByLabel = new Map(this.availableResponsibilities().map((item) => [item.label.trim().toLowerCase(), item]));
 
     let nextEntitySeq = this.entitySeq;
-    const normalizedEntities = (draft.entities ?? [])
-      .map((item) => {
-        const name = (item.name ?? '').trim();
-        const roles = (item.roles ?? []).filter((role): role is EntityRole => availableRoles.has(role as EntityRole));
-        if (!name || roles.length === 0) {
-          return null;
-        }
+    let nextActionSeq = this.actionSeq;
+    let nextOptionalSeq = this.optionalElementSeq;
 
-        const normalizedKey = name.toLowerCase();
-        const existingId = existingEntityIdByName.get(normalizedKey);
-        return {
-          id: existingId ?? `local-ai-entity-${++nextEntitySeq}`,
-          name,
-          roles: Array.from(new Set(roles))
-        } as StructuralEntity;
-      })
-      .filter((item): item is StructuralEntity => !!item)
-      .filter((item, index, items) => items.findIndex((candidate) => candidate.name.toLowerCase() === item.name.toLowerCase()) === index);
+    // Existing Step 3.1 entities are protected: they are never renamed, re-roled, or removed.
+    // The AI button only ADDS control actions (3.2) and optional elements (3.3-3.8). A new
+    // supporting entity is created only when one of those additions references a controller or
+    // process the analyst has not classified yet, so the new rows stay valid and saveable.
+    const mergedEntities = [...this.entities()];
+    const entityByNameKey = new Map(mergedEntities.map((item) => [item.name.trim().toLowerCase(), item]));
 
-    const entityByName = new Map(normalizedEntities.map((item) => [item.name, item]));
+    const aiRolesByName = new Map<string, EntityRole[]>();
+    for (const item of draft.entities ?? []) {
+      const name = (item.name ?? '').trim();
+      if (!name) {
+        continue;
+      }
 
-    let nextActionSeq = 0;
-    const normalizedActions = (draft.controlActions ?? [])
-      .map((item) => {
-        const action = (item.action ?? '').trim();
-        const sourceController = (item.sourceController ?? '').trim();
-        const targetProcess = (item.targetProcess ?? '').trim();
-        const responsibility = (item.responsibility ?? '').trim();
-        const sourceEntity = entityByName.get(sourceController);
-        const targetEntity = entityByName.get(targetProcess);
+      const roles = Array.from(
+        new Set((item.roles ?? []).filter((role): role is EntityRole => availableRoles.has(role as EntityRole)))
+      );
+      aiRolesByName.set(name.toLowerCase(), roles);
+    }
 
-        if (
-          !action ||
-          !sourceEntity ||
-          !targetEntity ||
-          !sourceEntity.roles.includes('Controller') ||
-          !targetEntity.roles.includes('Controlled Process') ||
-          !responsibilityLabels.has(responsibility)
-        ) {
-          return null;
-        }
+    const ensureEntity = (rawName: string, requiredRole?: EntityRole): StructuralEntity | null => {
+      const name = rawName.trim();
+      const key = name.toLowerCase();
+      if (!key) {
+        return null;
+      }
 
-        nextActionSeq += 1;
-        return {
-          id: `local-ai-control-action-${nextActionSeq}`,
-          ref: this.formatControlActionRef(nextActionSeq),
-          action,
-          sourceController,
-          targetProcess,
-          sourceEntityId: sourceEntity.id,
-          targetEntityId: targetEntity.id,
-          responsibility,
-          responsibilityId: this.availableResponsibilities().find((entry) => entry.label === responsibility)?.id
-        } as ControlAction;
-      })
-      .filter((item): item is ControlAction => !!item);
+      const existing = entityByNameKey.get(key);
+      if (existing) {
+        // Never mutate analyst-owned entities: reject the link if the role does not already fit.
+        return requiredRole && !existing.roles.includes(requiredRole) ? null : existing;
+      }
 
-    let nextOptionalSeq = 0;
-    const normalizedOptionalElements = (draft.optionalElements ?? [])
-      .map((item) => {
-        const type = (item.type ?? '').trim() as OptionalElementType;
-        const name = (item.name ?? '').trim();
-        const source = (item.source ?? '').trim();
-        const destination = (item.destination ?? '').trim();
-        const responsibility = (item.responsibility ?? '').trim();
+      const roles = Array.from(
+        new Set([...(requiredRole ? [requiredRole] : []), ...(aiRolesByName.get(key) ?? [])])
+      ).filter((role): role is EntityRole => availableRoles.has(role));
 
-        if (!optionalTypes.has(type) || !name || !source || !destination || !responsibilityLabels.has(responsibility)) {
-          return null;
-        }
+      if (roles.length === 0) {
+        return null;
+      }
 
-        const sourceEntity = entityByName.get(source);
-        const destinationEntity = entityByName.get(destination);
-        if (!sourceEntity && !externalLabels.has(source)) {
-          return null;
-        }
+      const created: StructuralEntity = {
+        id: `local-ai-entity-${++nextEntitySeq}`,
+        name,
+        roles
+      };
+      mergedEntities.push(created);
+      entityByNameKey.set(key, created);
+      return created;
+    };
 
-        if (!destinationEntity && !externalLabels.has(destination)) {
-          return null;
-        }
+    const mergedControlActions = [...this.controlActions()];
+    const controlActionKeys = new Set(
+      mergedControlActions.map((item) =>
+        [item.action, item.sourceController, item.targetProcess]
+          .map((value) => value.trim().toLowerCase())
+          .join('|')
+      )
+    );
 
-        nextOptionalSeq += 1;
-        return {
-          id: `local-ai-optional-element-${nextOptionalSeq}`,
-          type,
-          name,
-          source,
-          destination,
-          sourceEntityId: sourceEntity?.id ?? null,
-          sourceExternalId: sourceEntity ? null : this.externalSources().find((entry) => entry.label === source)?.id ?? null,
-          destinationEntityId: destinationEntity?.id ?? null,
-          destinationExternalId: destinationEntity ? null : this.externalSources().find((entry) => entry.label === destination)?.id ?? null,
-          responsibility,
-          responsibilityId: this.availableResponsibilities().find((entry) => entry.label === responsibility)?.id
-        } as OptionalElement;
-      })
-      .filter((item): item is OptionalElement => !!item);
+    for (const item of draft.controlActions ?? []) {
+      const action = (item.action ?? '').trim();
+      const responsibility = (item.responsibility ?? '').trim();
+      const sourceEntity = ensureEntity(item.sourceController ?? '', 'Controller');
+      const targetEntity = ensureEntity(item.targetProcess ?? '', 'Controlled Process');
 
-    this.entities.set(normalizedEntities);
-    this.controlActions.set(normalizedActions);
-    this.optionalElements.set(normalizedOptionalElements);
-    this.entitySeq = normalizedEntities.length;
-    this.actionSeq = normalizedActions.length;
-    this.optionalElementSeq = normalizedOptionalElements.length;
+      if (!action || !sourceEntity || !targetEntity) {
+        continue;
+      }
+
+      const actionKey = [action, sourceEntity.name, targetEntity.name]
+        .map((value) => value.toLowerCase())
+        .join('|');
+      if (controlActionKeys.has(actionKey)) {
+        continue;
+      }
+
+      mergedControlActions.push({
+        id: `local-ai-control-action-${++nextActionSeq}`,
+        ref: (item.ref ?? '').trim() || this.formatControlActionRef(nextActionSeq),
+        action,
+        sourceController: sourceEntity.name,
+        targetProcess: targetEntity.name,
+        sourceEntityId: sourceEntity.id,
+        targetEntityId: targetEntity.id,
+        responsibility: responsibility || 'Responsibility linkage not yet specified',
+        responsibilityId: responsibilityByLabel.get(responsibility.toLowerCase())?.id
+      });
+      controlActionKeys.add(actionKey);
+    }
+
+    const mergedOptionalElements = [...this.optionalElements()];
+    const optionalElementKeys = new Set(
+      mergedOptionalElements.map((item) =>
+        [item.type, item.name, item.source, item.destination]
+          .map((value) => value.trim().toLowerCase())
+          .join('|')
+      )
+    );
+
+    for (const item of draft.optionalElements ?? []) {
+      const type = this.normalizeOptionalElementType(item.type ?? '', optionalTypeByKey);
+      const name = (item.name ?? '').trim();
+      const source = (item.source ?? '').trim();
+      const destination = (item.destination ?? '').trim();
+      const responsibility = (item.responsibility ?? '').trim();
+
+      if (!type || !optionalTypes.has(type) || !name || !source || !destination) {
+        continue;
+      }
+
+      const sourceExternal = externalSourceByLabel.get(source.toLowerCase());
+      const destinationExternal = externalSourceByLabel.get(destination.toLowerCase());
+      const sourceEntity = sourceExternal ? null : ensureEntity(source);
+      const destinationEntity = destinationExternal ? null : ensureEntity(destination);
+
+      if (!sourceEntity && !sourceExternal) {
+        continue;
+      }
+
+      if (!destinationEntity && !destinationExternal) {
+        continue;
+      }
+
+      const resolvedSource = sourceEntity?.name ?? source;
+      const resolvedDestination = destinationEntity?.name ?? destination;
+      const optionalKey = [type, name, resolvedSource, resolvedDestination]
+        .map((value) => value.toLowerCase())
+        .join('|');
+      if (optionalElementKeys.has(optionalKey)) {
+        continue;
+      }
+
+      mergedOptionalElements.push({
+        id: `local-ai-optional-element-${++nextOptionalSeq}`,
+        type,
+        name,
+        source: resolvedSource,
+        destination: resolvedDestination,
+        sourceEntityId: sourceEntity?.id ?? null,
+        sourceExternalId: sourceEntity ? null : sourceExternal?.id ?? null,
+        destinationEntityId: destinationEntity?.id ?? null,
+        destinationExternalId: destinationEntity ? null : destinationExternal?.id ?? null,
+        responsibility: responsibility || 'Responsibility linkage pending refinement',
+        responsibilityId: responsibilityByLabel.get(responsibility.toLowerCase())?.id
+      });
+      optionalElementKeys.add(optionalKey);
+    }
+
+    this.entities.set(mergedEntities);
+    this.controlActions.set(mergedControlActions);
+    this.optionalElements.set(mergedOptionalElements);
+    this.entitySeq = nextEntitySeq;
+    this.actionSeq = nextActionSeq;
+    this.optionalElementSeq = nextOptionalSeq;
     this.controlActionForm.patchValue({
       ref: this.formatControlActionRef(this.actionSeq + 1)
     });
     if (this.optionalElementTypes().length > 0) {
       this.optionalElementForm.patchValue({ type: this.optionalElementTypes()[0] });
     }
+  }
+
+  private collectUnknownAiControllers(draft: StepThreeAiDraft): string[] {
+    const knownStepOneComponents = new Set(
+      this.entityCandidates()
+        .filter((item) => item.sourceType === 'systemComponent')
+        .map((item) => item.name.trim().toLowerCase())
+    );
+    const seen = new Set<string>();
+    const draftRolesByName = new Map(
+      (draft.entities ?? []).map((item) => [
+        (item.name ?? '').trim().toLowerCase(),
+        Array.from(new Set(item.roles ?? []))
+      ])
+    );
+    const results: string[] = [];
+
+    for (const action of draft.controlActions ?? []) {
+      const controllerName = (action.sourceController ?? '').trim();
+      if (!controllerName) {
+        continue;
+      }
+
+      const normalized = controllerName.toLowerCase();
+      if (seen.has(normalized) || knownStepOneComponents.has(normalized)) {
+        continue;
+      }
+
+      const existingEntity = this.entities().find((item) => item.name.trim().toLowerCase() === normalized);
+      if (existingEntity && this.hasRole(existingEntity, 'Controller')) {
+        continue;
+      }
+
+      const draftRoles = draftRolesByName.get(normalized) ?? [];
+      if (!draftRoles.includes('Controller')) {
+        continue;
+      }
+
+      seen.add(normalized);
+      results.push(controllerName);
+    }
+
+    return results;
+  }
+
+  private normalizeOptionalElementType(
+    rawType: string,
+    optionalTypeByKey: Map<string, OptionalElementType>
+  ): OptionalElementType | null {
+    const normalized = rawType.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    const exact = optionalTypeByKey.get(normalized);
+    if (exact) {
+      return exact;
+    }
+
+    if (normalized.includes('monitor')) {
+      return optionalTypeByKey.get('feedback') ?? null;
+    }
+
+    if (normalized.includes('sens')) {
+      return optionalTypeByKey.get('sensor') ?? null;
+    }
+
+    if (normalized.includes('actuat')) {
+      return optionalTypeByKey.get('actuator') ?? null;
+    }
+
+    if (normalized.includes('algorithm') || normalized.includes('logic')) {
+      return optionalTypeByKey.get('control algorithm') ?? null;
+    }
+
+    if (normalized.includes('model')) {
+      return optionalTypeByKey.get('process model') ?? null;
+    }
+
+    if (normalized.includes('external') || normalized.includes('input')) {
+      return optionalTypeByKey.get('external input') ?? null;
+    }
+
+    return null;
+  }
+
+  private filterDraftByRejectedControllers(draft: StepThreeAiDraft, rejectedControllers: string[]): StepThreeAiDraft {
+    if (rejectedControllers.length === 0) {
+      return draft;
+    }
+
+    const rejectedKeys = new Set(rejectedControllers.map((item) => item.trim().toLowerCase()));
+    const isRejectedControllerName = (value: string | null | undefined): boolean =>
+      rejectedKeys.has((value ?? '').trim().toLowerCase());
+
+    const filteredControlActions = (draft.controlActions ?? []).filter(
+      (item) =>
+        !isRejectedControllerName(item.sourceController) && !isRejectedControllerName(item.targetProcess)
+    );
+
+    const filteredOptionalElements = (draft.optionalElements ?? []).filter((item) => {
+      const source = (item.source ?? '').trim().toLowerCase();
+      const destination = (item.destination ?? '').trim().toLowerCase();
+      return !rejectedKeys.has(source) && !rejectedKeys.has(destination);
+    });
+
+    const referencedNames = new Set<string>();
+    for (const item of filteredControlActions) {
+      const sourceController = (item.sourceController ?? '').trim().toLowerCase();
+      const targetProcess = (item.targetProcess ?? '').trim().toLowerCase();
+      if (sourceController) {
+        referencedNames.add(sourceController);
+      }
+      if (targetProcess) {
+        referencedNames.add(targetProcess);
+      }
+    }
+
+    for (const item of filteredOptionalElements) {
+      const source = (item.source ?? '').trim().toLowerCase();
+      const destination = (item.destination ?? '').trim().toLowerCase();
+      if (source) {
+        referencedNames.add(source);
+      }
+      if (destination) {
+        referencedNames.add(destination);
+      }
+    }
+
+    const filteredEntities = (draft.entities ?? []).filter((item) => {
+      const name = (item.name ?? '').trim().toLowerCase();
+      if (rejectedKeys.has(name)) {
+        return false;
+      }
+
+      return !name || referencedNames.has(name) || this.isKnownEntityName(item.name ?? '');
+    });
+
+    return {
+      entities: filteredEntities,
+      controlActions: filteredControlActions,
+      optionalElements: filteredOptionalElements
+    };
+  }
+
+  private buildStepOneScopeUpdatePayload(projectId: number, approvedControllerNames: string[]): StepOneScopeUpdatePayload {
+    const scope = this.cloneRecord(this.latestStepOneScope ?? {}) as unknown as StepOneScopeUpdatePayload;
+    scope.id = projectId;
+
+    const existingComponents = this.collectStepOneSystemComponentRecords(this.latestStepOneScope ?? {}).map((item, index) => ({
+      id: this.readNumericField(item, ['id']) ?? index + 1,
+      name: this.readTextField(item, ['name', 'component', 'componentName', 'systemComponent']).trim(),
+      description: this.readTextField(item, ['description', 'details', 'summary']).trim()
+    }));
+    const existingKeys = new Set(existingComponents.map((item) => item.name.trim().toLowerCase()));
+    let nextId = existingComponents.reduce((max, item) => Math.max(max, item.id), 0);
+
+    for (const name of approvedControllerNames) {
+      const normalized = name.trim().toLowerCase();
+      if (!normalized || existingKeys.has(normalized)) {
+        continue;
+      }
+
+      nextId += 1;
+      existingComponents.push({
+        id: nextId,
+        name,
+        description: 'Added from Step 3 AI-proposed controller'
+      });
+      existingKeys.add(normalized);
+    }
+
+    scope.systemComponents = existingComponents;
+    return scope;
+  }
+
+  private mergeApprovedControllersIntoStepOneScope(approvedControllerNames: string[]): void {
+    const scope = this.cloneRecord(this.latestStepOneScope ?? {}) as Record<string, unknown>;
+    const existingComponents = this.collectStepOneSystemComponentRecords(scope).map((item, index) => ({
+      id: this.readNumericField(item, ['id']) ?? index + 1,
+      name: this.readTextField(item, ['name', 'component', 'componentName', 'systemComponent']).trim(),
+      description: this.readTextField(item, ['description', 'details', 'summary']).trim()
+    }));
+    const existingKeys = new Set(existingComponents.map((item) => item.name.trim().toLowerCase()));
+    let nextId = existingComponents.reduce((max, item) => Math.max(max, item.id), 0);
+
+    for (const name of approvedControllerNames) {
+      const normalized = name.trim().toLowerCase();
+      if (!normalized || existingKeys.has(normalized)) {
+        continue;
+      }
+
+      nextId += 1;
+      existingComponents.push({
+        id: nextId,
+        name,
+        description: 'Added from Step 3 AI-proposed controller'
+      });
+      existingKeys.add(normalized);
+    }
+
+    scope['systemComponents'] = existingComponents;
+    this.latestStepOneScope = scope;
+  }
+
+  private cloneRecord<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
+  }
+
+  private readNumericField(record: Record<string, unknown>, keys: string[]): number | null {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+
+      if (typeof value === 'string' && value.trim()) {
+        const parsed = Number(value);
+        if (!Number.isNaN(parsed)) {
+          return parsed;
+        }
+      }
+    }
+
+    return null;
   }
 
   private parseAiJsonResponse(response: unknown): unknown {
@@ -1741,31 +2483,374 @@ Rules:
     return values;
   }
 
-  private layoutNodes(
-    names: string[],
-    kind: SketchNode['kind'],
-    minX: number,
-    maxX: number,
-    y: number
-  ): SketchNode[] {
-    if (names.length === 0) {
+  private buildSketchNodes(): SketchNode[] {
+    const relevantEntities = this.sketchEntities().filter(
+      (entity) =>
+        this.hasRole(entity, 'Controller') ||
+        this.hasRole(entity, 'Controlled Process') ||
+        this.hasRole(entity, 'Passive Entity')
+    );
+
+    if (relevantEntities.length === 0) {
       return [];
     }
 
-    const width = kind === 'process' ? 250 : 230;
-    const height = kind === 'process' ? 86 : 78;
-    const usableRange = Math.max(maxX - minX - width, 0);
-    const spacing = names.length > 1 ? usableRange / (names.length - 1) : 0;
+    const entityByKey = new Map(
+      relevantEntities.map((entity) => [entity.name.trim().toLowerCase(), entity])
+    );
+    const incomingControlSources = new Map<string, string[]>();
 
-    return names.map((name, index) => ({
-      id: `${kind}-${index + 1}`,
-      label: name,
-      kind,
-      x: names.length === 1 ? minX + usableRange / 2 : minX + index * spacing,
-      y,
-      width,
-      height
-    }));
+    for (const action of this.sketchControlActions()) {
+      const sourceKey = action.sourceController.trim().toLowerCase();
+      const targetKey = action.targetProcess.trim().toLowerCase();
+
+      if (!entityByKey.has(sourceKey) || !entityByKey.has(targetKey)) {
+        continue;
+      }
+
+      const currentSources = incomingControlSources.get(targetKey) ?? [];
+      if (!currentSources.includes(sourceKey)) {
+        currentSources.push(sourceKey);
+        incomingControlSources.set(targetKey, currentSources);
+      }
+    }
+
+    const tierCache = new Map<string, number>();
+    const resolveTier = (entityKey: string, stack = new Set<string>()): number => {
+      if (tierCache.has(entityKey)) {
+        return tierCache.get(entityKey) ?? 0;
+      }
+
+      if (stack.has(entityKey)) {
+        return 0;
+      }
+
+      stack.add(entityKey);
+
+      const incoming = (incomingControlSources.get(entityKey) ?? []).filter((sourceKey) => {
+        const sourceEntity = entityByKey.get(sourceKey);
+        return !!sourceEntity && this.hasRole(sourceEntity, 'Controller');
+      });
+
+      const tier =
+        incoming.length === 0
+          ? 0
+          : 1 + Math.max(...incoming.map((sourceKey) => resolveTier(sourceKey, new Set(stack))));
+
+      stack.delete(entityKey);
+      tierCache.set(entityKey, tier);
+      return tier;
+    };
+
+    const internalDrafts: SketchNodeDraft[] = relevantEntities.map((entity) => {
+      const entityKey = entity.name.trim().toLowerCase();
+      const isController = this.hasRole(entity, 'Controller');
+      const isProcess =
+        this.hasRole(entity, 'Controlled Process') || this.hasRole(entity, 'Passive Entity');
+
+      const kind: SketchNode['kind'] = isController && isProcess
+        ? 'shared'
+        : isController
+          ? 'controller'
+          : 'process';
+
+      let tier = 0;
+
+      if (kind === 'controller' || kind === 'shared') {
+        tier = resolveTier(entityKey);
+      } else {
+        const incoming = incomingControlSources.get(entityKey) ?? [];
+        tier = incoming.length > 0
+          ? Math.max(...incoming.map((sourceKey) => resolveTier(sourceKey))) + 1
+          : 1;
+      }
+
+      return {
+        id: entity.id,
+        label: entity.name,
+        kind,
+        tier
+      };
+    });
+
+    const uniqueTiers = Array.from(new Set(internalDrafts.map((item) => item.tier))).sort((a, b) => a - b);
+    const yByTier = new Map(uniqueTiers.map((tier, index) => [tier, 96 + index * 160]));
+
+    const internalNodes = uniqueTiers.flatMap((tier) => {
+      const tierDrafts = internalDrafts
+        .filter((item) => item.tier === tier)
+        .sort((left, right) => {
+          const kindDiff = this.sketchKindRank(left.kind) - this.sketchKindRank(right.kind);
+          return kindDiff !== 0 ? kindDiff : left.label.localeCompare(right.label);
+        });
+
+      return this.layoutTierNodes(tierDrafts, yByTier.get(tier) ?? 96, 200, 1060);
+    });
+
+    const internalNodeByLabel = new Map(
+      internalNodes.map((node) => [node.label.trim().toLowerCase(), node])
+    );
+    const externalDrafts = this.buildExternalSketchNodeDrafts(internalNodeByLabel);
+    const leftExternalDrafts = externalDrafts.filter((item) => item.side === 'left');
+    const rightExternalDrafts = externalDrafts.filter((item) => item.side !== 'left');
+
+    const externalNodes = [
+      ...this.layoutExternalNodes(leftExternalDrafts, 'left', internalNodeByLabel),
+      ...this.layoutExternalNodes(rightExternalDrafts, 'right', internalNodeByLabel)
+    ];
+
+    return [...internalNodes, ...externalNodes];
+  }
+
+  private sketchKindRank(kind: SketchNode['kind']): number {
+    switch (kind) {
+      case 'controller':
+        return 0;
+      case 'shared':
+        return 1;
+      case 'process':
+        return 2;
+      case 'external':
+        return 3;
+    }
+  }
+
+  private layoutTierNodes(
+    drafts: SketchNodeDraft[],
+    y: number,
+    minX: number,
+    maxX: number
+  ): SketchNode[] {
+    if (drafts.length === 0) {
+      return [];
+    }
+
+    const nodes = drafts.map((draft) => {
+      const lines = this.wrapSketchLabel(draft.label, draft.kind === 'process' ? 19 : 17);
+      const width = draft.kind === 'process' ? 270 : draft.kind === 'shared' ? 260 : 245;
+      const height = Math.max(draft.kind === 'shared' ? 102 : 92, 44 + lines.length * 20);
+
+      return {
+        ...draft,
+        x: 0,
+        y,
+        width,
+        height,
+        lines
+      } satisfies SketchNode;
+    });
+
+    const gap = 34;
+    const totalWidth =
+      nodes.reduce((sum, node) => sum + node.width, 0) + Math.max(0, nodes.length - 1) * gap;
+    const availableWidth = maxX - minX;
+    let cursorX = minX + Math.max(0, (availableWidth - totalWidth) / 2);
+
+    return nodes.map((node) => {
+      const positioned = {
+        ...node,
+        x: cursorX
+      };
+      cursorX += node.width + gap;
+      return positioned;
+    });
+  }
+
+  private buildExternalSketchNodeDrafts(
+    internalNodeByLabel: Map<string, SketchNode>
+  ): SketchNodeDraft[] {
+    const stats = new Map<
+      string,
+      { label: string; asSourceCount: number; asDestinationCount: number; relatedLabels: string[] }
+    >();
+
+    for (const element of this.sketchOptionalElements()) {
+      const sourceKey = element.source.trim().toLowerCase();
+      const destinationKey = element.destination.trim().toLowerCase();
+      const sourceIsInternal = internalNodeByLabel.has(sourceKey);
+      const destinationIsInternal = internalNodeByLabel.has(destinationKey);
+
+      if (!sourceIsInternal && sourceKey) {
+        const entry = stats.get(sourceKey) ?? {
+          label: element.source.trim(),
+          asSourceCount: 0,
+          asDestinationCount: 0,
+          relatedLabels: []
+        };
+        entry.asSourceCount += 1;
+        if (destinationIsInternal) {
+          entry.relatedLabels.push(element.destination.trim());
+        }
+        stats.set(sourceKey, entry);
+      }
+
+      if (!destinationIsInternal && destinationKey) {
+        const entry = stats.get(destinationKey) ?? {
+          label: element.destination.trim(),
+          asSourceCount: 0,
+          asDestinationCount: 0,
+          relatedLabels: []
+        };
+        entry.asDestinationCount += 1;
+        if (sourceIsInternal) {
+          entry.relatedLabels.push(element.source.trim());
+        }
+        stats.set(destinationKey, entry);
+      }
+    }
+
+    return Array.from(stats.entries()).map(([key, value], index) => {
+      const side = value.asSourceCount >= value.asDestinationCount ? 'left' : 'right';
+      const relatedTiers = this.uniqueNames(value.relatedLabels)
+        .map((label) => internalNodeByLabel.get(label.toLowerCase())?.tier)
+        .filter((tier): tier is number => typeof tier === 'number');
+      const tier =
+        relatedTiers.length > 0
+          ? Math.round(relatedTiers.reduce((sum, item) => sum + item, 0) / relatedTiers.length)
+          : index;
+
+      return {
+        id: `external-${index + 1}`,
+        label: value.label,
+        kind: 'external' as const,
+        tier,
+        side,
+        relatedLabels: this.uniqueNames(value.relatedLabels)
+      };
+    });
+  }
+
+  private layoutExternalNodes(
+    drafts: SketchNodeDraft[],
+    side: 'left' | 'right',
+    internalNodeByLabel: Map<string, SketchNode>
+  ): SketchNode[] {
+    if (drafts.length === 0) {
+      return [];
+    }
+
+    const orderedDrafts = [...drafts].sort((left, right) => {
+      if (left.tier !== right.tier) {
+        return left.tier - right.tier;
+      }
+
+      return left.label.localeCompare(right.label);
+    });
+
+    const x = side === 'left' ? 32 : this.sketchCanvasWidth - 232;
+    let cursorY = 112;
+
+    return orderedDrafts.map((draft) => {
+      const lines = this.wrapSketchLabel(draft.label, 16);
+      const width = 200;
+      const height = Math.max(86, 42 + lines.length * 18);
+      const relatedNodes = (draft.relatedLabels ?? [])
+        .map((label) => internalNodeByLabel.get(label.toLowerCase()))
+        .filter((node): node is SketchNode => !!node);
+      const preferredY =
+        relatedNodes.length > 0
+          ? relatedNodes.reduce((sum, node) => sum + node.y + node.height / 2, 0) / relatedNodes.length -
+            height / 2
+          : cursorY;
+      const y = Math.max(cursorY, preferredY);
+
+      cursorY = y + height + 26;
+
+      return {
+        id: draft.id,
+        label: draft.label,
+        kind: 'external',
+        tier: draft.tier,
+        x,
+        y,
+        width,
+        height,
+        lines
+      };
+    });
+  }
+
+  private buildSketchTierBands(nodes: SketchNode[]): SketchTierBand[] {
+    const internalNodes = nodes.filter((node) => node.kind !== 'external');
+    const tiers = Array.from(new Set(internalNodes.map((node) => node.tier))).sort((a, b) => a - b);
+
+    return tiers.map((tier) => {
+      const tierNodes = internalNodes.filter((node) => node.tier === tier);
+      const y = Math.min(...tierNodes.map((node) => node.y)) - 28;
+      const height = Math.max(...tierNodes.map((node) => node.y + node.height)) - y + 28;
+      const kind: SketchTierBand['kind'] = tierNodes.some((node) => node.kind === 'shared')
+        ? 'shared'
+        : tierNodes.some((node) => node.kind === 'process')
+          ? 'process'
+          : 'controller';
+
+      return {
+        id: `tier-${tier}`,
+        label: this.describeSketchTier(kind, tier, tiers.length),
+        kind,
+        y,
+        height
+      };
+    });
+  }
+
+  private describeSketchTier(
+    kind: SketchTierBand['kind'],
+    tier: number,
+    totalTiers: number
+  ): string {
+    if (kind === 'shared') {
+      return 'Controller / controlled process';
+    }
+
+    if (kind === 'process') {
+      return totalTiers > 1 ? 'Controlled processes' : 'Controlled process';
+    }
+
+    return tier === 0 ? 'High-level controllers' : 'Supervisory controllers';
+  }
+
+  private wrapSketchLabel(label: string, maxLineLength: number, maxLines = 3): string[] {
+    const words = label.trim().split(/\s+/).filter((word) => word.length > 0);
+
+    if (words.length === 0) {
+      return [label];
+    }
+
+    const lines: string[] = [];
+    let currentLine = '';
+    let wordIndex = 0;
+
+    while (wordIndex < words.length) {
+      const word = words[wordIndex];
+      const candidate = currentLine ? `${currentLine} ${word}` : word;
+
+      if (candidate.length <= maxLineLength || !currentLine) {
+        currentLine = candidate;
+        wordIndex += 1;
+        continue;
+      }
+
+      lines.push(currentLine);
+      currentLine = '';
+
+      if (lines.length === maxLines - 1) {
+        break;
+      }
+    }
+
+    const remainingWords = currentLine
+      ? [currentLine, ...words.slice(wordIndex)]
+      : words.slice(wordIndex);
+    if (remainingWords.length > 0) {
+      let finalLine = remainingWords.join(' ');
+      if (finalLine.length > maxLineLength) {
+        finalLine = `${finalLine.slice(0, Math.max(0, maxLineLength - 3)).trimEnd()}...`;
+      }
+      lines.push(finalLine);
+    }
+
+    return lines.slice(0, maxLines);
   }
 
   private findNodeByName(
@@ -1792,6 +2877,7 @@ Rules:
 
   private buildSketchEdgeGeometries(nodes: SketchNode[], edges: SketchEdge[]): SketchEdgeGeometry[] {
     const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+    const samePathOffsetCount = new Map<string, number>();
 
     return edges
       .map((edge) => {
@@ -1802,32 +2888,58 @@ Rules:
           return null;
         }
 
-        const sourceCenterX = source.x + source.width / 2;
-        const sourceCenterY = source.y + source.height / 2;
-        const destinationCenterX = destination.x + destination.width / 2;
-        const destinationCenterY = destination.y + destination.height / 2;
+        const pairKey = `${edge.fromId}->${edge.toId}:${edge.kind}`;
+        const pairIndex = samePathOffsetCount.get(pairKey) ?? 0;
+        samePathOffsetCount.set(pairKey, pairIndex + 1);
 
-        let x1 = sourceCenterX;
-        let y1 = sourceCenterY;
-        let x2 = destinationCenterX;
-        let y2 = destinationCenterY;
+        const lateralOffset =
+          edge.kind === 'control' ? -26 - pairIndex * 10 : edge.kind === 'feedback' ? 26 + pairIndex * 10 : pairIndex * 12;
 
-        if (destinationCenterY > sourceCenterY + 6) {
-          y1 = source.y + source.height;
-          y2 = destination.y;
-        } else if (destinationCenterY < sourceCenterY - 6) {
-          y1 = source.y;
-          y2 = destination.y + destination.height;
-        } else if (destinationCenterX >= sourceCenterX) {
-          x1 = source.x + source.width;
-          x2 = destination.x;
+        const verticalRelation =
+          destination.y > source.y + source.height
+            ? 'down'
+            : destination.y + destination.height < source.y
+              ? 'up'
+              : 'same';
+
+        let path = '';
+        let labelX = 0;
+        let labelY = 0;
+
+        if (verticalRelation === 'down') {
+          const startX = source.x + source.width / 2 + lateralOffset;
+          const startY = source.y + source.height;
+          const endX = destination.x + destination.width / 2 + lateralOffset;
+          const endY = destination.y;
+          const midY = (startY + endY) / 2;
+
+          path = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+          labelX = startX === endX ? startX + 44 : (startX + endX) / 2;
+          labelY = midY - 10;
+        } else if (verticalRelation === 'up') {
+          const startX = source.x + source.width / 2 + lateralOffset;
+          const startY = source.y;
+          const endX = destination.x + destination.width / 2 + lateralOffset;
+          const endY = destination.y + destination.height;
+          const midY = (startY + endY) / 2;
+
+          path = `M ${startX} ${startY} L ${startX} ${midY} L ${endX} ${midY} L ${endX} ${endY}`;
+          labelX = startX === endX ? startX + 44 : (startX + endX) / 2;
+          labelY = midY - 12;
         } else {
-          x1 = source.x;
-          x2 = destination.x + destination.width;
-        }
+          const destinationIsRight = destination.x >= source.x;
+          const startX = destinationIsRight ? source.x + source.width : source.x;
+          const endX = destinationIsRight ? destination.x : destination.x + destination.width;
+          const startY = source.y + source.height / 2 + (edge.kind === 'feedback' ? -12 : 12);
+          const endY = destination.y + destination.height / 2 + (edge.kind === 'feedback' ? -12 : 12);
+          const direction = destinationIsRight ? 1 : -1;
+          const bendY = Math.min(startY, endY) - 36 - pairIndex * 14;
+          const entryOffset = 26 * direction;
 
-        const labelX = (x1 + x2) / 2;
-        const labelY = (y1 + y2) / 2 - 8;
+          path = `M ${startX} ${startY} L ${startX + entryOffset} ${startY} L ${startX + entryOffset} ${bendY} L ${endX - entryOffset} ${bendY} L ${endX - entryOffset} ${endY} L ${endX} ${endY}`;
+          labelX = (startX + endX) / 2;
+          labelY = bendY - 8;
+        }
 
         const marker =
           edge.kind === 'control'
@@ -1839,10 +2951,7 @@ Rules:
         return {
           id: edge.id,
           label: edge.label,
-          x1,
-          y1,
-          x2,
-          y2,
+          path,
           labelX,
           labelY,
           marker,

@@ -3,7 +3,7 @@
     <p class="step">Step 3</p>
     <div class="page__title-row">
       <h2>Define the STPA Control Structure</h2>
-      <button type="button" class="button button--ai" [disabled]="isGeneratingStepThreeAi()" (click)="generateStepThreeWithAi()" aria-label="Generate with AI">
+      <button type="button" class="button button--ai" [disabled]="isGeneratingStepThreeAi()" (click)="openStepThreeAiModal()" aria-label="Generate with AI">
         <span class="button__icon" aria-hidden="true">
           @if (isGeneratingStepThreeAi()) {
             <span class="button__spinner"></span>
@@ -334,7 +334,29 @@
   </section>
 
   <section class="card card--diagram">
-    <h3>Control structure sketch</h3>
+    <div class="diagram__header-row">
+      <h3>Control structure sketch</h3>
+      <div class="diagram__header-actions">
+        <button type="button" class="button button--secondary" (click)="updateSketchPreview()">Update sketch</button>
+        @if (isSketchPreviewActive()) {
+          <button type="button" class="button button--secondary" (click)="clearSketchPreview()">Reset preview</button>
+        }
+      </div>
+    </div>
+    <p class="diagram__intro">
+      The sketch follows the STPA control-structure conventions from the reference material: higher-authority controllers are placed above, controller/process hybrids stay in the middle of the hierarchy, controlled processes stay below, and feedback returns upward.
+    </p>
+    @if (sketchPreviewMessage()) {
+      <p class="diagram__preview-note">{{ sketchPreviewMessage() }}</p>
+    }
+    <div class="diagram__legend" aria-label="Control structure legend">
+      <span class="diagram__legend-item"><span class="diagram__swatch diagram__swatch--controller"></span> Controller</span>
+      <span class="diagram__legend-item"><span class="diagram__swatch diagram__swatch--shared"></span> Controller / controlled process</span>
+      <span class="diagram__legend-item"><span class="diagram__swatch diagram__swatch--process"></span> Controlled process</span>
+      <span class="diagram__legend-item"><span class="diagram__line diagram__line--control"></span> Control action</span>
+      <span class="diagram__legend-item"><span class="diagram__line diagram__line--feedback"></span> Feedback / sensing</span>
+      <span class="diagram__legend-item"><span class="diagram__line diagram__line--optional"></span> Other information</span>
+    </div>
     @if (hasSketchData()) {
       <div class="diagram">
         <svg
@@ -356,24 +378,24 @@
             </marker>
           </defs>
 
-          <g class="authority-axis">
-            <text x="70" y="46">High authority</text>
-            <rect x="75" y="60" width="46" height="370" rx="10" ry="10"></rect>
-            <polygon points="98,490 58,430 138,430"></polygon>
-            <text x="67" y="530">Low authority</text>
-            <text x="98" y="280" transform="rotate(-90 98 280)">Control, Authority</text>
-          </g>
+          @for (band of sketchTierBands(); track band.id) {
+            <g [attr.class]="'tier-band tier-band--' + band.kind">
+              <rect x="72" [attr.y]="band.y" [attr.width]="1088" [attr.height]="band.height" rx="18" ry="18"></rect>
+              <text class="tier-band__label" x="100" [attr.y]="band.y + 28">{{ band.label }}</text>
+            </g>
+          }
+
+          @if (sketchHasExternalContext()) {
+            <text class="tier-band__label tier-band__label--external" x="1035" y="70">External context / other inputs</text>
+          }
 
           @for (edge of sketchEdgeGeometries(); track edge.id) {
             <g>
-              <line
+              <path
                 [attr.class]="edge.cssClass"
-                [attr.x1]="edge.x1"
-                [attr.y1]="edge.y1"
-                [attr.x2]="edge.x2"
-                [attr.y2]="edge.y2"
+                [attr.d]="edge.path"
                 [attr.marker-end]="edge.marker"
-              ></line>
+              ></path>
               <text class="edge-label" [attr.x]="edge.labelX" [attr.y]="edge.labelY">{{ edge.label }}</text>
             </g>
           }
@@ -388,12 +410,17 @@
                 rx="10"
                 ry="10"
               ></rect>
+              @if (node.kind === 'shared') {
+                <text class="node-role-hint" [attr.x]="node.x + node.width / 2" [attr.y]="node.y + 18">Controller / Process</text>
+              }
               <text
                 class="node-label"
                 [attr.x]="node.x + node.width / 2"
-                [attr.y]="node.y + node.height / 2"
+                [attr.y]="node.y + node.height / 2 - ((node.lines.length - 1) * 9) + (node.kind === 'shared' ? 10 : 0)"
               >
-                {{ node.label.length > 32 ? (node.label | slice:0:32) + '...' : node.label }}
+                @for (line of node.lines; track line + '-' + $index) {
+                  <tspan [attr.x]="node.x + node.width / 2" [attr.dy]="$index === 0 ? 0 : 18">{{ line }}</tspan>
+                }
               </text>
             </g>
           }
@@ -405,7 +432,7 @@
       </p>
     }
     <p class="note">
-      Treat the sketch as the minimum viable control structure. Add optional structure elements only when they improve the later UCA and loss-scenario analysis.
+      Treat the sketch as the minimum viable hierarchical control structure: control actions flow downward, feedback flows upward, and optional elements should only be added when they materially improve the later UCA and loss-scenario analysis.
     </p>
   </section>
 
@@ -417,6 +444,148 @@
           <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
         </header>
         <img class="bpmn-model-image" src="/assets/control-structure-bpmn.png" alt="BPMN model for Step 3 control structure" />
+      </div>
+    </div>
+  }
+
+  @if (isStepThreeAiModalOpen()) {
+    <div class="modal-backdrop" (click)="closeStepThreeAiModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="step-three-ai-modal-title">
+        <header class="modal__header">
+          <h4 id="step-three-ai-modal-title">Generate Step 3 with AI</h4>
+          <button type="button" class="modal__close" [disabled]="isGeneratingStepThreeAi()" (click)="closeStepThreeAiModal()">×</button>
+        </header>
+
+        <form class="grid" [formGroup]="stepThreeAiConfigForm" (ngSubmit)="submitStepThreeAiRequest()">
+          <div class="field field--full">
+            <span>Controller source strategy</span>
+            <div class="checkbox-grid checkbox-grid--modal">
+              <label class="checkbox-card">
+                <input
+                  type="checkbox"
+                  [checked]="!!stepThreeAiConfigForm.controls.allowNewControllers.value"
+                  [disabled]="isGeneratingStepThreeAi()"
+                  (change)="setStepThreeAiControllerMode('allow-new', $any($event.target).checked)"
+                />
+                <div>
+                  <strong>Let the AI suggest new systemComponent controllers</strong>
+                  <small>New controllers may be proposed and then confirmed into Step 1.1.5 before Step 3 applies them.</small>
+                </div>
+              </label>
+
+              <label class="checkbox-card">
+                <input
+                  type="checkbox"
+                  [checked]="!!stepThreeAiConfigForm.controls.existingControllersOnly.value"
+                  [disabled]="isGeneratingStepThreeAi()"
+                  (change)="setStepThreeAiControllerMode('existing-only', $any($event.target).checked)"
+                />
+                <div>
+                  <strong>Use only controllers already returned by Step 1</strong>
+                  <small>Any AI row that depends on a controller outside Step 1.1.5 will be ignored.</small>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <label class="field">
+            <span>Minimum number of control actions to add</span>
+            <input type="number" min="1" formControlName="minControlActions" />
+          </label>
+
+          <label class="field">
+            <span>Maximum number of control actions to add</span>
+            <input type="number" min="1" formControlName="maxControlActions" />
+          </label>
+
+          <label class="field">
+            <span>Minimum number of optional elements to add</span>
+            <input type="number" min="0" formControlName="minOptionalElements" />
+          </label>
+
+          <label class="field">
+            <span>Maximum number of optional elements to add</span>
+            <input type="number" min="0" formControlName="maxOptionalElements" />
+          </label>
+
+          <label class="field field--full">
+            <span>Additional directives</span>
+            <textarea
+              rows="5"
+              formControlName="promptInstructions"
+              placeholder="Describe any extra constraints, preferred controller/process relationships, or domain-specific guidance for the Step 3 prompt."
+            ></textarea>
+          </label>
+
+          @if (stepThreeAiConfigError()) {
+            <div class="save-feedback save-feedback--error field--full">
+              {{ stepThreeAiConfigError() }}
+            </div>
+          }
+
+          <div class="ai-modal__actions field--full">
+            <button type="button" class="button button--secondary" [disabled]="isGeneratingStepThreeAi()" (click)="closeStepThreeAiModal()">
+              Cancel
+            </button>
+            <button type="submit" class="button button--ai" [disabled]="isGeneratingStepThreeAi()">
+              <span class="button__icon" aria-hidden="true">
+                @if (isGeneratingStepThreeAi()) {
+                  <span class="button__spinner"></span>
+                } @else {
+                  <span class="ai-robot-icon" aria-hidden="true"></span>
+                }
+              </span>
+              <span>{{ isGeneratingStepThreeAi() ? 'Running...' : 'Continue' }}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  @if (isControllerApprovalModalOpen()) {
+    <div class="modal-backdrop" (click)="closeControllerApprovalModal()">
+      <div class="modal modal--ai" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="step-three-controller-approval-title">
+        <header class="modal__header">
+          <h4 id="step-three-controller-approval-title">Add new Step 1.1.5 system components?</h4>
+          <button type="button" class="modal__close" [disabled]="isSavingPendingControllers()" (click)="closeControllerApprovalModal()">×</button>
+        </header>
+
+        <div class="modal__content">
+          <p class="modal__message">
+            The AI proposed controllers that are not defined in Step 1.1.5 System components. Select which ones should be added to Step 1 before their related Step 3 rows are applied.
+          </p>
+
+          <div class="controller-approval-list" role="group" aria-label="New system components proposed by AI">
+            @for (item of pendingControllerApprovalOptions(); track item.name) {
+              <label class="checkbox-card controller-approval-item">
+                <input
+                  type="checkbox"
+                  [checked]="item.selected"
+                  [disabled]="isSavingPendingControllers()"
+                  (change)="togglePendingController(item.name, $any($event.target).checked)"
+                />
+                <div>
+                  <strong>{{ item.name }}</strong>
+                  <small>Add this controller to Step 1.1.5 if selected.</small>
+                </div>
+              </label>
+            }
+          </div>
+
+          <p class="modal__message modal__message--muted">
+            Control actions or optional elements that depend on an unselected controller will be ignored. Existing Step 3 entities, control actions, and optional elements are preserved.
+          </p>
+        </div>
+
+        <div class="ai-modal__actions">
+          <button type="button" class="button button--secondary" [disabled]="isSavingPendingControllers()" (click)="closeControllerApprovalModal()">
+            Cancel
+          </button>
+          <button type="button" class="button" [disabled]="isSavingPendingControllers()" (click)="applyPendingControllerSelection()">
+            {{ isSavingPendingControllers() ? 'Updating Step 1...' : 'Apply selection' }}
+          </button>
+        </div>
       </div>
     </div>
   }

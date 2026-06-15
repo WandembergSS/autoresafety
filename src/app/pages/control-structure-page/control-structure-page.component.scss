@@ -180,6 +180,10 @@
   flex-direction: column;
 }
 
+.modal--ai {
+  width: min(720px, 100%);
+}
+
 .modal--bpmn {
   width: min(1000px, 100%);
 }
@@ -216,6 +220,40 @@
 
 .modal__close:hover {
   color: #0f172a;
+}
+
+.modal__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.modal__message {
+  margin: 0;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.modal__message--muted {
+  font-size: 0.92rem;
+}
+
+.ai-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.controller-approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.controller-approval-item {
+  align-items: flex-start;
 }
 
 .overview-strip {
@@ -627,69 +665,186 @@
 
 .card--diagram {
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  gap: 1rem;
+}
+
+.diagram__intro {
+  margin: 0;
+  color: #334155;
+  max-width: 78ch;
+}
+
+.diagram__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.diagram__header-actions {
+  display: inline-flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.diagram__preview-note {
+  margin: 0;
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.8rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.diagram__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.diagram__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.diagram__swatch {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0.35rem;
+  border: 2px solid #0f172a;
+  background: #ffffff;
+  flex: 0 0 auto;
+}
+
+.diagram__swatch--controller {
+  background: #f8fafc;
+}
+
+.diagram__swatch--shared {
+  background: #fef3c7;
+  border-style: dashed;
+  border-color: #b45309;
+}
+
+.diagram__swatch--process {
+  background: #eef2ff;
+  border-color: #334155;
+}
+
+.diagram__line {
+  width: 1.9rem;
+  height: 0;
+  border-top: 3px solid #0f172a;
+  flex: 0 0 auto;
+}
+
+.diagram__line--feedback {
+  border-top-color: #475569;
+  border-top-style: dashed;
+}
+
+.diagram__line--optional {
+  border-top-color: #0ea5e9;
+  border-top-style: dashed;
 }
 
 .diagram {
   overflow-x: auto;
   border: 1px solid #dbe3ee;
   border-radius: 1rem;
-  background: #ffffff;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
 }
 
 .diagram__svg {
   width: 100%;
-  min-width: 920px;
+  min-width: 1180px;
   height: auto;
   display: block;
 }
 
-.authority-axis text {
-  fill: #334155;
-  font-size: 22px;
-  font-weight: 600;
-  text-anchor: middle;
-}
-
-.authority-axis rect {
-  fill: #e2e8f0;
-  stroke: #94a3b8;
+.tier-band rect {
+  fill: rgba(255, 255, 255, 0.72);
+  stroke: #dbe3ee;
   stroke-width: 1.5;
+  stroke-dasharray: 10 8;
 }
 
-.authority-axis polygon {
-  fill: #cbd5e1;
+.tier-band--controller rect {
+  fill: rgba(248, 250, 252, 0.88);
+}
+
+.tier-band--shared rect {
+  fill: rgba(254, 243, 199, 0.42);
+  stroke: #f59e0b;
+}
+
+.tier-band--process rect {
+  fill: rgba(238, 242, 255, 0.44);
+  stroke: #94a3b8;
+}
+
+.tier-band__label {
+  fill: #334155;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tier-band__label--external {
+  fill: #0369a1;
 }
 
 .node rect {
   fill: #ffffff;
   stroke: #0f172a;
   stroke-width: 2.2;
+  filter: drop-shadow(0 12px 22px rgba(15, 23, 42, 0.12));
 }
 
 .node--controller rect {
   fill: #f8fafc;
 }
 
+.node--shared rect {
+  fill: #fffbeb;
+  stroke: #b45309;
+  stroke-dasharray: 8 5;
+}
+
 .node--process rect {
-  fill: #f8fafc;
+  fill: #eef2ff;
 }
 
 .node--external rect {
-  fill: #f0f9ff;
-  stroke: #0284c7;
+  fill: #ecfeff;
+  stroke: #0891b2;
 }
 
 .node-label {
   fill: #0f172a;
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   text-anchor: middle;
-  dominant-baseline: middle;
+}
+
+.node-role-hint {
+  fill: #92400e;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+  text-transform: uppercase;
 }
 
 .edge {
   fill: none;
   stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .edge--control {
@@ -711,9 +866,13 @@
 
 .edge-label {
   fill: #0f172a;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   text-anchor: middle;
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 7px;
+  stroke-linejoin: round;
 }
 
 .diagram__empty {
@@ -757,6 +916,6 @@
   }
 
   .diagram__svg {
-    min-width: 820px;
+    min-width: 1100px;
   }
 }
