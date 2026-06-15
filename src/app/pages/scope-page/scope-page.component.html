@@ -1,44 +1,39 @@
 <section class="page">
   <header class="page__header">
-    <p class="step">Step 1</p>
-    <div class="page__title-row">
-      <h2>Define the Scope of the Safety-Critical System</h2>
-      <button
-        type="button"
-        class="button button--ai button--with-info"
-        [disabled]="isStepOneAiRunning()"
-        (click)="generateStepOneWithAi()"
-        aria-label="Generate with AI"
-      >
-        <span class="button__icon" aria-hidden="true">
-          @if (isStepOneAiRunning()) {
-            <span class="button__spinner"></span>
-          } @else {
-            <span class="ai-robot-icon" aria-hidden="true"></span>
-          }
-        </span>
-        <span>{{ isStepOneAiRunning() ? 'Generating...' : 'Generate with AI' }}</span>
-        <span
-          class="button__info"
-          data-tooltip="AI will only help fill the fields in Step 1 (Define SCS Scope). The quality depends on the information already provided until now."
-          aria-label="AI fills only Step 1; quality depends on the information provided in this form."
+    <div class="page__header-copy">
+      <p class="step">Step 1</p>
+      <div class="page__title-row">
+        <h2>Define the Scope of the Safety-Critical System</h2>
+        <button
+          type="button"
+          class="button button--ai button--with-info"
+          [disabled]="isStepOneAiRunning()"
+          (click)="generateStepOneWithAi()"
+          aria-label="Generate with AI"
         >
-          i
-        </span>
-      </button>
+          <span class="button__icon" aria-hidden="true">
+            @if (isStepOneAiRunning()) {
+              <span class="button__spinner"></span>
+            } @else {
+              <span class="ai-robot-icon" aria-hidden="true"></span>
+            }
+          </span>
+          <span>{{ isStepOneAiRunning() ? 'Generating...' : 'Generate with AI' }}</span>
+          <span
+            class="button__info"
+            data-tooltip="AI will only help fill the fields in Step 1 (Define SCS Scope). The quality depends on the information already provided until now."
+            aria-label="AI fills only Step 1; quality depends on the information provided in this form."
+          >
+            i
+          </span>
+        </button>
+      </div>
+      <p class="page__subtitle">
+    Populate the ReSafety project rationale and project scope blocks. Establish the mission context, hazards, and
+        high-level constraints that guide the remaining RESafety analysis.
+      </p>
     </div>
-    <p class="page__subtitle">
-  Populate the ReSafety project rationale and project scope blocks. Establish the mission context, hazards, and
-      high-level constraints that guide the remaining RESafety analysis.
-    </p> 
-    <div class="bpmn-preview-inline">
-      <button
-        type="button"
-        class="button button--secondary"
-        (click)="openBpmnModelModal('Define the Scope of the Safety-Critical System', '/assets/scope-bpmn-model.jpg')"
-      >
-        BPMN model
-      </button>
+    <div class="bpmn-preview-inline bpmn-preview-inline--header">
       <button
         type="button"
         class="bpmn-preview-thumb"
@@ -47,6 +42,7 @@
       >
         <img src="/assets/scope-bpmn-model.jpg" alt="Small preview of the Step 1 BPMN model" />
       </button>
+      <span class="bpmn-preview-caption">Diagrama BPMN do step 1. Clique na imagem para mais detalhes do processo.</span>
     </div>
   </header>
 
@@ -184,7 +180,7 @@
                 [disabled]="!canEdit112()"
                 (change)="selectSystemDefinitionSource('manual')"
               />
-              <span>Use this objective</span>
+              <span>Use this System definition</span>
             </label>
           </div>
           <label class="field">
@@ -210,7 +206,7 @@
                 [disabled]="!canEdit112()"
                 (change)="selectSystemDefinitionSource('ai')"
               />
-              <span>Use this objective</span>
+              <span>Use this System definition</span>
             </label>
           </div>
           <label class="field field--ai-objective">
@@ -326,7 +322,7 @@
                 [disabled]="!canEdit114()"
                 (change)="selectSystemBoundarySource('manual')"
               />
-              <span>Use this objective</span>
+              <span>Use this System boundary</span>
             </label>
           </div>
           <label class="field">
@@ -352,7 +348,7 @@
                 [disabled]="!canEdit114()"
                 (change)="selectSystemBoundarySource('ai')"
               />
-              <span>Use this objective</span>
+              <span>Use this System boundary</span>
             </label>
           </div>
           <label class="field field--ai-objective">
@@ -694,6 +690,11 @@
           [src]="selectedBpmnModelImage()"
           alt="BPMN model of Step 1 scope definition"
         />
+        <div class="modal__actions">
+          <a class="button button--secondary" href="/#resafety-timeline" target="_blank" rel="noopener noreferrer">
+            More details
+          </a>
+        </div>
       </div>
     </div>
   }

@@ -37,6 +37,31 @@ button.button--ai,
 	line-height: 1;
 }
 
+.modal__actions {
+	display: flex;
+	justify-content: flex-start;
+	margin-top: 1rem;
+}
+
+.modal__actions .button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	text-decoration: none;
+}
+
+.bpmn-preview-inline--header {
+	flex-direction: column;
+	gap: 0.45rem;
+}
+
+.bpmn-preview-caption {
+	font-size: 0.78rem;
+	line-height: 1.2;
+	color: #64748b;
+	text-align: center;
+}
+
 .ai-robot-icon {
 	--ai-robot-size: 1.05rem;
 	position: relative;

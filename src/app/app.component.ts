@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   NavigationCancel,
@@ -34,6 +34,11 @@ export class AppComponent {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly isAuthenticated = this.authService.authState;
+  readonly isDashboardRoute = computed(() => this.isRootUrl(this.currentUrl()));
+  readonly isHelpRoute = computed(() => this.isHelpUrl(this.currentUrl()));
+  readonly showWorkflowNav = computed(
+    () => this.isAuthenticated() && !this.isDashboardRoute() && !this.isHelpRoute()
+  );
 
   readonly navSections = [
     {
@@ -108,6 +113,10 @@ export class AppComponent {
 
         if (event instanceof NavigationEnd) {
           this.currentUrl.set(event.urlAfterRedirects);
+
+          if (this.isDashboardRoute() || this.isHelpRoute()) {
+            this.closeNav();
+          }
         }
 
         if (!this.hasCompletedInitialNavigation()) {
@@ -125,5 +134,17 @@ export class AppComponent {
     this.authService.signOut();
     this.closeNav();
     this.router.navigate(['/login']);
+  }
+
+  private isRootUrl(url: string): boolean {
+    const primarySegments = this.router.parseUrl(url || '/').root.children['primary']?.segments ?? [];
+
+    return primarySegments.length === 0;
+  }
+
+  private isHelpUrl(url: string): boolean {
+    const primarySegments = this.router.parseUrl(url || '/').root.children['primary']?.segments ?? [];
+
+    return primarySegments.length > 0 && primarySegments[0]?.path === 'help';
   }
 }

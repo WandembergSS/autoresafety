@@ -1,81 +1,43 @@
-1. Reduncancia para validacao, tanto o app como o pistar validam as regras dos modelos para o step 2
-2. Modelos SD e SR devem obeder regras istar 2.0 and Istar4Safety
-3. Página com todos os artefatos organizados por steps onde se pode fazer o download em templates pre estabelecidos
-4. Deve manter menu original da ferramenta pistar4safety
-5. No step 2, os botoes para gerar elementos pra os diagramas com a ajuda da Ia, devem estar liberados se os requisitos para a adicao deles de acorcodo com o Istar4Safety forem atendidas, e quando estiverem bloqueados, app deve informar o motivo
-6. Não deve ser possivel salvar um modelo vazio, deve ter ao menos 1 actor
-8. numero do codigo do uca deve ser definido por usuario onde nao pode haver código repetido e sempre inicia por UCA - (fixo)
-9. No step 6 é permitido revisar todos os campos podendo marcar como revisado e tudo volta para pending quando projeto é reaberto
-10. 
+Requirements
+1. Add validation redundancy: both the app and piStar must validate model rules in Step 2.
+2. SD and SR models must follow iStar 2.0 and iStar4Safety rules.
+3. Provide a page with all artifacts organized by steps, with download options using pre-defined templates.
+4. Keep the original piStar4Safety menu.
+5. In Step 2, AI-assisted diagram element generation buttons must only be enabled when iStar4Safety conditions are satisfied. When disabled, the app must explain the reason.
+6. It must not be possible to save an empty model; at least one actor is required.
+7. The UCA code number must be defined by the user, must be unique, and must always start with the fixed prefix "UCA -".
+8. In Step 6, all fields can be reviewed and marked as reviewed; all statuses return to pending when the project is reopened.
 
+Dissertation Notes
+1. Include an appendix with full requirement documentation.
+2. Include non-functional requirements.
+3. In Chapter 4, keep only the tool name.
+4. Describe the role of the AI tool used during development.
+5. Mention section 3.2 (Alternative Uses of the RESafety Process): users may start from steps other than the first; consider this in the discussion.
+6. Discuss the database and data structure, including limitations, and mention complete integration across steps.
+7. Add elements to the presentation and show the added elements in the report.
+8. Use the Step 6 "review step" button implementation as an example to explain how AI is used in development.
+9. Discuss UX and mobile-inspired design choices, including the use of modals.
+10. Use the insulin pump example similarly to Moniky's template (not use case 5.1; only as an illustration).
+11. Define the evaluation instrument: review Ernesto's thesis tool and use his evaluation approach as a reference.
+12. Chapter 8 note: if you use a simple/low-cost AI model and request at least X elements, it will deliver X elements.
 
-update full endpoint chamado no step 6
+Moniky Support - Pending Items
+1. Note that users may already have analysis inputs ready (for example, a control structure), which could provide data for AI support in other steps. Do not mention this for now because of complexity.
+2. Consider a leaner AI-help form design. Evaluate whether a separate input for AI output is really necessary, since the current format is costly for the user. A single input may be more user-friendly.
+3. If needed, schedule with Moniky to continue the presentation, giving notice two weeks in advance if it happens before July.
+4. Explore bugs using defense case-state scenarios.
+5. Test with a new AI interaction. Check feasibility, or classify as future work, or ignore.
 
-remover acesso a steps diretamente na pagina home
-
-
-
-anexo com documentacao completa para requisitos
-requisitos nao funcionais
-capitulo 4 soment enome da ferrramenta
-papel da ferramenta de ia utilizada no desenvolivmento
-
-exemplo de uso bomba de insulina fazer mesmo que monick fez na templatee (nao caso de uso 5.,1 mais ilustracao)
-instrumento de avaliacao: olhar ferramenta do ernesto tese, e se basear na avaliacao da ferramenta que ele fez ernesto fonseca veiga sese secretses
-cap 8\
-
-
-
-
-
-
-1 identifique afirmaao 
-2 extraia suposicao oculta
-3. o que pode nao ser verdade -> formule hipotes econtraria
-
-
-
-Moniky
-1. alterar posição da imagem para direita e colocar legenda sobre bpmn. tirar botao
-2. Citar que pode ser possível usuário já possuir input da análise prontos, como por exemplo a estrutura de contra, e isso já poderia contribuir como dados para a IA ajduar em todos os outros (Não mencionar por conta da complexidade)
-3. 3.2 Alternative Uses of the RESafety Process - Preve começãr por steps diferentes do primeiro -> Levar em consideração
-4. 6-step ReSafety timeline do dashboard -> Deixar link de acesso fácil em todas as páginas, colocar bpmn`s nos modais e remover das telas despoluindo
-    4.1 - cards com resumos dos steps estão afastados e pequenos -> substituir setas por diagrama semalhante a apresentação inicial RESafety
-5. cabeçalho colocar meu nome na frente e trocar candidato por proponente
-6. Modal para limitar resultados e imput adicionais não está funcionando
-7. ˜Use this objective˜ repete em varios forms
-8. Talvez seja mais interessante para o usuário ter uma versao mais enxuta dos formularios, relativos a ajuda de IA. Realmente precisa ter o resultado da IA num input a parte. Porque da forma atual é muito custoso para o usuário. Um único input seria mais user friendly
-10. Se for necessário, marcar com moniky para continuar apresentação, avisando duas semanas antes caso seja antes de julho
-11. Deixar claro a aeficientcia dos botoes ia dependem do que foi preenchido até agora, semelhante ao que foi feito na pagina inicial de criaçao do projeto
-12. Página explicando como funciona a ferramenta ou um link de fácil acesso ao usuário -> Um help semelhante ao que foi implementado no pistar4safety
-13. Falar sobre a base e estrutura de dados e limitaçoes, e mencionar integracao entre completa entre os steps
-14. bugs diagrama
-15. menu para organizar butoes ia step 2
-ESTRUTURA DE CONTROLE COM MERMAID PARA STEP 3
-17. RELATORIOS FINAIS BEM FEITO É IMPORTANTE PARA A BANCA. SAIDA MAIS LEGIVEL ---- IMPORTANTE!!!!!!!!!!!!
-        ACRESCENTAR ELEMENTOS NA APRESENTACAO E MOSTRAR NO RELATORIO OS ELEMENTOS ADICIONADOS
-
-EXPLORAR BUGS USANDO ESTADO DE CASO DA DEFESA
-
-TESTAR COM NOVA INTERACAO COM IA - VERIFICAR POSSIBILIADE OU ESCREVER COMO TRABALHO FUTURO OU IGNORAR
+Future Work
+1. Improve the Step 4 implementation for HC modeling.
+2. Improve the data model to avoid repeated data.
+3. Improve Associated Safety Constraint (SC) support for responsibilities in Step 4.
+4. Mitigate Step 2 model preloading issues.
+5. Introduce specialized STPA and RESafety agents, since prompts cannot include unlimited context.
 
 
 
 
-melhorar implementacao em step 4 modelagem de HCs
 
-melhorar modelo de dados para nao haver dados repetidos
-melhorar Associated Safety Constraint (SC) para responsabilidaddes em step 4
-falar dissertacao sobre UX e inspiracao mobile com uso de modais
 
-dar o exemplo da implementacao do botao de reviewd step no step 6, para explicar como AI é usada no desenvolvimento
-
-mudar icone de robo que parece maça
-
-pagina para envio de sugestoes
-avaliacao ia no step 2
-mitigar pre carregamento modelo step 2
-
-trabalho futuro introduzir agentes especializados em stpa e resafety, porque nao é possivel enviar prompts de tamanho ilimitado com o contexto
-
-se voce usa um modelo simples e barato de IA e pede ao menos x elementos, ele vai lhe entregar x elementos

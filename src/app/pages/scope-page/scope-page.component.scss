@@ -5,9 +5,17 @@
 }
 
 .page__header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem 1.5rem;
+}
+
+.page__header-copy {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-width: 0;
 }
 
 .page__header h2 {
@@ -26,8 +34,8 @@
 .bpmn-preview-inline {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  align-self: flex-start;
+  justify-self: end;
+  align-self: start;
 }
 
 .bpmn-preview-thumb {
@@ -35,7 +43,7 @@
   border: 1px solid #bfdbfe;
   border-radius: 0.7rem;
   background: #ffffff;
-  width: clamp(280px, 28vw, 480px);
+  width: clamp(224px, 22.4vw, 384px);
   aspect-ratio: 16 / 9;
   overflow: hidden;
   display: inline-flex;
@@ -68,9 +76,19 @@
   margin-bottom: 0.1rem;
 }
 
+@media (max-width: 960px) {
+  .page__header {
+    grid-template-columns: 1fr;
+  }
+
+  .bpmn-preview-inline {
+    justify-self: start;
+  }
+}
+
 .page-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.75rem;
 }
 

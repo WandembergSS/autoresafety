@@ -1,24 +1,25 @@
 <section class="page-header">
-  <p class="step">Step 5</p>
-  <div class="page-header__title-row">
-    <h2>Analyze Loss Scenarios and Derive Safety Requirements</h2>
-    <button type="button" class="button button--ai" [disabled]="isGeneratingStepFiveAi()" (click)="openStepFiveAiModal()">
-      <span class="button__icon" aria-hidden="true">
-        @if (isGeneratingStepFiveAi()) {
-          <span class="button__spinner"></span>
-        } @else {
-          <span class="ai-robot-icon" aria-hidden="true"></span>
-        }
-      </span>
-      <span>{{ isGeneratingStepFiveAi() ? 'Generating...' : 'Generate with AI' }}</span>
-    </button>
+  <div class="page-header__main">
+    <p class="step">Step 5</p>
+    <div class="page-header__title-row">
+      <h2>Analyze Loss Scenarios and Derive Safety Requirements</h2>
+      <button type="button" class="button button--ai" [disabled]="isGeneratingStepFiveAi()" (click)="openStepFiveAiModal()">
+        <span class="button__icon" aria-hidden="true">
+          @if (isGeneratingStepFiveAi()) {
+            <span class="button__spinner"></span>
+          } @else {
+            <span class="ai-robot-icon" aria-hidden="true"></span>
+          }
+        </span>
+        <span>{{ isGeneratingStepFiveAi() ? 'Generating...' : 'Generate with AI' }}</span>
+      </button>
+    </div>
+    <p>
+      Complete the Step 5 traceability chain by recording the causal conditions behind each unsafe behavior and then
+      deriving explicit safety requirements that mitigate those scenarios.
+    </p>
   </div>
-  <p>
-    Complete the Step 5 traceability chain by recording the causal conditions behind each unsafe behavior and then
-    deriving explicit safety requirements that mitigate those scenarios.
-  </p>
-  <div class="bpmn-preview-inline">
-    <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+  <div class="bpmn-preview-inline bpmn-preview-inline--header">
     <button
       type="button"
       class="bpmn-preview-thumb"
@@ -27,6 +28,7 @@
     >
       <img src="/assets/step-5-bpmn.png" alt="Small preview of the Step 5 BPMN model" />
     </button>
+    <span class="bpmn-preview-caption">Diagrama BPMN do step 5. Clique na imagem para mais detalhes do processo.</span>
   </div>
 </section>
 
@@ -435,6 +437,11 @@
         <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
       </header>
       <img class="bpmn-model-image" src="/assets/step-5-bpmn.png" alt="BPMN model for Step 5 loss scenarios and safety requirements" />
+      <div class="modal__actions">
+        <a class="button button--secondary" href="/#resafety-timeline" target="_blank" rel="noopener noreferrer">
+          More details
+        </a>
+      </div>
     </div>
   </div>
 }

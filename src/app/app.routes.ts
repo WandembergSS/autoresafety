@@ -66,6 +66,12 @@ export const routes: Routes = [
 			)
 	},
 	{
+		path: 'help',
+		canActivate: [authGuard],
+		loadComponent: () =>
+			import('./pages/help-page/help-page.component').then((m) => m.HelpPageComponent)
+	},
+	{
 		path: '**',
 		redirectTo: '',
 		pathMatch: 'full'

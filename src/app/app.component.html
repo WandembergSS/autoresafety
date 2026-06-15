@@ -1,6 +1,6 @@
 <div class="shell">
   <header class="shell__header">
-    @if (isAuthenticated()) {
+    @if (showWorkflowNav()) {
       <button type="button" class="shell__menu" (click)="toggleNav()" aria-label="Toggle navigation">
         ☰
       </button>
@@ -12,16 +12,19 @@
       </a>
     </div>
     @if (isAuthenticated()) {
-      <button type="button" class="shell__logout" (click)="logout()">Logout</button>
+      <div class="shell__actions">
+        <a class="shell__help" routerLink="/help" aria-label="Open help and guide">Help</a>
+        <button type="button" class="shell__logout" (click)="logout()">Logout</button>
+      </div>
     }
   </header>
 
   <div
     class="shell__body"
-    [class.shell__body--no-nav]="!isAuthenticated()"
-    [class.shell__body--home]="isAuthenticated() && currentUrl() === '/'"
+    [class.shell__body--no-nav]="!showWorkflowNav()"
+    [class.shell__body--home]="isAuthenticated() && isDashboardRoute()"
   >
-    @if (isAuthenticated() && currentUrl() !== '/') {
+    @if (showWorkflowNav()) {
       <aside class="shell__nav" [class.shell__nav--open]="navOpen()">
         <nav>
           @for (section of navSections; track section.heading) {
@@ -72,17 +75,17 @@
         <p class="footer__label">Responsible technicians for the app</p>
         <ul>
           <li>
+            <strong>Wandemberg Silva dos Santos</strong>, Master's degree proponent<br />
+            Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
+            Recife-PE – Brasil
+          </li>
+          <li>
             <strong>Jaelson Freire Brelaz de Castro</strong> - PhD. in Computing<br />
             Imperial College of Science, Technology and Medicine<br />
             University of London - Reino Unido
           </li>
           <li>
             <strong>Sarah Moniky Silva Ribeiro</strong> - PhD.<br />
-            Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
-            Recife-PE – Brasil
-          </li>
-          <li>
-            <strong>Wandemberg Silva dos Santos</strong>, Master candidate<br />
             Centro de Informática da Universidade Federal de Pernambuco (CIn - UFPE)<br />
             Recife-PE – Brasil
           </li>
@@ -96,6 +99,11 @@
           <p>Av. Jornalista Aníbal Fernandes, s/n – Cidade Universitária.</p>
           <p>Recife-PE – Brasil</p>
           <p>CEP: 50.740-560</p>
+        </address>
+        <br />
+        <p class="footer__label">Developer contact</p>
+        <address class="footer__address">
+          <p>wss2&#64;cin.ufpe.br</p>
         </address>
       </div>
     </div>

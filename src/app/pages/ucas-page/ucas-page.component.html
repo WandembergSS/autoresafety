@@ -1,28 +1,29 @@
 <section class="page">
   <header class="page__header">
-    <p class="step">Step 4</p>
-    <div class="page__title-row">
-      <h2>Identify Unsafe Control Actions (UCAs)</h2>
-      <div class="page__header-actions">
-        <button type="button" class="button button--ai" [disabled]="isGeneratingStepFourAi()" (click)="openStepFourAiModal()" aria-label="Generate with AI">
-          <span class="button__icon" aria-hidden="true">
-            @if (isGeneratingStepFourAi()) {
-              <span class="button__spinner"></span>
-            } @else {
-              <span class="ai-robot-icon" aria-hidden="true"></span>
-            }
-          </span>
-          <span>{{ isGeneratingStepFourAi() ? 'Generating...' : 'Generate with AI' }}</span>
-        </button>
+    <div class="page__header-copy">
+      <p class="step">Step 4</p>
+      <div class="page__title-row">
+        <h2>Identify Unsafe Control Actions (UCAs)</h2>
+        <div class="page__header-actions">
+          <button type="button" class="button button--ai" [disabled]="isGeneratingStepFourAi()" (click)="openStepFourAiModal()" aria-label="Generate with AI">
+            <span class="button__icon" aria-hidden="true">
+              @if (isGeneratingStepFourAi()) {
+                <span class="button__spinner"></span>
+              } @else {
+                <span class="ai-robot-icon" aria-hidden="true"></span>
+              }
+            </span>
+            <span>{{ isGeneratingStepFourAi() ? 'Generating...' : 'Generate with AI' }}</span>
+          </button>
+        </div>
       </div>
+      <p>
+        Systematically evaluate each control action from the STPA control structure across the four unsafe contexts. The
+        goal of Step 4 is to turn a controller-action pair into a traceable UCA statement that clearly names the hazard,
+        the unsafe context, the originating responsibility, and the safety constraint that governs it.
+      </p>
     </div>
-    <p>
-      Systematically evaluate each control action from the STPA control structure across the four unsafe contexts. The
-      goal of Step 4 is to turn a controller-action pair into a traceable UCA statement that clearly names the hazard,
-      the unsafe context, the originating responsibility, and the safety constraint that governs it.
-    </p>
-    <div class="bpmn-preview-inline">
-      <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+    <div class="bpmn-preview-inline bpmn-preview-inline--header">
       <button
         type="button"
         class="bpmn-preview-thumb"
@@ -31,6 +32,7 @@
       >
         <img src="/assets/ucas-bpmn.png" alt="Small preview of the Step 4 BPMN model" />
       </button>
+      <span class="bpmn-preview-caption">Diagrama BPMN do step 4. Clique na imagem para mais detalhes do processo.</span>
     </div>
   </header>
 
@@ -364,6 +366,11 @@
           <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
         </header>
         <img class="bpmn-model-image" src="/assets/ucas-bpmn.png" alt="BPMN model for Step 4 unsafe control actions" />
+        <div class="modal__actions">
+          <a class="button button--secondary" href="/#resafety-timeline" target="_blank" rel="noopener noreferrer">
+            More details
+          </a>
+        </div>
       </div>
     </div>
   }

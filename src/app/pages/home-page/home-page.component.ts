@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Project } from '../../models/project.model';
 import { ProjectService } from '../../services/project.service';
@@ -37,6 +37,7 @@ interface TimelineInfo {
 })
 export class HomePageComponent {
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly destroyRef = inject(DestroyRef);
@@ -1760,6 +1761,11 @@ export class HomePageComponent {
 
   constructor() {
     this.refreshOpenProjects();
+    this.route.fragment.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((fragment) => {
+      if (fragment === 'resafety-timeline') {
+        this.scrollToTimelineSection();
+      }
+    });
   }
 
   readonly pendingProjects = computed(() =>
@@ -1796,6 +1802,18 @@ export class HomePageComponent {
 
   closeBpmnModelModal(): void {
     this.isBpmnModelModalOpen.set(false);
+  }
+
+  private scrollToTimelineSection(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.getElementById('resafety-timeline')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   }
 
   closeTimelineModal(): void {

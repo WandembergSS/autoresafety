@@ -126,6 +126,23 @@
   align-items: center;
 }
 
+.timeline-diagram--circular {
+  position: relative;
+  display: block;
+  width: min(100%, 660px);
+  margin: 1.5rem auto 0.5rem;
+  aspect-ratio: 1 / 1;
+}
+
+.timeline-circle-arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .timeline-step {
   display: flex;
   gap: 0.75rem;
@@ -143,6 +160,64 @@
   border-color: #93c5fd;
   box-shadow: 0 12px 24px -18px rgba(37, 99, 235, 0.6);
   transform: translateY(-2px);
+}
+
+.timeline-diagram--circular .timeline-step {
+  position: absolute;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  width: 31%;
+  min-width: 132px;
+  max-width: 188px;
+  padding: 0.75rem 0.85rem;
+  text-align: center;
+  background: #ffffff;
+  box-shadow: 0 12px 30px -22px rgba(15, 23, 42, 0.45);
+  transform: translate(-50%, -50%);
+  z-index: 1;
+}
+
+.timeline-diagram--circular .timeline-step:hover {
+  transform: translate(-50%, -50%) translateY(-3px);
+}
+
+.timeline-diagram--circular .timeline-step p {
+  display: none;
+}
+
+.timeline-diagram--circular .timeline-step h4 {
+  font-size: 0.9rem;
+}
+
+.timeline-diagram--circular .timeline-step[data-step="1"] {
+  top: 9%;
+  left: 50%;
+}
+
+.timeline-diagram--circular .timeline-step[data-step="2"] {
+  top: 31%;
+  left: 84%;
+}
+
+.timeline-diagram--circular .timeline-step[data-step="3"] {
+  top: 69%;
+  left: 84%;
+}
+
+.timeline-diagram--circular .timeline-step[data-step="4"] {
+  top: 91%;
+  left: 50%;
+}
+
+.timeline-diagram--circular .timeline-step[data-step="5"] {
+  top: 69%;
+  left: 16%;
+}
+
+.timeline-diagram--circular .timeline-step[data-step="6"] {
+  top: 31%;
+  left: 16%;
 }
 
 .timeline-step__index {
@@ -168,12 +243,6 @@
   margin: 0;
   color: #475569;
   font-size: 0.9rem;
-}
-
-.timeline-arrow {
-  font-size: 1.35rem;
-  color: #94a3b8;
-  justify-self: center;
 }
 
 .timeline-extras {
@@ -322,8 +391,35 @@
     grid-template-columns: 1fr;
   }
 
-  .timeline-arrow {
+  .timeline-diagram--circular {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    margin: 1rem 0 0;
+    aspect-ratio: auto;
+  }
+
+  .timeline-circle-arrow {
     display: none;
+  }
+
+  .timeline-diagram--circular .timeline-step {
+    position: static;
+    transform: none;
+    flex-direction: row;
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+    max-width: none;
+  }
+
+  .timeline-diagram--circular .timeline-step:hover {
+    transform: translateY(-2px);
+  }
+
+  .timeline-diagram--circular .timeline-step p {
+    display: block;
   }
 
   .bpmn-preview-inline {

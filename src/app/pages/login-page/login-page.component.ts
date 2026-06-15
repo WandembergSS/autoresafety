@@ -25,8 +25,7 @@ export class LoginPageComponent {
 
   readonly loginForm = this.fb.group({
     username: ['', [Validators.required]],
-    password: ['', [Validators.required, Validators.minLength(6)]],
-    remember: [true]
+    password: ['', [Validators.required, Validators.minLength(6)]]
   });
 
   signIn(): void {
@@ -35,13 +34,13 @@ export class LoginPageComponent {
       return;
     }
 
-    const { username, password, remember } = this.loginForm.getRawValue();
+    const { username, password } = this.loginForm.getRawValue();
 
     this.errorMessage.set(null);
     this.status.set('submitting');
 
     this.authService
-      .signIn(username ?? '', password ?? '', remember ?? true)
+      .signIn(username ?? '', password ?? '', true)
       .then(() => {
         this.status.set('success');
         const redirectTo = this.route.snapshot.queryParamMap.get('redirectTo') ?? '/';

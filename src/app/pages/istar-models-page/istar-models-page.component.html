@@ -1,31 +1,32 @@
 <section class="page">
   <header class="page__header">
-    <p class="step">Step 2</p>
-    <div class="page__title-row">
-      <h2>Define the iStar4Safety Models</h2>
-      <button
-        type="button"
-        class="button button--ai"
-        [disabled]="isAnyStepTwoAiActionRunning()"
-        (click)="generateStepTwoWithAi()"
-        aria-label="Generate with AI"
-      >
-        <span class="button__icon" aria-hidden="true">
-          @if (isGeneratingStepTwoAi()) {
-            <span class="button__spinner"></span>
-          } @else {
-            <span class="ai-robot-icon" aria-hidden="true"></span>
-          }
-        </span>
-        <span>{{ isGeneratingStepTwoAi() ? 'Generating...' : 'Generate with AI' }}</span>
-      </button>
+    <div class="page__header-copy">
+      <p class="step">Step 2</p>
+      <div class="page__title-row">
+        <h2>Define the iStar4Safety Models</h2>
+        <button
+          type="button"
+          class="button button--ai"
+          [disabled]="isAnyStepTwoAiActionRunning()"
+          (click)="generateStepTwoWithAi()"
+          aria-label="Generate with AI"
+        >
+          <span class="button__icon" aria-hidden="true">
+            @if (isGeneratingStepTwoAi()) {
+              <span class="button__spinner"></span>
+            } @else {
+              <span class="ai-robot-icon" aria-hidden="true"></span>
+            }
+          </span>
+          <span>{{ isGeneratingStepTwoAi() ? 'Generating...' : 'Generate with AI' }}</span>
+        </button>
+      </div>
+      <p class="page__subtitle">
+        Use the five structured stages below to build your iStar4Safety SD and SR models.
+        Start with SD model actors, then proceed through SR model intentional elements and relationships, and complete social dependencies.
+      </p>
     </div>
-    <p class="page__subtitle">
-      Use the five structured stages below to build your iStar4Safety SD and SR models.
-      Start with SD model actors, then proceed through SR model intentional elements and relationships, and complete social dependencies.
-    </p>
-    <div class="bpmn-preview-inline">
-      <button type="button" class="button button--secondary" (click)="openBpmnModelModal()">BPMN model</button>
+    <div class="bpmn-preview-inline bpmn-preview-inline--header">
       <button
         type="button"
         class="bpmn-preview-thumb"
@@ -34,6 +35,7 @@
       >
         <img src="/assets/istar-models-bpmn.jpg" alt="Small preview of the Step 2 BPMN model" />
       </button>
+      <span class="bpmn-preview-caption">Diagrama BPMN do step 2. Clique na imagem para mais detalhes do processo.</span>
     </div>
   </header>
 
@@ -584,6 +586,11 @@
           <button type="button" class="modal__close" (click)="closeBpmnModelModal()">×</button>
         </header>
         <img class="bpmn-model-image" src="/assets/istar-models-bpmn.jpg" alt="BPMN model for iStar4Safety models" />
+        <div class="modal__actions">
+          <a class="button button--secondary" href="/#resafety-timeline" target="_blank" rel="noopener noreferrer">
+            More details
+          </a>
+        </div>
       </div>
     </div>
   }

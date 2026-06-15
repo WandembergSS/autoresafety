@@ -7,6 +7,20 @@ section {
   margin-block-end: 1.75rem;
 }
 
+.page-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem 1.5rem;
+}
+
+.page-header__main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
 .page-header h2,
 .card__heading h3,
 .guardrail-card h3 {
@@ -23,8 +37,8 @@ section {
 .bpmn-preview-inline {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  align-self: flex-start;
+  justify-self: end;
+  align-self: start;
 }
 
 .bpmn-preview-thumb {
@@ -32,7 +46,7 @@ section {
   border: 1px solid #bfdbfe;
   border-radius: 0.7rem;
   background: #ffffff;
-  width: clamp(280px, 28vw, 480px);
+  width: clamp(224px, 22.4vw, 384px);
   aspect-ratio: 26 / 9;
   overflow: hidden;
   display: inline-flex;
@@ -60,9 +74,24 @@ section {
   color: #475569;
 }
 
+.page-header__main > .step,
+.page-header__main > p {
+  margin: 0;
+}
+
+@media (max-width: 960px) {
+  .page-header {
+    grid-template-columns: 1fr;
+  }
+
+  .bpmn-preview-inline {
+    justify-self: start;
+  }
+}
+
 .page-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 0.75rem;
 }
 

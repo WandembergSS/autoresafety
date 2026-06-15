@@ -154,25 +154,32 @@
     </div>
   </div>
 
-  <section class="card card--summary">
+  <section id="resafety-timeline" class="card card--summary">
     <h3>6-step ReSafety timeline</h3>
     <p class="timeline__intro">
       The RESafety framework is an iterative and incremental process designed to model safety requirements and
       generate safety analysis artifacts by integrating System-Theoretic Process Analysis (STPA) with the iStar4Safety
       language. The process consists of seven main steps, several of which contain detailed substeps and workflows.
     </p>
-    <div class="timeline-diagram" aria-label="6-step ReSafety timeline diagram">
-      @for (step of timelineSteps; track step.id; let idx = $index) {
-        <button type="button" class="timeline-step" (click)="openTimelineStep(step)">
+    <div class="timeline-diagram timeline-diagram--circular" aria-label="6-step ReSafety timeline diagram">
+      <svg class="timeline-circle-arrow" viewBox="0 0 200 200" aria-hidden="true" focusable="false">
+        <defs>
+          <marker id="timeline-arrowhead" markerWidth="5" markerHeight="5" refX="2.6" refY="2.5"
+                  orient="auto" markerUnits="strokeWidth">
+            <path d="M0 0 L5 2.5 L0 5 Z" fill="#cbd2dc" />
+          </marker>
+        </defs>
+        <path d="M100 18 A82 82 0 1 1 86 18.9" fill="none" stroke="#cbd2dc"
+              stroke-width="10" stroke-linecap="round" marker-end="url(#timeline-arrowhead)" />
+      </svg>
+      @for (step of timelineSteps; track step.id) {
+        <button type="button" class="timeline-step" [attr.data-step]="step.id" (click)="openTimelineStep(step)">
           <span class="timeline-step__index">{{ step.id }}</span>
           <div>
             <h4>{{ step.title }}</h4>
             <p>{{ step.description }}</p>
           </div>
         </button>
-        @if (idx < timelineSteps.length - 1) {
-          <span class="timeline-arrow" aria-hidden="true">→</span>
-        }
       }
     </div>
     <div class="timeline-extras">
